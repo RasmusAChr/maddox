@@ -22,7 +22,12 @@ function buildCellDom() {
 
   const runBtn = document.createElement("button");
   runBtn.className = "run-btn";
-  runBtn.textContent = "Run";
+  runBtn.title = "Run cell (Ctrl+Enter)";
+  runBtn.setAttribute("aria-label", "Run cell");
+  runBtn.innerHTML =
+    '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' +
+    '<path d="M7 4.5v15l12-7.5z" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.8" stroke-linejoin="round"/></svg>';
   actions.appendChild(runBtn);
 
   return { wrapper, main, inputArea, outputDiv, runBtn };
@@ -121,7 +126,10 @@ function createCellElement(cell, index) {
 function createPhantomCell() {
   const { wrapper, main, inputArea, runBtn } = buildCellDom();
   wrapper.classList.add("phantom");
-  runBtn.onclick = () => {};
+  runBtn.onclick = () => {
+    const promoted = promotePhantom();
+    if (promoted !== null) runCell(promoted);
+  };
 
   const placeholder = document.createElement("span");
   placeholder.className = "cell-placeholder";
