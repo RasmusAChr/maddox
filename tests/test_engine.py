@@ -60,3 +60,10 @@ def test_reset_clears_the_namespace():
     result = engine.evaluate("a")
     assert result["error"] is None
     assert result["output_latex"] == "a"
+
+
+def test_unbalanced_brackets_produce_error_not_a_crash():
+    engine = Engine()
+    result = engine.evaluate("))")
+    assert result["output_latex"] is None
+    assert result["error"] is not None

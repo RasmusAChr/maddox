@@ -31,7 +31,7 @@ class Engine:
     def evaluate(self, cell_text):
         try:
             node = classify(cell_text)
-        except ValueError as e:
+        except Exception as e:
             return {"output_latex": None, "error": str(e)}
 
         expr_text = node.expr_text if isinstance(node, Assignment) else node.text
