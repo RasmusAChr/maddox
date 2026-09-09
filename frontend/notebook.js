@@ -5,6 +5,8 @@ let activeEditor = null;
 const TEMPLATES = [
   { category: "Assign", items: [
     { label: "Assign variable", snippet: "x := |" },
+    { label: "Clear variable", snippet: "clear(|)" },
+    { label: "Clear all variables", snippet: "clear()" },
   ]},
   { category: "Algebra", items: [
     { label: "Solve equation", snippet: "solve(| = 0, x)" },
