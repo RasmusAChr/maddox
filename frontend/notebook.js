@@ -1,22 +1,37 @@
 let cellEditors = [];
 
-function createCellElement(cell, index) {
+function buildCellDom() {
   const wrapper = document.createElement("div");
   wrapper.className = "cell";
-  wrapper.dataset.index = index;
+
+  const main = document.createElement("div");
+  main.className = "cell-main";
+  wrapper.appendChild(main);
 
   const inputArea = document.createElement("textarea");
-  inputArea.value = cell.input || "";
-  wrapper.appendChild(inputArea);
-
-  const runBtn = document.createElement("button");
-  runBtn.textContent = "Run";
-  runBtn.onclick = () => runCell(index);
-  wrapper.appendChild(runBtn);
+  main.appendChild(inputArea);
 
   const outputDiv = document.createElement("div");
   outputDiv.className = "output";
-  wrapper.appendChild(outputDiv);
+  main.appendChild(outputDiv);
+
+  const actions = document.createElement("div");
+  actions.className = "cell-actions";
+  wrapper.appendChild(actions);
+
+  const runBtn = document.createElement("button");
+  runBtn.className = "run-btn";
+  runBtn.textContent = "Run";
+  actions.appendChild(runBtn);
+
+  return { wrapper, main, inputArea, outputDiv, runBtn };
+}
+
+function createCellElement(cell, index) {
+  const { wrapper, inputArea, outputDiv, runBtn } = buildCellDom();
+  wrapper.dataset.index = index;
+  inputArea.value = cell.input || "";
+  runBtn.onclick = () => runCell(index);
 
   document.getElementById("cells").appendChild(wrapper);
 
@@ -24,10 +39,46 @@ function createCellElement(cell, index) {
     mode: "text/x-python",
     lineNumbers: false,
     viewportMargin: Infinity,
+    extraKeys: { "Ctrl-Enter": () => runCell(index) },
   });
   cellEditors[index] = editor;
 
   renderOutput(outputDiv, cell);
+  return wrapper;
+}
+
+function createPhantomCell() {
+  const { wrapper, main, inputArea, runBtn } = buildCellDom();
+  wrapper.classList.add("phantom");
+  runBtn.onclick = () => {};
+
+  const placeholder = document.createElement("span");
+  placeholder.className = "cell-placeholder";
+  placeholder.textContent = "Type to start a new cell…";
+  main.appendChild(placeholder);
+
+  document.getElementById("cells").appendChild(wrapper);
+
+  const editor = CodeMirror.fromTextArea(inputArea, {
+    mode: "text/x-python",
+    lineNumbers: false,
+    viewportMargin: Infinity,
+    extraKeys: { "Ctrl-Enter": () => {} },
+  });
+
+  function promote() {
+    editor.off("change", promote);
+    const index = cellEditors.length;
+    wrapper.classList.remove("phantom");
+    wrapper.dataset.index = index;
+    placeholder.remove();
+    cellEditors[index] = editor;
+    editor.setOption("extraKeys", { "Ctrl-Enter": () => runCell(index) });
+    runBtn.onclick = () => runCell(index);
+    createPhantomCell();
+  }
+  editor.on("change", promote);
+
   return wrapper;
 }
 
@@ -49,20 +100,20 @@ async function runCell(index) {
   renderOutput(wrapper.querySelector(".output"), cell);
 }
 
-function addCell() {
-  const index = cellEditors.length;
-  createCellElement({ input: "", output_latex: null, error: null }, index);
-}
-
 function clearCells() {
   document.getElementById("cells").innerHTML = "";
   cellEditors = [];
 }
 
+function renderCells(cells) {
+  clearCells();
+  cells.forEach((cell, i) => createCellElement(cell, i));
+  createPhantomCell();
+}
+
 async function newNotebook() {
   await window.pywebview.api.new_notebook();
-  clearCells();
-  addCell();
+  renderCells([]);
 }
 
 async function openNotebook() {
@@ -71,9 +122,7 @@ async function openNotebook() {
     setStatus(`Error: ${result.error}`);
     return;
   }
-  clearCells();
-  result.cells.forEach((cell, i) => createCellElement(cell, i));
-  if (result.cells.length === 0) addCell();
+  renderCells(result.cells);
   setStatus(`Opened ${result.path}`);
 }
 
@@ -106,6 +155,11 @@ window.addEventListener("pywebviewready", () => {
   document.getElementById("open-btn").onclick = openNotebook;
   document.getElementById("save-btn").onclick = saveNotebook;
   document.getElementById("run-all-btn").onclick = runAll;
-  document.getElementById("add-cell-btn").onclick = addCell;
-  addCell();
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === "Enter") {
+      e.preventDefault();
+      runAll();
+    }
+  });
+  renderCells([]);
 });
