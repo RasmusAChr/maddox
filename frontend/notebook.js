@@ -35,7 +35,12 @@ function makeExtraKeys(getIndex) {
   return {
     "Ctrl-Enter": () => {
       const i = getIndex();
-      if (i < cellEditors.length) runCell(i);
+      if (i < cellEditors.length) {
+        runCell(i);
+      } else if (i === cellEditors.length) {
+        const promoted = promotePhantom();
+        if (promoted !== null) runCell(promoted);
+      }
     },
     "Enter": () => {
       moveToNextCell(getIndex());
@@ -64,13 +69,22 @@ function focusEditor(editor, pos) {
 }
 
 function moveToNextCell(index) {
+  if (index === cellEditors.length) {
+    // We're in the phantom cell — Enter here promotes it (if it has
+    // content) into a real cell, then moves into the freshly created
+    // phantom that follows it. An empty phantom has nothing to commit.
+    const promotedIndex = promotePhantom();
+    if (promotedIndex !== null) {
+      focusEditor(phantomEditor, { line: 0, ch: 0 });
+    }
+    return;
+  }
   const nextIndex = index + 1;
   if (nextIndex < cellEditors.length) {
     focusEditor(cellEditors[nextIndex], { line: 0, ch: 0 });
-  } else if (phantomEditor && index < cellEditors.length) {
+  } else if (phantomEditor) {
     focusEditor(phantomEditor, { line: 0, ch: 0 });
   }
-  // Otherwise index is already the phantom (or beyond) — nothing to move to.
 }
 
 function moveToPrevCell(index) {
@@ -94,6 +108,7 @@ function createCellElement(cell, index) {
     mode: "text/x-python",
     lineNumbers: false,
     viewportMargin: Infinity,
+    scrollbarStyle: "null",
     extraKeys: makeExtraKeys(() => index),
   });
   cellEditors[index] = editor;
@@ -118,24 +133,40 @@ function createPhantomCell() {
     mode: "text/x-python",
     lineNumbers: false,
     viewportMargin: Infinity,
+    scrollbarStyle: "null",
     extraKeys: makeExtraKeys(() => cellEditors.length),
   });
   phantomEditor = editor;
 
-  function promote() {
-    editor.off("change", promote);
-    const index = cellEditors.length;
-    wrapper.classList.remove("phantom");
-    wrapper.dataset.index = index;
-    placeholder.remove();
-    cellEditors[index] = editor;
-    editor.setOption("extraKeys", makeExtraKeys(() => index));
-    runBtn.onclick = () => runCell(index);
-    createPhantomCell();
-  }
-  editor.on("change", promote);
+  // Typing alone does not create a cell — only committing via Enter or
+  // Ctrl-Enter (see promotePhantom) does. This just keeps the "type to
+  // start a new cell" placeholder in sync with whether there's a draft.
+  editor.on("change", () => {
+    placeholder.hidden = editor.getValue().length > 0;
+  });
 
+  wrapper._placeholder = placeholder;
+  wrapper._runBtn = runBtn;
   return wrapper;
+}
+
+// Turns the current phantom cell into a real cell, if it has any content.
+// Returns the new cell's index, or null if there was nothing to promote.
+function promotePhantom() {
+  if (!phantomEditor || !phantomEditor.getValue().trim()) return null;
+  const editor = phantomEditor;
+  const wrapper = editor.getWrapperElement().closest(".cell");
+  const index = cellEditors.length;
+
+  wrapper.classList.remove("phantom");
+  wrapper.dataset.index = index;
+  wrapper._placeholder.remove();
+  cellEditors[index] = editor;
+  editor.setOption("extraKeys", makeExtraKeys(() => index));
+  wrapper._runBtn.onclick = () => runCell(index);
+
+  createPhantomCell();
+  return index;
 }
 
 function renderOutput(outputDiv, cell) {

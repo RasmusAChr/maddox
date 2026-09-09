@@ -60,6 +60,7 @@ body {
 .CodeMirror {
   border: 1px solid #eee;
   height: auto;
+  padding: 0.35rem 0.5rem;
 }
 
 .CodeMirror-scroll {
@@ -71,6 +72,10 @@ body {
   margin-top: 0.5rem;
   padding: 0.25rem 0.5rem;
   min-height: 1.5rem;
+}
+
+.output:empty {
+  display: none;
 }
 
 .output.error {
