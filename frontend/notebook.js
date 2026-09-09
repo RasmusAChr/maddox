@@ -1,4 +1,5 @@
 let cellEditors = [];
+let phantomEditor = null;
 
 function buildCellDom() {
   const wrapper = document.createElement("div");
@@ -27,6 +28,60 @@ function buildCellDom() {
   return { wrapper, main, inputArea, outputDiv, runBtn };
 }
 
+// getIndex() returns this editor's current cell index — a fixed number for
+// a real cell, or cellEditors.length (its prospective index) for the
+// not-yet-promoted phantom cell.
+function makeExtraKeys(getIndex) {
+  return {
+    "Ctrl-Enter": () => {
+      const i = getIndex();
+      if (i < cellEditors.length) runCell(i);
+    },
+    "Enter": () => {
+      moveToNextCell(getIndex());
+    },
+    "Shift-Enter": "newlineAndIndent",
+    "Up": function (cm) {
+      if (cm.getCursor().line === 0) {
+        moveToPrevCell(getIndex());
+      } else {
+        return CodeMirror.Pass;
+      }
+    },
+    "Down": function (cm) {
+      if (cm.getCursor().line === cm.lastLine()) {
+        moveToNextCell(getIndex());
+      } else {
+        return CodeMirror.Pass;
+      }
+    },
+  };
+}
+
+function focusEditor(editor, pos) {
+  editor.focus();
+  editor.setCursor(pos);
+}
+
+function moveToNextCell(index) {
+  const nextIndex = index + 1;
+  if (nextIndex < cellEditors.length) {
+    focusEditor(cellEditors[nextIndex], { line: 0, ch: 0 });
+  } else if (phantomEditor && index < cellEditors.length) {
+    focusEditor(phantomEditor, { line: 0, ch: 0 });
+  }
+  // Otherwise index is already the phantom (or beyond) — nothing to move to.
+}
+
+function moveToPrevCell(index) {
+  if (index > 0) {
+    const prev = cellEditors[index - 1];
+    const lastLine = prev.lastLine();
+    focusEditor(prev, { line: lastLine, ch: prev.getLine(lastLine).length });
+  }
+  // index === 0 — this is the first cell, nothing above it.
+}
+
 function createCellElement(cell, index) {
   const { wrapper, inputArea, outputDiv, runBtn } = buildCellDom();
   wrapper.dataset.index = index;
@@ -39,7 +94,7 @@ function createCellElement(cell, index) {
     mode: "text/x-python",
     lineNumbers: false,
     viewportMargin: Infinity,
-    extraKeys: { "Ctrl-Enter": () => runCell(index) },
+    extraKeys: makeExtraKeys(() => index),
   });
   cellEditors[index] = editor;
 
@@ -63,8 +118,9 @@ function createPhantomCell() {
     mode: "text/x-python",
     lineNumbers: false,
     viewportMargin: Infinity,
-    extraKeys: { "Ctrl-Enter": () => {} },
+    extraKeys: makeExtraKeys(() => cellEditors.length),
   });
+  phantomEditor = editor;
 
   function promote() {
     editor.off("change", promote);
@@ -73,7 +129,7 @@ function createPhantomCell() {
     wrapper.dataset.index = index;
     placeholder.remove();
     cellEditors[index] = editor;
-    editor.setOption("extraKeys", { "Ctrl-Enter": () => runCell(index) });
+    editor.setOption("extraKeys", makeExtraKeys(() => index));
     runBtn.onclick = () => runCell(index);
     createPhantomCell();
   }
@@ -103,6 +159,7 @@ async function runCell(index) {
 function clearCells() {
   document.getElementById("cells").innerHTML = "";
   cellEditors = [];
+  phantomEditor = null;
 }
 
 function renderCells(cells) {
