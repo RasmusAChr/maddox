@@ -1,5 +1,38 @@
 let cellEditors = [];
 let phantomEditor = null;
+let activeEditor = null;
+
+// Snippets use "|" to mark where the cursor lands after insertion.
+const TEMPLATES = [
+  { category: "Assign", items: [
+    { label: "Assign variable", snippet: "x := |" },
+  ]},
+  { category: "Algebra", items: [
+    { label: "Solve equation", snippet: "solve(| = 0, x)" },
+    { label: "Simplify", snippet: "simplify(|)" },
+    { label: "Expand", snippet: "expand(|)" },
+    { label: "Factor", snippet: "factor(|)" },
+    { label: "Substitute", snippet: "(|).subs(x, 2)" },
+  ]},
+  { category: "Calculus", items: [
+    { label: "Derivative", snippet: "diff(|, x)" },
+    { label: "Integral", snippet: "integrate(|, x)" },
+    { label: "Definite integral", snippet: "integrate(|, (x, 0, 1))" },
+    { label: "Limit", snippet: "limit(|, x, 0)" },
+  ]},
+  { category: "Linear algebra", items: [
+    { label: "Matrix", snippet: "Matrix([[|, 0], [0, 1]])" },
+    { label: "Determinant", snippet: "det(|)" },
+    { label: "Inverse", snippet: "(|).inv()" },
+    { label: "Transpose", snippet: "(|).T" },
+    { label: "Eigenvalues", snippet: "(|).eigenvals()" },
+    { label: "Linear system", snippet: "solve([| = 0, y = 0], [x, y])" },
+  ]},
+  { category: "Numeric", items: [
+    { label: "Evaluate", snippet: "N(|)" },
+    { label: "Evaluate to 10 digits", snippet: "N(|, 10)" },
+  ]},
+];
 
 function buildCellDom() {
   const wrapper = document.createElement("div");
@@ -118,6 +151,7 @@ function createCellElement(cell, index) {
   });
   cellEditors[index] = editor;
   editor.refresh();
+  editor.on("focus", () => { activeEditor = editor; });
 
   renderOutput(outputDiv, cell);
   return wrapper;
@@ -147,6 +181,7 @@ function createPhantomCell() {
   });
   phantomEditor = editor;
   editor.refresh();
+  editor.on("focus", () => { activeEditor = editor; });
 
   // Typing alone does not create a cell — only committing via Enter or
   // Ctrl-Enter (see promotePhantom) does. This just keeps the "type to
@@ -201,6 +236,7 @@ function clearCells() {
   document.getElementById("cells").innerHTML = "";
   cellEditors = [];
   phantomEditor = null;
+  activeEditor = null;
 }
 
 function renderCells(cells) {
@@ -248,7 +284,52 @@ async function runAll() {
   });
 }
 
+function insertTemplate(snippet) {
+  const editor = activeEditor || phantomEditor;
+  if (!editor) return;
+  const marker = snippet.indexOf("|");
+  const before = marker === -1 ? snippet : snippet.slice(0, marker);
+  const after = marker === -1 ? "" : snippet.slice(marker + 1);
+  const selected = editor.getSelection();
+  editor.replaceSelection(before + selected + after, "start");
+  const start = editor.getCursor();
+  const cursor = editor.posFromIndex(
+    editor.indexFromPos(start) + before.length + selected.length
+  );
+  editor.setCursor(cursor);
+  editor.focus();
+}
+
+function renderTemplates() {
+  const container = document.getElementById("templates");
+  TEMPLATES.forEach((group, i) => {
+    const details = document.createElement("details");
+    details.open = i === 0 || i === 1;
+    const summary = document.createElement("summary");
+    summary.textContent = group.category;
+    details.appendChild(summary);
+
+    const list = document.createElement("div");
+    list.className = "template-list";
+    group.items.forEach((item) => {
+      const btn = document.createElement("button");
+      btn.title = item.snippet.replace("|", "…");
+      btn.onclick = () => insertTemplate(item.snippet);
+      const label = document.createElement("span");
+      label.textContent = item.label;
+      const code = document.createElement("code");
+      code.textContent = item.snippet.replace("|", "…");
+      btn.appendChild(label);
+      btn.appendChild(code);
+      list.appendChild(btn);
+    });
+    details.appendChild(list);
+    container.appendChild(details);
+  });
+}
+
 window.addEventListener("pywebviewready", () => {
+  renderTemplates();
   document.getElementById("new-btn").onclick = newNotebook;
   document.getElementById("open-btn").onclick = openNotebook;
   document.getElementById("save-btn").onclick = saveNotebook;
