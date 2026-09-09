@@ -77,10 +77,19 @@ async function saveNotebook() {
   await window.pywebview.api.save_notebook();
 }
 
+async function runAll() {
+  const results = await window.pywebview.api.run_all();
+  results.forEach((cell, index) => {
+    const wrapper = document.querySelector(`.cell[data-index="${index}"]`);
+    renderOutput(wrapper.querySelector(".output"), cell);
+  });
+}
+
 window.addEventListener("pywebviewready", () => {
   document.getElementById("new-btn").onclick = newNotebook;
   document.getElementById("open-btn").onclick = openNotebook;
   document.getElementById("save-btn").onclick = saveNotebook;
+  document.getElementById("run-all-btn").onclick = runAll;
   document.getElementById("add-cell-btn").onclick = addCell;
   addCell();
 });
