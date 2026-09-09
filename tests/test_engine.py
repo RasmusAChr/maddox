@@ -62,6 +62,14 @@ def test_reset_clears_the_namespace():
     assert result["output_latex"] == "a"
 
 
+def test_empty_cell_is_a_no_op():
+    engine = Engine()
+    engine.evaluate("a:=2")
+    assert engine.evaluate("") == {"output_latex": None, "error": None}
+    assert engine.evaluate("   ") == {"output_latex": None, "error": None}
+    assert engine.evaluate("a") == {"output_latex": "2", "error": None}
+
+
 def test_unbalanced_brackets_produce_error_not_a_crash():
     engine = Engine()
     result = engine.evaluate("))")

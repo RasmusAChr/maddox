@@ -36,7 +36,7 @@ class Engine:
 
         expr_text = node.expr_text if isinstance(node, Assignment) else node.text
         if not expr_text.strip():
-            return {"output_latex": None, "error": "Empty expression"}
+            return {"output_latex": None, "error": None}
 
         try:
             value = parse_expr(

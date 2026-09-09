@@ -1,5 +1,4 @@
 let cellEditors = [];
-let phantomEditor = null;
 let activeEditor = null;
 
 // Snippets use "|" to mark where the cursor lands after insertion.
@@ -63,35 +62,19 @@ function buildCellDom() {
     'stroke-width="1.8" stroke-linejoin="round"/></svg>';
   actions.appendChild(runBtn);
 
-  return { wrapper, main, inputArea, outputDiv, runBtn };
+  return { wrapper, inputArea, outputDiv, runBtn };
 }
 
-// getIndex() returns this editor's current cell index — a fixed number for
-// a real cell, or cellEditors.length (its prospective index) for the
-// not-yet-promoted phantom cell.
+// getIndex() returns this editor's current cell index; it is re-bound
+// whenever cells are inserted or removed (see reindexCell).
 function makeExtraKeys(getIndex) {
   return {
-    "Ctrl-Enter": () => {
-      const i = getIndex();
-      if (i < cellEditors.length) {
-        runCell(i);
-      } else if (i === cellEditors.length) {
-        const promoted = promotePhantom();
-        if (promoted !== null) runCell(promoted);
-      }
-    },
-    "Enter": () => {
-      moveToNextCell(getIndex());
-    },
+    "Ctrl-Enter": () => runCell(getIndex()),
+    "Enter": () => insertCellAfter(getIndex()),
     "Shift-Enter": "newlineAndIndent",
     "Backspace": function (cm) {
       if (cm.getValue() !== "") return CodeMirror.Pass;
-      const i = getIndex();
-      if (i < cellEditors.length) {
-        removeCell(i);
-      } else {
-        moveToPrevCell(i);
-      }
+      if (cellEditors.length > 1) removeCell(getIndex());
     },
     "Up": function (cm) {
       if (cm.getCursor().line === 0) {
@@ -115,136 +98,75 @@ function focusEditor(editor, pos) {
   editor.setCursor(pos);
 }
 
+function focusEnd(editor) {
+  const lastLine = editor.lastLine();
+  focusEditor(editor, { line: lastLine, ch: editor.getLine(lastLine).length });
+}
+
 function moveToNextCell(index) {
-  if (index === cellEditors.length) {
-    // We're in the phantom cell — Enter here promotes it (if it has
-    // content) into a real cell, then moves into the freshly created
-    // phantom that follows it. An empty phantom has nothing to commit.
-    const promotedIndex = promotePhantom();
-    if (promotedIndex !== null) {
-      focusEditor(phantomEditor, { line: 0, ch: 0 });
-    }
-    return;
+  if (index + 1 < cellEditors.length) {
+    focusEditor(cellEditors[index + 1], { line: 0, ch: 0 });
   }
-  const nextIndex = index + 1;
-  if (nextIndex < cellEditors.length) {
-    focusEditor(cellEditors[nextIndex], { line: 0, ch: 0 });
-  } else if (phantomEditor) {
-    focusEditor(phantomEditor, { line: 0, ch: 0 });
-  }
+}
+
+function moveToPrevCell(index) {
+  if (index > 0) focusEnd(cellEditors[index - 1]);
+}
+
+function cellWrapper(editor) {
+  return editor.getWrapperElement().closest(".cell");
 }
 
 function reindexCell(j) {
   const editor = cellEditors[j];
-  const wrapper = editor.getWrapperElement().closest(".cell");
+  const wrapper = cellWrapper(editor);
   wrapper.dataset.index = j;
   wrapper.querySelector(".run-btn").onclick = () => runCell(j);
   editor.setOption("extraKeys", makeExtraKeys(() => j));
 }
 
+// Creates a cell at `index`, shifting any later cells down by one.
+function createCellElement(cell, index) {
+  const { wrapper, inputArea, outputDiv } = buildCellDom();
+  inputArea.value = cell.input || "";
+
+  const container = document.getElementById("cells");
+  const next = cellEditors[index] ? cellWrapper(cellEditors[index]) : null;
+  container.insertBefore(wrapper, next);
+
+  const editor = CodeMirror.fromTextArea(inputArea, {
+    mode: "text/x-python",
+    lineNumbers: false,
+    viewportMargin: Infinity,
+    scrollbarStyle: "null",
+  });
+  cellEditors.splice(index, 0, editor);
+  for (let j = index; j < cellEditors.length; j++) reindexCell(j);
+  editor.refresh();
+  editor.on("focus", () => { activeEditor = editor; });
+
+  renderOutput(outputDiv, cell);
+  return editor;
+}
+
+function insertCellAfter(index) {
+  const editor = createCellElement({ input: "", output_latex: null, error: null }, index + 1);
+  syncTexts();
+  focusEditor(editor, { line: 0, ch: 0 });
+}
+
 function removeCell(index) {
   const editor = cellEditors[index];
-  editor.getWrapperElement().closest(".cell").remove();
+  cellWrapper(editor).remove();
   cellEditors.splice(index, 1);
   if (activeEditor === editor) activeEditor = null;
   for (let j = index; j < cellEditors.length; j++) reindexCell(j);
   syncTexts();
   if (index > 0) {
     moveToPrevCell(index);
-  } else if (cellEditors.length > 0) {
-    focusEditor(cellEditors[0], { line: 0, ch: 0 });
   } else {
-    focusEditor(phantomEditor, { line: 0, ch: 0 });
+    focusEditor(cellEditors[0], { line: 0, ch: 0 });
   }
-}
-
-function moveToPrevCell(index) {
-  if (index > 0) {
-    const prev = cellEditors[index - 1];
-    const lastLine = prev.lastLine();
-    focusEditor(prev, { line: lastLine, ch: prev.getLine(lastLine).length });
-  }
-  // index === 0 — this is the first cell, nothing above it.
-}
-
-function createCellElement(cell, index) {
-  const { wrapper, inputArea, outputDiv, runBtn } = buildCellDom();
-  wrapper.dataset.index = index;
-  inputArea.value = cell.input || "";
-  runBtn.onclick = () => runCell(index);
-
-  document.getElementById("cells").appendChild(wrapper);
-
-  const editor = CodeMirror.fromTextArea(inputArea, {
-    mode: "text/x-python",
-    lineNumbers: false,
-    viewportMargin: Infinity,
-    scrollbarStyle: "null",
-    extraKeys: makeExtraKeys(() => index),
-  });
-  cellEditors[index] = editor;
-  editor.refresh();
-  editor.on("focus", () => { activeEditor = editor; });
-
-  renderOutput(outputDiv, cell);
-  return wrapper;
-}
-
-function createPhantomCell() {
-  const { wrapper, main, inputArea, runBtn } = buildCellDom();
-  wrapper.classList.add("phantom");
-  runBtn.onclick = () => {
-    const promoted = promotePhantom();
-    if (promoted !== null) runCell(promoted);
-  };
-
-  const placeholder = document.createElement("span");
-  placeholder.className = "cell-placeholder";
-  placeholder.textContent = "Type to start a new cell…";
-  main.appendChild(placeholder);
-
-  document.getElementById("cells").appendChild(wrapper);
-
-  const editor = CodeMirror.fromTextArea(inputArea, {
-    mode: "text/x-python",
-    lineNumbers: false,
-    viewportMargin: Infinity,
-    scrollbarStyle: "null",
-    extraKeys: makeExtraKeys(() => cellEditors.length),
-  });
-  phantomEditor = editor;
-  editor.refresh();
-  editor.on("focus", () => { activeEditor = editor; });
-
-  // Typing alone does not create a cell — only committing via Enter or
-  // Ctrl-Enter (see promotePhantom) does. This just keeps the "type to
-  // start a new cell" placeholder in sync with whether there's a draft.
-  editor.on("change", () => {
-    placeholder.hidden = editor.getValue().length > 0;
-  });
-
-  wrapper._placeholder = placeholder;
-  wrapper._runBtn = runBtn;
-  return wrapper;
-}
-
-// Turns the current phantom cell into a real cell, if it has any content.
-// Returns the new cell's index, or null if there was nothing to promote.
-function promotePhantom() {
-  if (!phantomEditor || !phantomEditor.getValue().trim()) return null;
-  const editor = phantomEditor;
-  const wrapper = editor.getWrapperElement().closest(".cell");
-  const index = cellEditors.length;
-
-  wrapper.classList.remove("phantom");
-  wrapper.dataset.index = index;
-  wrapper._placeholder.remove();
-  cellEditors[index] = editor;
-  editor.setOption("extraKeys", makeExtraKeys(() => index));
-  wrapper._runBtn.onclick = () => runCell(index);
-
-  createPhantomCell();
-  return index;
 }
 
 function renderOutput(outputDiv, cell) {
@@ -268,14 +190,14 @@ async function runCell(index) {
 function clearCells() {
   document.getElementById("cells").innerHTML = "";
   cellEditors = [];
-  phantomEditor = null;
   activeEditor = null;
 }
 
+// The notebook always shows at least one cell.
 function renderCells(cells) {
   clearCells();
+  if (cells.length === 0) cells = [{ input: "", output_latex: null, error: null }];
   cells.forEach((cell, i) => createCellElement(cell, i));
-  createPhantomCell();
 }
 
 async function newNotebook() {
@@ -318,7 +240,7 @@ async function runAll() {
 }
 
 function insertTemplate(snippet) {
-  const editor = activeEditor || phantomEditor;
+  const editor = activeEditor || cellEditors[0];
   if (!editor) return;
   const marker = snippet.indexOf("|");
   const before = marker === -1 ? snippet : snippet.slice(0, marker);

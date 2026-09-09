@@ -178,11 +178,6 @@ body {
   padding: 0.5rem;
 }
 
-.cell.phantom {
-  border-style: dashed;
-  opacity: 0.6;
-}
-
 .cell-main {
   flex: 1;
   min-width: 0;
@@ -210,16 +205,6 @@ body {
 .run-btn:hover {
   color: var(--text);
   background: var(--hover);
-}
-
-.cell-placeholder {
-  position: absolute;
-  top: 0.35rem;
-  left: 0.5rem;
-  color: #999;
-  font-style: italic;
-  pointer-events: none;
-  z-index: 1;
 }
 
 .CodeMirror {
