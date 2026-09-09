@@ -54,7 +54,33 @@ function addCell() {
   createCellElement({ input: "", output_latex: null, error: null }, index);
 }
 
+function clearCells() {
+  document.getElementById("cells").innerHTML = "";
+  cellEditors = [];
+}
+
+async function newNotebook() {
+  await window.pywebview.api.new_notebook();
+  clearCells();
+  addCell();
+}
+
+async function openNotebook() {
+  const result = await window.pywebview.api.load_notebook();
+  if (!result.ok) return;
+  clearCells();
+  result.cells.forEach((cell, i) => createCellElement(cell, i));
+  if (result.cells.length === 0) addCell();
+}
+
+async function saveNotebook() {
+  await window.pywebview.api.save_notebook();
+}
+
 window.addEventListener("pywebviewready", () => {
+  document.getElementById("new-btn").onclick = newNotebook;
+  document.getElementById("open-btn").onclick = openNotebook;
+  document.getElementById("save-btn").onclick = saveNotebook;
   document.getElementById("add-cell-btn").onclick = addCell;
   addCell();
 });
