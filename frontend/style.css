@@ -1,4 +1,44 @@
 body {
   font-family: system-ui, sans-serif;
-  margin: 1.5rem;
+  margin: 0;
+  background: #f7f7f8;
+}
+
+#toolbar {
+  padding: 0.5rem 1rem;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+}
+
+#toolbar button {
+  margin-right: 0.5rem;
+}
+
+#cells {
+  padding: 1rem;
+}
+
+.cell {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+}
+
+.CodeMirror {
+  border: 1px solid #eee;
+  height: auto;
+}
+
+.output {
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  min-height: 1.5rem;
+}
+
+.output.error {
+  color: #b00020;
+  font-family: monospace;
+  white-space: pre-wrap;
 }
