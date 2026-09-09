@@ -1,37 +1,41 @@
 let cellEditors = [];
 let activeEditor = null;
 
-// Snippets use "|" to mark where the cursor lands after insertion.
+// `hint` is shown in the sidebar; `latex` is what gets inserted. `\placeholder{}`
+// is a fillable box; Tab moves between them.
 const TEMPLATES = [
   { category: "Assign", items: [
-    { label: "Assign variable", snippet: "x := |" },
-    { label: "Clear variable", snippet: "clear(|)" },
-    { label: "Clear all variables", snippet: "clear()" },
+    { label: "Assign variable", hint: "x := …", latex: "x\\coloneq\\placeholder{}" },
+    { label: "Clear variable", hint: "clear(…)", latex: "\\operatorname{clear}\\left(\\placeholder{}\\right)" },
+    { label: "Clear all variables", hint: "clear()", latex: "\\operatorname{clear}\\left(\\right)" },
   ]},
   { category: "Algebra", items: [
-    { label: "Solve equation", snippet: "solve(| = 0, x)" },
-    { label: "Simplify", snippet: "simplify(|)" },
-    { label: "Expand", snippet: "expand(|)" },
-    { label: "Factor", snippet: "factor(|)" },
-    { label: "Substitute", snippet: "(|).subs(x, 2)" },
+    { label: "Solve equation", hint: "solve(… = 0, x)", latex: "\\operatorname{solve}\\left(\\placeholder{}=0,x\\right)" },
+    { label: "Simplify", hint: "simplify(…)", latex: "\\operatorname{simplify}\\left(\\placeholder{}\\right)" },
+    { label: "Expand", hint: "expand(…)", latex: "\\operatorname{expand}\\left(\\placeholder{}\\right)" },
+    { label: "Factor", hint: "factor(…)", latex: "\\operatorname{factor}\\left(\\placeholder{}\\right)" },
+    { label: "Substitute", hint: "(…).subs(x, 2)", latex: "\\left(\\placeholder{}\\right).\\operatorname{subs}\\left(x,2\\right)" },
+    { label: "Fraction", hint: "a/b", latex: "\\frac{\\placeholder{}}{\\placeholder{}}" },
+    { label: "Square root", hint: "sqrt(…)", latex: "\\sqrt{\\placeholder{}}" },
+    { label: "Power", hint: "…^n", latex: "\\placeholder{}^{\\placeholder{}}" },
   ]},
   { category: "Calculus", items: [
-    { label: "Derivative", snippet: "diff(|, x)" },
-    { label: "Integral", snippet: "integrate(|, x)" },
-    { label: "Definite integral", snippet: "integrate(|, (x, 0, 1))" },
-    { label: "Limit", snippet: "limit(|, x, 0)" },
+    { label: "Derivative", hint: "diff(…, x)", latex: "\\operatorname{diff}\\left(\\placeholder{},x\\right)" },
+    { label: "Integral", hint: "integrate(…, x)", latex: "\\operatorname{integrate}\\left(\\placeholder{},x\\right)" },
+    { label: "Definite integral", hint: "integrate(…, (x, 0, 1))", latex: "\\operatorname{integrate}\\left(\\placeholder{},\\left(x,0,1\\right)\\right)" },
+    { label: "Limit", hint: "limit(…, x, 0)", latex: "\\operatorname{limit}\\left(\\placeholder{},x,0\\right)" },
   ]},
   { category: "Linear algebra", items: [
-    { label: "Matrix", snippet: "Matrix([[|, 0], [0, 1]])" },
-    { label: "Determinant", snippet: "det(|)" },
-    { label: "Inverse", snippet: "(|).inv()" },
-    { label: "Transpose", snippet: "(|).T" },
-    { label: "Eigenvalues", snippet: "(|).eigenvals()" },
-    { label: "Linear system", snippet: "solve([| = 0, y = 0], [x, y])" },
+    { label: "Matrix 2×2", hint: "Matrix([[a, b], [c, d]])", latex: "\\begin{pmatrix}\\placeholder{}&\\placeholder{}\\\\\\placeholder{}&\\placeholder{}\\end{pmatrix}" },
+    { label: "Determinant", hint: "det(…)", latex: "\\operatorname{det}\\left(\\placeholder{}\\right)" },
+    { label: "Inverse", hint: "(…).inv()", latex: "\\left(\\placeholder{}\\right).\\operatorname{inv}\\left(\\right)" },
+    { label: "Transpose", hint: "(…).T", latex: "\\left(\\placeholder{}\\right).T" },
+    { label: "Eigenvalues", hint: "(…).eigenvals()", latex: "\\left(\\placeholder{}\\right).\\operatorname{eigenvals}\\left(\\right)" },
+    { label: "Linear system", hint: "solve([… = 0, y = 0], [x, y])", latex: "\\operatorname{solve}\\left(\\left[\\placeholder{}=0,y=0\\right],\\left[x,y\\right]\\right)" },
   ]},
   { category: "Numeric", items: [
-    { label: "Evaluate", snippet: "N(|)" },
-    { label: "Evaluate to 10 digits", snippet: "N(|, 10)" },
+    { label: "Evaluate", hint: "N(…)", latex: "\\operatorname{N}\\left(\\placeholder{}\\right)" },
+    { label: "Evaluate to 10 digits", hint: "N(…, 10)", latex: "\\operatorname{N}\\left(\\placeholder{},10\\right)" },
   ]},
 ];
 
@@ -268,10 +272,14 @@ async function runAll() {
   });
 }
 
-function insertTemplate(snippet) {
+function insertTemplate(item) {
   const mf = activeEditor || cellEditors[0];
   if (!mf) return;
-  mf.insert(snippet.replace("|", ""), { focus: true });
+  const selected = mf.getValue(mf.selection, "latex");
+  const latex = selected
+    ? item.latex.replace("\\placeholder{}", selected)
+    : item.latex;
+  mf.insert(latex, { focus: true, selectionMode: "placeholder" });
 }
 
 function renderTemplates() {
@@ -287,12 +295,12 @@ function renderTemplates() {
     list.className = "template-list";
     group.items.forEach((item) => {
       const btn = document.createElement("button");
-      btn.title = item.snippet.replace("|", "…");
-      btn.onclick = () => insertTemplate(item.snippet);
+      btn.title = item.hint;
+      btn.onclick = () => insertTemplate(item);
       const label = document.createElement("span");
       label.textContent = item.label;
       const code = document.createElement("code");
-      code.textContent = item.snippet.replace("|", "…");
+      code.textContent = item.hint;
       btn.appendChild(label);
       btn.appendChild(code);
       list.appendChild(btn);
