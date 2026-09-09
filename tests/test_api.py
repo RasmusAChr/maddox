@@ -79,3 +79,21 @@ def test_save_notebook_cancelled_dialog_returns_not_ok():
         result = api.save_notebook()
 
     assert result == {"ok": False, "error": "Save cancelled"}
+
+
+def test_load_notebook_opens_a_dialog_when_no_path_is_given(tmp_path):
+    api = Api()
+    api.evaluate_cell(None, "a:=2")
+    path = str(tmp_path / "dialog.mnb")
+    api.save_notebook(path)
+
+    fake_window = MagicMock()
+    fake_window.create_file_dialog.return_value = path
+
+    api2 = Api()
+    with patch("mathnb.api.webview.windows", [fake_window]):
+        result = api2.load_notebook()
+
+    assert result["ok"] is True
+    assert result["path"] == path
+    fake_window.create_file_dialog.assert_called_once()

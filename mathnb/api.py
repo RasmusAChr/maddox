@@ -55,7 +55,7 @@ class Api:
             chosen = webview.windows[0].create_file_dialog(webview.OPEN_DIALOG)
             if not chosen:
                 return {"ok": False, "error": "Open cancelled"}
-            target = chosen[0]
+            target = chosen if isinstance(chosen, str) else chosen[0]
         self.notebook = Notebook.load(target)
         self.engine.reset()
         self.current_path = target
