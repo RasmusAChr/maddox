@@ -37,6 +37,7 @@ body {
   flex: 1;
   min-width: 0;
   position: relative;
+  padding: 0.35rem 0.5rem;
 }
 
 .cell-actions {
@@ -49,8 +50,8 @@ body {
 
 .cell-placeholder {
   position: absolute;
-  top: 0.4rem;
-  left: 0.6rem;
+  top: 0.35rem;
+  left: 0.5rem;
   color: #999;
   font-style: italic;
   pointer-events: none;
@@ -60,7 +61,6 @@ body {
 .CodeMirror {
   border: 1px solid #eee;
   height: auto;
-  padding: 0.35rem 0.5rem;
 }
 
 .CodeMirror-scroll {

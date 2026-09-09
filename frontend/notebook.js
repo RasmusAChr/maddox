@@ -112,6 +112,7 @@ function createCellElement(cell, index) {
     extraKeys: makeExtraKeys(() => index),
   });
   cellEditors[index] = editor;
+  editor.refresh();
 
   renderOutput(outputDiv, cell);
   return wrapper;
@@ -137,6 +138,7 @@ function createPhantomCell() {
     extraKeys: makeExtraKeys(() => cellEditors.length),
   });
   phantomEditor = editor;
+  editor.refresh();
 
   // Typing alone does not create a cell — only committing via Enter or
   // Ctrl-Enter (see promotePhantom) does. This just keeps the "type to
