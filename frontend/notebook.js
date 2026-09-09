@@ -35,6 +35,11 @@ const TEMPLATES = [
   ]},
 ];
 
+const ENGINE_FUNCTIONS = [
+  "solve", "simplify", "expand", "factor", "subs", "diff", "integrate",
+  "limit", "Matrix", "det", "inv", "eigenvals", "N", "clear", "sqrt",
+];
+
 function buildCellDom() {
   const wrapper = document.createElement("div");
   wrapper.className = "cell";
@@ -47,8 +52,9 @@ function buildCellDom() {
   main.className = "cell-main";
   wrapper.appendChild(main);
 
-  const inputArea = document.createElement("textarea");
-  main.appendChild(inputArea);
+  const mf = document.createElement("math-field");
+  mf.className = "cell-input";
+  main.appendChild(mf);
 
   const outputDiv = document.createElement("div");
   outputDiv.className = "output";
@@ -64,110 +70,131 @@ function buildCellDom() {
     'stroke-width="1.8" stroke-linejoin="round"/></svg>';
   actions.appendChild(runBtn);
 
-  return { wrapper, inputArea, outputDiv, runBtn };
+  return { wrapper, mf, outputDiv, runBtn };
 }
 
-// getIndex() returns this editor's current cell index; it is re-bound
-// whenever cells are inserted or removed (see reindexCell).
-function makeExtraKeys(getIndex) {
-  return {
-    "Ctrl-Enter": () => runCell(getIndex()),
-    "Enter": () => insertCellAfter(getIndex()),
-    "Shift-Enter": "newlineAndIndent",
-    "Backspace": function (cm) {
-      if (cm.getValue() !== "") return CodeMirror.Pass;
+function configureMathField(mf) {
+  const shortcuts = { ...mf.inlineShortcuts, ":=": "\\coloneq" };
+  ENGINE_FUNCTIONS.forEach((name) => {
+    shortcuts[name] = `\\operatorname{${name}}`;
+  });
+  mf.inlineShortcuts = shortcuts;
+  mf.smartFence = true;
+}
+
+function cellLatex(mf) {
+  return mf.value;
+}
+
+// v1 notebooks store plain engine text. MathLive's ascii-math importer reads it,
+// but it spells Python's "**" as \star and wraps function names as
+// \operatorname{\mathrm{f}}; neither survives the LaTeX -> engine-text trip back,
+// so normalize both.
+function importPlainText(mf, text) {
+  mf.setValue(text.replace(/\*\*/g, "^"), { format: "ascii-math" });
+  mf.value = mf.value.replace(
+    /\\operatorname\{\\mathrm\{([^{}]*)\}\}/g,
+    "\\operatorname{$1}"
+  );
+}
+
+// getIndex() returns this cell's current index; it is re-bound whenever
+// cells are inserted or removed (see reindexCell).
+function bindCellKeys(mf, getIndex) {
+  mf.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.ctrlKey) runCell(getIndex());
+      else insertCellAfter(getIndex());
+    } else if (e.key === "Backspace" && cellLatex(mf) === "") {
+      e.preventDefault();
       if (cellEditors.length > 1) removeCell(getIndex());
-    },
-    "Up": function (cm) {
-      if (cm.getCursor().line === 0) {
-        moveToPrevCell(getIndex());
-      } else {
-        return CodeMirror.Pass;
-      }
-    },
-    "Down": function (cm) {
-      if (cm.getCursor().line === cm.lastLine()) {
-        moveToNextCell(getIndex());
-      } else {
-        return CodeMirror.Pass;
-      }
-    },
-  };
+    }
+  });
+  mf.addEventListener("move-out", (e) => {
+    if (e.detail.direction === "upward") {
+      e.preventDefault();
+      moveToPrevCell(getIndex());
+    } else if (e.detail.direction === "downward") {
+      e.preventDefault();
+      moveToNextCell(getIndex());
+    }
+  });
 }
 
-function focusEditor(editor, pos) {
-  editor.focus();
-  editor.setCursor(pos);
+function focusStart(mf) {
+  mf.focus();
+  mf.executeCommand("moveToMathfieldStart");
 }
 
-function focusEnd(editor) {
-  const lastLine = editor.lastLine();
-  focusEditor(editor, { line: lastLine, ch: editor.getLine(lastLine).length });
+function focusEnd(mf) {
+  mf.focus();
+  mf.executeCommand("moveToMathfieldEnd");
 }
 
 function moveToNextCell(index) {
-  if (index + 1 < cellEditors.length) {
-    focusEditor(cellEditors[index + 1], { line: 0, ch: 0 });
-  }
+  if (index + 1 < cellEditors.length) focusStart(cellEditors[index + 1]);
 }
 
 function moveToPrevCell(index) {
   if (index > 0) focusEnd(cellEditors[index - 1]);
 }
 
-function cellWrapper(editor) {
-  return editor.getWrapperElement().closest(".cell");
+function cellWrapper(mf) {
+  return mf.closest(".cell");
 }
 
 function reindexCell(j) {
-  const editor = cellEditors[j];
-  const wrapper = cellWrapper(editor);
+  const mf = cellEditors[j];
+  const wrapper = cellWrapper(mf);
   wrapper.dataset.index = j;
   wrapper.querySelector(".run-btn").onclick = () => runCell(j);
-  editor.setOption("extraKeys", makeExtraKeys(() => j));
+  mf._getIndex = () => j;
 }
 
 // Creates a cell at `index`, shifting any later cells down by one.
 function createCellElement(cell, index) {
-  const { wrapper, inputArea, outputDiv } = buildCellDom();
-  inputArea.value = cell.input || "";
+  const { wrapper, mf, outputDiv } = buildCellDom();
 
   const container = document.getElementById("cells");
   const next = cellEditors[index] ? cellWrapper(cellEditors[index]) : null;
   container.insertBefore(wrapper, next);
 
-  const editor = CodeMirror.fromTextArea(inputArea, {
-    mode: "text/x-python",
-    lineNumbers: false,
-    viewportMargin: Infinity,
-    scrollbarStyle: "null",
-  });
-  cellEditors.splice(index, 0, editor);
+  configureMathField(mf);
+  if (cell.latex) {
+    mf.value = cell.latex;
+  } else if (cell.input) {
+    importPlainText(mf, cell.input);
+  }
+
+  cellEditors.splice(index, 0, mf);
+  mf._getIndex = () => index;
   for (let j = index; j < cellEditors.length; j++) reindexCell(j);
-  editor.refresh();
-  editor.on("focus", () => { activeEditor = editor; });
+  bindCellKeys(mf, () => mf._getIndex());
+  mf.addEventListener("focus", () => { activeEditor = mf; });
 
   renderOutput(outputDiv, cell);
-  return editor;
+  return mf;
 }
 
 function insertCellAfter(index) {
-  const editor = createCellElement({ input: "", output_latex: null, error: null }, index + 1);
+  const mf = createCellElement({ latex: "", input: "", output_latex: null, error: null }, index + 1);
   syncTexts();
-  focusEditor(editor, { line: 0, ch: 0 });
+  focusStart(mf);
 }
 
 function removeCell(index) {
-  const editor = cellEditors[index];
-  cellWrapper(editor).remove();
+  const mf = cellEditors[index];
+  cellWrapper(mf).remove();
   cellEditors.splice(index, 1);
-  if (activeEditor === editor) activeEditor = null;
+  if (activeEditor === mf) activeEditor = null;
   for (let j = index; j < cellEditors.length; j++) reindexCell(j);
   syncTexts();
   if (index > 0) {
     moveToPrevCell(index);
   } else {
-    focusEditor(cellEditors[0], { line: 0, ch: 0 });
+    focusStart(cellEditors[0]);
   }
 }
 
@@ -183,8 +210,8 @@ function renderOutput(outputDiv, cell) {
 }
 
 async function runCell(index) {
-  const text = cellEditors[index].getValue();
-  const cell = await window.pywebview.api.evaluate_cell(index, text);
+  const latex = cellLatex(cellEditors[index]);
+  const cell = await window.pywebview.api.evaluate_cell(index, latex);
   const wrapper = document.querySelector(`.cell[data-index="${index}"]`);
   renderOutput(wrapper.querySelector(".output"), cell);
 }
@@ -218,7 +245,7 @@ async function openNotebook() {
 }
 
 function syncTexts() {
-  return window.pywebview.api.set_cell_texts(cellEditors.map(e => e.getValue()));
+  return window.pywebview.api.set_cell_texts(cellEditors.map(cellLatex));
 }
 
 function setStatus(text) {
@@ -242,19 +269,9 @@ async function runAll() {
 }
 
 function insertTemplate(snippet) {
-  const editor = activeEditor || cellEditors[0];
-  if (!editor) return;
-  const marker = snippet.indexOf("|");
-  const before = marker === -1 ? snippet : snippet.slice(0, marker);
-  const after = marker === -1 ? "" : snippet.slice(marker + 1);
-  const selected = editor.getSelection();
-  editor.replaceSelection(before + selected + after, "start");
-  const start = editor.getCursor();
-  const cursor = editor.posFromIndex(
-    editor.indexFromPos(start) + before.length + selected.length
-  );
-  editor.setCursor(cursor);
-  editor.focus();
+  const mf = activeEditor || cellEditors[0];
+  if (!mf) return;
+  mf.insert(snippet.replace("|", ""), { focus: true });
 }
 
 function renderTemplates() {
@@ -285,7 +302,19 @@ function renderTemplates() {
   });
 }
 
-window.addEventListener("pywebviewready", () => {
+async function setupMathLive() {
+  await customElements.whenDefined("math-field");
+  MathfieldElement.fontsDirectory = "vendor/mathlive/fonts";
+  MathfieldElement.soundsDirectory = null;
+}
+
+window.addEventListener("pywebviewready", async () => {
+  if (!customElements.get("math-field")) {
+    document.getElementById("cells").textContent =
+      "Math input failed to load: vendor/mathlive/mathlive.min.js is missing.";
+    return;
+  }
+  await setupMathLive();
   renderTemplates();
   document.getElementById("new-btn").onclick = newNotebook;
   document.getElementById("open-btn").onclick = openNotebook;

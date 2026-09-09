@@ -207,11 +207,19 @@ body {
   background: var(--hover);
 }
 
-.CodeMirror {
+math-field.cell-input {
+  display: block;
+  width: 100%;
   border: 1px solid var(--border-soft);
   border-radius: 4px;
-  height: auto;
-  font-size: 13px;
+  padding: 4px 8px;
+  font-size: 16px;
+  background: var(--surface);
+}
+
+math-field.cell-input:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .output {
