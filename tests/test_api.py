@@ -220,6 +220,38 @@ def test_run_all_reconverts_latex_and_reports_unsupported_cells():
     assert results[2]["output_latex"] == "2"
 
 
+def test_set_cell_texts_keeps_engine_text_when_the_latex_does_not_convert():
+    # A v1 cell's imported LaTeX may not convert; Save must not blank its input.
+    api = Api()
+    api.evaluate_cell(None, "a:=2")
+    cells = api.set_cell_texts([r"a\coloneq\foo"])
+    assert cells[0]["input"] == "a:=2"
+    assert cells[0]["latex"] == r"a\coloneq\foo"
+    assert "Unsupported notation" in cells[0]["error"]
+    assert cells[0]["output_latex"] is None
+
+
+def test_set_cell_texts_appends_an_errored_cell_for_unsupported_latex():
+    api = Api()
+    cells = api.set_cell_texts([r"\foo"])
+    assert cells[0]["latex"] == r"\foo"
+    assert cells[0]["input"] == ""
+    assert cells[0]["output_latex"] is None
+    assert "Unsupported notation" in cells[0]["error"]
+
+
+def test_set_cell_texts_survives_a_save_load_round_trip_with_bad_latex(tmp_path):
+    api = Api()
+    api.evaluate_cell(None, "a:=2")
+    api.set_cell_texts([r"a\coloneq\foo"])
+    path = str(tmp_path / "kept.mnb")
+    assert api.save_notebook(path)["ok"] is True
+
+    api2 = Api()
+    result = api2.load_notebook(path)
+    assert result["cells"][0]["input"] == "a:=2"
+
+
 def test_v1_cells_without_latex_still_run(tmp_path):
     path = tmp_path / "old.mnb"
     path.write_text('{"cells": [{"input": "a:=2", "output_latex": null, "error": null}]}')

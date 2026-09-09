@@ -34,8 +34,18 @@ class Api:
         for i, latex in enumerate(latexes):
             try:
                 text = to_engine_text(latex)
-            except UnsupportedLatex:
-                text = ""
+            except UnsupportedLatex as e:
+                # Keep whatever engine text the cell already had -- a v1 cell's
+                # imported text must survive a Save that cannot convert its
+                # LaTeX -- but flag it and drop the now-stale cached output.
+                if i < len(cells):
+                    cells[i]["latex"] = latex
+                    cells[i]["output_latex"] = None
+                    cells[i]["error"] = str(e)
+                else:
+                    cells.append({"latex": latex, "input": "",
+                                  "output_latex": None, "error": str(e)})
+                continue
             if i < len(cells):
                 cells[i]["latex"] = latex
                 cells[i]["input"] = text

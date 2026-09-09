@@ -6,6 +6,36 @@ class UnsupportedLatex(ValueError):
     pass
 
 
+# Marks both ends of every *name* this converter emits (pi, oo, alpha, sin,
+# sqrt, Matrix, \operatorname{...} bodies). _resolve_atom_marks turns a mark
+# into "*" when it sits between two alphanumerics and drops it otherwise, so a
+# juxtaposed name is never glued to its neighbour. Without it SymPy's
+# split_symbols transformation silently tears the glued token apart:
+# "2\pi r" -> "2pir" -> 2*p*i*r, "x\sqrt{y}" -> "xsqrt(y)" -> q*r*s*t*x*y.
+# Marks never survive to_engine_text's return value.
+_ATOM = "\x00"
+
+
+def _atom(text):
+    return _ATOM + text + _ATOM if text else text
+
+
+def _resolve_atom_marks(text):
+    text = re.sub(_ATOM + "+", _ATOM, text)
+    out = []
+    for i, ch in enumerate(text):
+        if ch != _ATOM:
+            out.append(ch)
+            continue
+        # "_" ends a name (the Greek renames below) but never starts one -- on
+        # the right it opens a subscript, which needs no "*".
+        left = out[-1] if out else ""
+        right = text[i + 1:i + 2]
+        if (left.isalnum() or left == "_") and right.isalnum():
+            out.append("*")
+    return "".join(out)
+
+
 _GREEK = {
     "alpha", "beta", "gamma", "delta", "epsilon", "varepsilon", "zeta", "eta",
     "theta", "vartheta", "iota", "kappa", "lambda", "mu", "nu", "xi", "omicron",
@@ -13,8 +43,16 @@ _GREEK = {
     "Gamma", "Delta", "Theta", "Lambda", "Xi", "Pi", "Sigma", "Upsilon", "Phi",
     "Psi", "Omega",
 }
-# "lambda" is a Python keyword; SymPy spells the symbol "lamda".
-_GREEK_RENAMES = {"lambda": "lamda"}
+# Greek names SymPy does not treat as a plain symbol: "lambda" is a Python
+# keyword, "beta"/"gamma"/"zeta" are SymPy functions, "Lambda" is a class, and
+# the "var..." spellings are unknown multi-letter names that split_symbols
+# would shred. The trailing "_" spellings are plain Symbols and still render as
+# the Greek letter (sympy.latex gives e.g. "\beta_{}").
+_GREEK_RENAMES = {
+    "lambda": "lamda",
+    "beta": "beta_", "gamma": "gamma_", "zeta": "zeta_", "Lambda": "Lambda_",
+    "varepsilon": "varepsilon_", "vartheta": "vartheta_", "varphi": "varphi_",
+}
 
 _FUNCTIONS = {
     "sin", "cos", "tan", "cot", "sec", "csc", "arcsin", "arccos", "arctan",
@@ -37,8 +75,25 @@ _SPACING = {",", ";", "!", " ", "quad", "qquad", "enspace", "thinspace",
 _TEXT_LIKE = {"operatorname", "mathrm", "text", "mathit", "mathbf", "textrm", "mathsf"}
 _MATRIX_ENVS = {"pmatrix", "bmatrix", "matrix", "vmatrix", "Bmatrix"}
 
+# _SIMPLE entries that stand for a symbol (rather than an operator) and so need
+# the atom marks; the rest ("*", "<=", ...) never touch a neighbouring name.
+_SYMBOL_COMMANDS = {"pi", "infty", "exponentialE", "imaginaryI", "differentialD"}
+
 _TOKEN = re.compile(r"\\([A-Za-z]+)|\\(.)|(\s+)|(.)", re.DOTALL)
 _SUBSCRIPT = re.compile(r"[A-Za-z0-9]+")
+
+# Leibniz notation: \frac{d}{dx}, \frac{dy}{dx}, \frac{\differentialD}{\differentialD x}.
+# The engine has no d/dx operator, so "((d)/(dx))" would quietly evaluate to a
+# ratio of plain symbols instead of a derivative.
+_DIFF_NUMERATOR = re.compile(r"d([A-Za-z(].*)?$", re.DOTALL)
+_DIFF_DENOMINATOR = re.compile(r"d[A-Za-z]")
+
+
+def _is_leibniz_derivative(numerator, denominator):
+    numerator = numerator.replace(_ATOM, "")
+    denominator = denominator.replace(_ATOM, "")
+    return bool(_DIFF_NUMERATOR.match(numerator)
+                and _DIFF_DENOMINATOR.match(denominator))
 
 
 def _tokenize(latex):
@@ -90,6 +145,8 @@ class _Converter:
                 return "_" + self.subscript()
             if val == "&":
                 raise UnsupportedLatex("Unexpected '&' outside a matrix")
+            if val == "|":
+                raise UnsupportedLatex("Use Abs(x) for absolute value")
             return val
         return self.command(val)
 
@@ -107,7 +164,7 @@ class _Converter:
         return self.item()
 
     def subscript(self):
-        inner = self.arg()
+        inner = self.arg().replace(_ATOM, "")
         if not _SUBSCRIPT.fullmatch(inner):
             raise UnsupportedLatex(f"Unsupported subscript: {inner}")
         return inner
@@ -136,6 +193,8 @@ class _Converter:
             return ""
         if name == "frac":
             a, b = self.arg(), self.arg()
+            if _is_leibniz_derivative(a, b):
+                raise UnsupportedLatex("Use diff(expr, x) for derivatives")
             return f"(({a})/({b}))"
         if name == "sqrt":
             if self.peek() == ("char", "["):
@@ -143,9 +202,9 @@ class _Converter:
                 n = self.convert_until(stop=(("char", "]"),))
                 self.expect(("char", "]"))
                 return f"(({self.arg()})^(1/({n})))"
-            return f"sqrt({self.arg()})"
+            return _ATOM + f"sqrt({self.arg()})"
         if name in _TEXT_LIKE:
-            return self.raw_group()
+            return _atom(self.raw_group())
         if name == "placeholder":
             self.raw_group()
             raise UnsupportedLatex("Fill in all placeholder fields first")
@@ -154,11 +213,25 @@ class _Converter:
         if name == "end":
             raise UnsupportedLatex("Unexpected \\end")
         if name in _SIMPLE:
-            return _SIMPLE[name]
+            text = _SIMPLE[name]
+            return _atom(text) if name in _SYMBOL_COMMANDS else text
         if name in _FUNCTIONS:
-            return _FUNCTION_RENAMES.get(name, name)
+            script = self.peek()
+            if script in (("char", "_"), ("char", "^")):
+                call = _FUNCTION_RENAMES.get(name, name)
+                hint = (f"use {call}(x, 2)" if script[1] == "_"
+                        else f"use ({call}(x))^2")
+                raise UnsupportedLatex(
+                    f"Unsupported notation: \\{name}{script[1]}... - {hint}"
+                )
+            return _atom(_FUNCTION_RENAMES.get(name, name))
         if name in _GREEK:
-            return _GREEK_RENAMES.get(name, name)
+            text = _GREEK_RENAMES.get(name, name)
+            # A subscript already makes the name a plain symbol, so the "_"
+            # suffix is redundant there and would render as a superscript.
+            if text.endswith("_") and self.peek() == ("char", "_"):
+                text = text[:-1]
+            return _atom(text)
         raise UnsupportedLatex(f"Unsupported notation: \\{name}")
 
     def matrix(self, env):
@@ -189,8 +262,8 @@ class _Converter:
         rows[-1].append("".join(cell))
         if rows[-1] == [""]:
             rows.pop()
-        return "Matrix([" + ",".join("[" + ",".join(r) + "]" for r in rows) + "])"
+        return _ATOM + "Matrix([" + ",".join("[" + ",".join(r) + "]" for r in rows) + "])"
 
 
 def to_engine_text(latex):
-    return _Converter(_tokenize(latex)).convert_until()
+    return _resolve_atom_marks(_Converter(_tokenize(latex)).convert_until())
