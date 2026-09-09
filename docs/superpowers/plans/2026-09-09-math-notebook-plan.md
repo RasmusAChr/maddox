@@ -239,6 +239,13 @@ def _wrap_bare_equations(text):
     cursor = 0
     for start, end, lhs, rhs in replacements:
         pieces.append(text[cursor:start])
+        # Preserve any leading whitespace within the segment (e.g. the
+        # space after a comma) — without this, the second+ equation in
+        # a multi-equation cell like `solve([x = 1, y = 2], [x, y])`
+        # loses its leading space.
+        seg_text = text[start:end]
+        leading_ws_count = len(seg_text) - len(seg_text.lstrip())
+        pieces.append(seg_text[:leading_ws_count])
         pieces.append(f"Eq({lhs}, {rhs})")
         cursor = end
     pieces.append(text[cursor:])
