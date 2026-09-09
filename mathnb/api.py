@@ -1,6 +1,7 @@
 import webview
 
 from .engine import Engine
+from .latex_input import to_engine_text, UnsupportedLatex
 from .notebook import Notebook
 
 
@@ -10,34 +11,43 @@ class Api:
         self.notebook = Notebook()
         self.current_path = None
 
-    def evaluate_cell(self, index, text):
+    def _run(self, latex, text):
+        if latex is not None:
+            try:
+                text = to_engine_text(latex)
+            except UnsupportedLatex as e:
+                return {"latex": latex, "input": "", "output_latex": None, "error": str(e)}
         result = self.engine.evaluate(text)
-        cell = {"input": text, "output_latex": result["output_latex"], "error": result["error"]}
+        return {"latex": latex, "input": text,
+                "output_latex": result["output_latex"], "error": result["error"]}
+
+    def evaluate_cell(self, index, latex):
+        cell = self._run(latex, "")
         if index is None or index >= len(self.notebook.cells):
             self.notebook.cells.append(cell)
         else:
             self.notebook.cells[index] = cell
         return cell
 
-    def set_cell_texts(self, texts):
+    def set_cell_texts(self, latexes):
         cells = self.notebook.cells
-        for i, t in enumerate(texts):
+        for i, latex in enumerate(latexes):
+            try:
+                text = to_engine_text(latex)
+            except UnsupportedLatex:
+                text = ""
             if i < len(cells):
-                cells[i]["input"] = t
+                cells[i]["latex"] = latex
+                cells[i]["input"] = text
             else:
-                cells.append({"input": t, "output_latex": None, "error": None})
-        del cells[len(texts):]
+                cells.append({"latex": latex, "input": text, "output_latex": None, "error": None})
+        del cells[len(latexes):]
         return cells
 
     def run_all(self):
         self.engine.reset()
         for i, cell in enumerate(self.notebook.cells):
-            result = self.engine.evaluate(cell["input"])
-            self.notebook.cells[i] = {
-                "input": cell["input"],
-                "output_latex": result["output_latex"],
-                "error": result["error"],
-            }
+            self.notebook.cells[i] = self._run(cell.get("latex"), cell["input"])
         return self.notebook.cells
 
     def new_notebook(self):

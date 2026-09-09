@@ -7,7 +7,7 @@ from mathnb.api import Api
 def test_evaluate_cell_appends_a_new_cell():
     api = Api()
     cell = api.evaluate_cell(None, "a:=2")
-    assert cell == {"input": "a:=2", "output_latex": "2", "error": None}
+    assert cell == {"latex": "a:=2", "input": "a:=2", "output_latex": "2", "error": None}
     assert api.notebook.cells == [cell]
 
 
@@ -101,18 +101,12 @@ def test_load_notebook_opens_a_dialog_when_no_path_is_given(tmp_path):
 
 def test_set_cell_texts_updates_existing_and_appends_new_cells():
     api = Api()
-    api.evaluate_cell(None, "a:=2")  # existing cell 0, has output_latex/error set
-
-    cells = api.set_cell_texts(["a:=99", "b:=3"])
-
-    assert len(cells) == 2
-    # existing index: input text updated, prior output/error preserved as-is
-    assert cells[0]["input"] == "a:=99"
-    assert cells[0]["output_latex"] == "2"
-    assert cells[0]["error"] is None
-    # new index: fresh cell with input set, output/error None
-    assert cells[1] == {"input": "b:=3", "output_latex": None, "error": None}
-    assert api.notebook.cells == cells
+    api.evaluate_cell(None, "a:=2")
+    cells = api.set_cell_texts(["a:=3", "b:=4"])
+    assert cells[0]["latex"] == "a:=3"
+    assert cells[0]["input"] == "a:=3"
+    assert cells[0]["output_latex"] == "2"  # cached output kept until re-run
+    assert cells[1] == {"latex": "b:=4", "input": "b:=4", "output_latex": None, "error": None}
 
 
 def test_set_cell_texts_truncates_cells_beyond_the_given_texts():
@@ -196,3 +190,41 @@ def test_save_notebook_to_nonexistent_directory_returns_error_instead_of_raising
 
     assert result["ok"] is False
     assert "error" in result
+
+
+def test_evaluate_cell_converts_latex_and_stores_both_forms():
+    api = Api()
+    cell = api.evaluate_cell(None, r"x\coloneq5^{2}")
+    assert cell["latex"] == r"x\coloneq5^{2}"
+    assert cell["input"] == "x:=5^(2)"
+    assert cell["output_latex"] == "25"
+    assert cell["error"] is None
+
+
+def test_unsupported_latex_is_a_cell_error_and_skips_the_engine():
+    api = Api()
+    api.evaluate_cell(None, "a:=1")
+    cell = api.evaluate_cell(None, r"a+\foo")
+    assert cell["output_latex"] is None
+    assert "Unsupported notation" in cell["error"]
+    assert cell["input"] == ""
+    assert api.evaluate_cell(0, "a")["output_latex"] == "1"
+
+
+def test_run_all_reconverts_latex_and_reports_unsupported_cells():
+    api = Api()
+    api.set_cell_texts([r"a\coloneq2", r"\foo", "a"])
+    results = api.run_all()
+    assert results[0]["output_latex"] == "2"
+    assert "Unsupported notation" in results[1]["error"]
+    assert results[2]["output_latex"] == "2"
+
+
+def test_v1_cells_without_latex_still_run(tmp_path):
+    path = tmp_path / "old.mnb"
+    path.write_text('{"cells": [{"input": "a:=2", "output_latex": null, "error": null}]}')
+    api = Api()
+    api.load_notebook(str(path))
+    results = api.run_all()
+    assert results[0]["output_latex"] == "2"
+    assert results[0]["latex"] is None

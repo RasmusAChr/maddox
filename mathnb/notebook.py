@@ -5,8 +5,8 @@ class Notebook:
     def __init__(self, cells=None):
         self.cells = cells if cells is not None else []
 
-    def add_cell(self, input_text="", output_latex=None, error=None):
-        cell = {"input": input_text, "output_latex": output_latex, "error": error}
+    def add_cell(self, input_text="", output_latex=None, error=None, latex=None):
+        cell = {"input": input_text, "output_latex": output_latex, "error": error, "latex": latex}
         self.cells.append(cell)
         return cell
 

@@ -25,7 +25,7 @@ def test_save_writes_expected_json_shape(tmp_path):
         data = json.load(f)
 
     assert data == {
-        "cells": [{"input": "x:=1", "output_latex": "1", "error": None}]
+        "cells": [{"input": "x:=1", "output_latex": "1", "error": None, "latex": None}]
     }
 
 
@@ -36,6 +36,6 @@ def test_from_dict_ignores_missing_cells_key():
 
 def test_add_cell_returns_the_new_cell():
     nb = Notebook()
-    cell = nb.add_cell(input_text="a:=2")
-    assert cell == {"input": "a:=2", "output_latex": None, "error": None}
+    cell = nb.add_cell(input_text="a:=2", latex="a\\coloneq2")
+    assert cell == {"input": "a:=2", "output_latex": None, "error": None, "latex": "a\\coloneq2"}
     assert nb.cells == [cell]
