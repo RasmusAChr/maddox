@@ -5,6 +5,10 @@ function buildCellDom() {
   const wrapper = document.createElement("div");
   wrapper.className = "cell";
 
+  const actions = document.createElement("div");
+  actions.className = "cell-actions";
+  wrapper.appendChild(actions);
+
   const main = document.createElement("div");
   main.className = "cell-main";
   wrapper.appendChild(main);
@@ -15,10 +19,6 @@ function buildCellDom() {
   const outputDiv = document.createElement("div");
   outputDiv.className = "output";
   main.appendChild(outputDiv);
-
-  const actions = document.createElement("div");
-  actions.className = "cell-actions";
-  wrapper.appendChild(actions);
 
   const runBtn = document.createElement("button");
   runBtn.className = "run-btn";
