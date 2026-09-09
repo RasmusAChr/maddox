@@ -39,9 +39,12 @@ const TEMPLATES = [
   ]},
 ];
 
+// "sqrt" is deliberately absent: MathLive's own "sqrt" inline shortcut builds
+// the 2D radical \sqrt{#?}, which \operatorname{sqrt} would replace with flat
+// upright text.
 const ENGINE_FUNCTIONS = [
   "solve", "simplify", "expand", "factor", "subs", "diff", "integrate",
-  "limit", "Matrix", "det", "inv", "eigenvals", "N", "clear", "sqrt",
+  "limit", "Matrix", "det", "inv", "eigenvals", "N", "clear",
 ];
 
 function buildCellDom() {
@@ -84,6 +87,13 @@ function configureMathField(mf) {
   });
   mf.inlineShortcuts = shortcuts;
   mf.smartFence = true;
+  // MathLive binds Ctrl+Enter to addRowAfter in math mode and handles it on its
+  // internal keyboard sink before our host keydown listener sees it, so inside a
+  // matrix the run key would grow the matrix and then run the mutated value.
+  // Drop those bindings; running the cell stays with bindCellKeys.
+  mf.keybindings = mf.keybindings.filter(
+    (kb) => !/^ctrl\+\[(Return|Enter)\]$/.test(kb.key)
+  );
 }
 
 function cellLatex(mf) {
@@ -127,13 +137,17 @@ function bindCellKeys(mf, getIndex) {
   });
 }
 
+// activeEditor is set here as well as on the focus event, because MathLive
+// dispatches focus asynchronously and templates may be inserted before it fires.
 function focusStart(mf) {
   mf.focus();
+  activeEditor = mf;
   mf.executeCommand("moveToMathfieldStart");
 }
 
 function focusEnd(mf) {
   mf.focus();
+  activeEditor = mf;
   mf.executeCommand("moveToMathfieldEnd");
 }
 
@@ -322,17 +336,22 @@ window.addEventListener("pywebviewready", async () => {
       "Math input failed to load: vendor/mathlive/mathlive.min.js is missing.";
     return;
   }
-  await setupMathLive();
-  renderTemplates();
-  document.getElementById("new-btn").onclick = newNotebook;
-  document.getElementById("open-btn").onclick = openNotebook;
-  document.getElementById("save-btn").onclick = saveNotebook;
-  document.getElementById("run-all-btn").onclick = runAll;
-  document.addEventListener("keydown", (e) => {
-    if (e.ctrlKey && e.shiftKey && e.key === "Enter") {
-      e.preventDefault();
-      runAll();
-    }
-  });
-  renderCells([]);
+  try {
+    await setupMathLive();
+    renderTemplates();
+    document.getElementById("new-btn").onclick = newNotebook;
+    document.getElementById("open-btn").onclick = openNotebook;
+    document.getElementById("save-btn").onclick = saveNotebook;
+    document.getElementById("run-all-btn").onclick = runAll;
+    document.addEventListener("keydown", (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === "Enter") {
+        e.preventDefault();
+        runAll();
+      }
+    });
+    renderCells([]);
+  } catch (e) {
+    document.getElementById("cells").textContent =
+      "Math input failed to initialise: " + e;
+  }
 });

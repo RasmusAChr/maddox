@@ -76,6 +76,7 @@ bracket.
 | `\exponentialE` (MathLive's e) | `E` |
 | `\imaginaryI` | `I` |
 | Greek `\alpha` … `\omega` | `alpha` … `omega` (SymPy auto-symbols) |
+| `\lambda`, `\beta`, `\gamma`, `\zeta`, `\Lambda`, `\varepsilon`, `\vartheta`, `\varphi` | `lamda`, `beta_`, `gamma_`, `zeta_`, `Lambda_`, `varepsilon_`, `vartheta_`, `varphi_` |
 | `x_{1}`, `x_1` | `x_1` |
 | `\le`, `\ge`, `\ne` | `<=`, `>=`, `!=` |
 | `\coloneq`, `:=` | `:=` |
@@ -84,12 +85,41 @@ bracket.
 | `\begin{pmatrix} a & b \\ c & d \end{pmatrix}` (also `bmatrix`, `matrix`) | `Matrix([[a, b], [c, d]])` |
 | `\{`, `\}` | `{`, `}` |
 | `\%` | `%` (left to the engine to reject) |
+| `\log_{2}`, `\sin^{2}` (script on a function name) | error: use `log(x, 2)` / `(sin(x))^2` |
+| `\frac{d}{dx}`, `\frac{dy}{dx}` (Leibniz derivative) | error: `Use diff(expr, x) for derivatives` |
+| a bare `\|` (absolute-value bars) | error: `Use Abs(x) for absolute value` |
 | `\ldots`, `\cdots` | error (unsupported) |
 | any other `\command` | error: `Unsupported notation: \command` |
 
 Plain characters (`+ - * / = ( ) [ ] , . digits letters`) pass through.
 `2x` stays `2x` — the engine's implicit multiplication handles it.
 Braces used only for grouping (`{2}`) become parentheses.
+
+**Name separation.** Every *name* the converter emits — `pi`, `oo`, `E`, `I`,
+`d`, the Greek symbols, function names (`sin`, `sqrt`, `Matrix`, and
+`\operatorname{…}` bodies) — is separated from an adjacent alphanumeric
+character with an explicit `*` on either side. The engine parses with SymPy's
+`implicit_multiplication_application`, whose `split_symbols` step shreds any
+unknown multi-letter token, so a glued name is not merely ugly but silently
+wrong: `2\pi r` → `2pir` → `2·p·i·r`, `x\sqrt{y}` → `xsqrt(y)` → `q·r·s·t·x·y`.
+The `*` is inserted only between two alphanumerics, so a call's parenthesis
+still binds (`\sin(x)` → `sin(x)`, `clear(\alpha)` → `clear(alpha)`); nothing is
+parenthesised.
+
+- `2\pi r` → `2*pi*r`, `2\pi` → `2*pi`, `x\pi` → `x*pi`, `x\infty` → `x*oo`
+- `\alpha\beta` → `alpha*beta_`, `\exponentialE^{\imaginaryI\pi}` → `E^(I*pi)`
+- `x\sqrt{y}` → `x*sqrt(y)`, `x\sin(x)` → `x*sin(x)`, `\sin(x)` → `sin(x)`
+- `\sin x` (a function name juxtaposed with a letter, which the engine has no
+  meaning for) therefore becomes `sin*x` and fails loudly with a TypeError
+  instead of silently evaluating to `i·n·s·x`.
+
+**Greek renames.** `\lambda` cannot be spelled `lambda` (a Python keyword);
+`beta`, `gamma` and `zeta` are SymPy *functions* and `Lambda` a SymPy class, so
+they would render as `B`/`Γ`/`ζ`-the-function or raise a `TypeError`; and
+`varepsilon`/`vartheta`/`varphi` are unknown multi-letter names that
+`split_symbols` shreds. All are emitted with a trailing `_`, which SymPy parses
+as a plain `Symbol` and `sympy.latex` still renders as the Greek letter
+(`\beta_{}`).
 
 Round-trip examples the tests must pin down:
 
@@ -100,6 +130,8 @@ Round-trip examples the tests must pin down:
 - `\operatorname{Matrix}\left(\left[\left[1,2\right],\left[3,4\right]\right]\right)` → `Matrix([[1,2],[3,4]])`
 - `\begin{pmatrix}1&2\\3&4\end{pmatrix}` → `Matrix([[1,2],[3,4]])`
 - `\operatorname{clear}\left(x\right)` → `clear(x)`
+- `2\pi r` → `2*pi*r`
+- `\exponentialE^{\imaginaryI\pi}` → `E^(I*pi)` → `-1`
 
 ## Frontend
 
@@ -113,14 +145,17 @@ Its default virtual-keyboard toggle is kept; sounds are disabled.
 `det`, `N`, `clear`, `subs`, `inv`, `eigenvals`, …) is registered as a
 MathLive inline shortcut so typing the name produces
 `\operatorname{name}` — rendered upright, converted back to the bare
-name. Typing `:=` produces `\coloneq`.
+name. Typing `:=` produces `\coloneq`. `sqrt` is deliberately *not* in that
+list: MathLive already ships a `sqrt` shortcut that builds the 2D radical
+`\sqrt{#?}`, and overriding it with `\operatorname{sqrt}` would replace the
+radical with flat upright text.
 
 **Keymap** (replaces the CodeMirror keymap one-for-one):
 
 | Key | Behaviour | Mechanism |
 |---|---|---|
 | Enter | new cell below, focus it | `beforeinput` with `inputType === 'insertLineBreak'` |
-| Ctrl+Enter | run this cell | `keybindings` entry → custom command |
+| Ctrl+Enter | run this cell | host `keydown`; MathLive's own `ctrl+[Return]`/`ctrl+[Enter]` → `addRowAfter` bindings are removed in `configureMathField`, or inside a matrix the run key would add a row before running |
 | Ctrl+Shift+Enter | run all | existing document-level listener |
 | Backspace on empty field | remove cell unless it is the only one | `keydown` when `mf.value === ''` |
 | Up / Down | move to previous/next cell | `keydown`; only when MathLive's own `moveUp`/`moveDown` cannot move (e.g. not inside a fraction), so in-expression navigation still wins |
@@ -167,9 +202,16 @@ as a best-effort display, and the next save writes `latex`.
 
 - `tests/test_latex_input.py`: one test per rule in the table plus the
   round-trip examples, and the unsupported-notation error.
+- `tests/test_latex_input_engine.py`: the same LaTeX run all the way through
+  `Engine.evaluate`, asserting the *value*. Conversion tests alone cannot see
+  the split-symbols class of bug, where plausible-looking engine text evaluates
+  to something else. Covers every entry of the frontend's `TEMPLATES` table
+  (read straight out of `notebook.js`, so the two cannot drift).
 - `tests/test_api.py`: `evaluate_cell` with LaTeX stores both `latex`
   and `input`; unsupported LaTeX yields an error dict; a v1 cell without
-  `latex` still loads and runs.
+  `latex` still loads and runs; `set_cell_texts` on unsupported LaTeX keeps the
+  cell's existing engine text (a Save must never blank an imported v1 cell)
+  while recording the error and dropping the stale output.
 - Frontend: as before, no automated UI tests; verified with
   `evaluate_js` probes and DPI-aware screenshots — specifically that
   `5^{2}` shows a raised exponent, a template shows placeholder boxes,
