@@ -84,6 +84,15 @@ function makeExtraKeys(getIndex) {
       moveToNextCell(getIndex());
     },
     "Shift-Enter": "newlineAndIndent",
+    "Backspace": function (cm) {
+      if (cm.getValue() !== "") return CodeMirror.Pass;
+      const i = getIndex();
+      if (i < cellEditors.length) {
+        removeCell(i);
+      } else {
+        moveToPrevCell(i);
+      }
+    },
     "Up": function (cm) {
       if (cm.getCursor().line === 0) {
         moveToPrevCell(getIndex());
@@ -121,6 +130,30 @@ function moveToNextCell(index) {
   if (nextIndex < cellEditors.length) {
     focusEditor(cellEditors[nextIndex], { line: 0, ch: 0 });
   } else if (phantomEditor) {
+    focusEditor(phantomEditor, { line: 0, ch: 0 });
+  }
+}
+
+function reindexCell(j) {
+  const editor = cellEditors[j];
+  const wrapper = editor.getWrapperElement().closest(".cell");
+  wrapper.dataset.index = j;
+  wrapper.querySelector(".run-btn").onclick = () => runCell(j);
+  editor.setOption("extraKeys", makeExtraKeys(() => j));
+}
+
+function removeCell(index) {
+  const editor = cellEditors[index];
+  editor.getWrapperElement().closest(".cell").remove();
+  cellEditors.splice(index, 1);
+  if (activeEditor === editor) activeEditor = null;
+  for (let j = index; j < cellEditors.length; j++) reindexCell(j);
+  syncTexts();
+  if (index > 0) {
+    moveToPrevCell(index);
+  } else if (cellEditors.length > 0) {
+    focusEditor(cellEditors[0], { line: 0, ch: 0 });
+  } else {
     focusEditor(phantomEditor, { line: 0, ch: 0 });
   }
 }
