@@ -67,17 +67,33 @@ async function newNotebook() {
 
 async function openNotebook() {
   const result = await window.pywebview.api.load_notebook();
-  if (!result.ok) return;
+  if (!result.ok) {
+    setStatus(`Error: ${result.error}`);
+    return;
+  }
   clearCells();
   result.cells.forEach((cell, i) => createCellElement(cell, i));
   if (result.cells.length === 0) addCell();
+  setStatus(`Opened ${result.path}`);
+}
+
+function syncTexts() {
+  return window.pywebview.api.set_cell_texts(cellEditors.map(e => e.getValue()));
+}
+
+function setStatus(text) {
+  const status = document.getElementById("status");
+  if (status) status.textContent = text;
 }
 
 async function saveNotebook() {
-  await window.pywebview.api.save_notebook();
+  await syncTexts();
+  const result = await window.pywebview.api.save_notebook();
+  setStatus(result.ok ? `Saved to ${result.path}` : `Error: ${result.error}`);
 }
 
 async function runAll() {
+  await syncTexts();
   const results = await window.pywebview.api.run_all();
   results.forEach((cell, index) => {
     const wrapper = document.querySelector(`.cell[data-index="${index}"]`);
