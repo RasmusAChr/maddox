@@ -75,6 +75,22 @@ _SPACING = {",", ";", "!", " ", "quad", "qquad", "enspace", "thinspace",
 _TEXT_LIKE = {"operatorname", "mathrm", "text", "mathit", "mathbf", "textrm", "mathsf"}
 _MATRIX_ENVS = {"pmatrix", "bmatrix", "matrix", "vmatrix", "Bmatrix"}
 
+# MathLive expands an inline shortcut (e.g. "solve" -> \operatorname{solve} per
+# notebook.js's ENGINE_FUNCTIONS) as \operatorname{\mathrm{solve}}, nesting a
+# \mathrm{} the shortcut config never asked for. raw_group() reads that
+# verbatim as the literal name "mathrm{solve}", so unwrap one layer of it.
+_NESTED_TEXT_LIKE = re.compile(
+    r"^(?:" + "|".join(sorted(_TEXT_LIKE)) + r")\{(.*)\}$", re.DOTALL
+)
+
+
+def _unwrap_nested_text_like(raw):
+    while True:
+        m = _NESTED_TEXT_LIKE.fullmatch(raw)
+        if not m:
+            return raw
+        raw = m.group(1)
+
 # _SIMPLE entries that stand for a symbol (rather than an operator) and so need
 # the atom marks; the rest ("*", "<=", ...) never touch a neighbouring name.
 _SYMBOL_COMMANDS = {"pi", "infty", "exponentialE", "imaginaryI", "differentialD"}
@@ -204,7 +220,7 @@ class _Converter:
                 return f"(({self.arg()})^(1/({n})))"
             return _ATOM + f"sqrt({self.arg()})"
         if name in _TEXT_LIKE:
-            return _atom(self.raw_group())
+            return _atom(_unwrap_nested_text_like(self.raw_group()))
         if name == "placeholder":
             self.raw_group()
             raise UnsupportedLatex("Fill in all placeholder fields first")

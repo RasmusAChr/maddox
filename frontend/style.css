@@ -215,6 +215,15 @@ math-field.cell-input {
   padding: 4px 8px;
   font-size: 16px;
   background: var(--surface);
+  /* This UI is fixed-light, but MathLive's own stylesheet switches its
+     "caret is inside this group" highlight box to a dark panel under
+     `prefers-color-scheme: dark`. Linux WebKitGTK follows the system GTK
+     theme for that media feature, so a dark GTK theme (unrelated to this
+     app's own light styling) turned the box into an unwanted dark-grey
+     block; Windows' WebView2 apparently didn't report dark there. Pin it
+     to MathLive's own light-mode default so it no longer depends on the
+     OS theme. */
+  --contains-highlight-background-color: #edf2f7;
 }
 
 math-field.cell-input:focus-within {

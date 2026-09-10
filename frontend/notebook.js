@@ -115,6 +115,10 @@ function importPlainText(mf, text) {
 // getIndex() returns this cell's current index; it is re-bound whenever
 // cells are inserted or removed (see reindexCell).
 function bindCellKeys(mf, getIndex) {
+  // Set by the "move-out" handler below when MathLive itself detects the
+  // caret is already at the field's top/bottom row and asks to leave it.
+  let lastMoveOutDirection = null;
+
   mf.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -124,13 +128,36 @@ function bindCellKeys(mf, getIndex) {
     } else if (e.key === "Backspace" && cellLatex(mf) === "") {
       e.preventDefault();
       if (cellEditors.length > 1) removeCell(getIndex());
+    } else if (
+      (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+      !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey
+    ) {
+      // On WebKitGTK (Linux), MathLive's own boundary detection for Up/Down
+      // does not reliably fire the "move-out" event below, so pressing Up/Down
+      // at a field's top/bottom row silently does nothing instead of moving
+      // to the previous/next cell. Left/Right and the "move-out" event itself
+      // work fine there -- it's specifically vertical boundary detection that
+      // doesn't. Fall back to moving cells ourselves whenever the caret
+      // provably didn't move, but only if "move-out" didn't already handle it
+      // (which it does on platforms where it works, e.g. Windows).
+      const direction = e.key === "ArrowUp" ? "upward" : "downward";
+      const positionBefore = mf.position;
+      lastMoveOutDirection = null;
+      requestAnimationFrame(() => {
+        if (lastMoveOutDirection === direction) return;
+        if (mf.position !== positionBefore) return;
+        if (direction === "upward") moveToPrevCell(getIndex());
+        else moveToNextCell(getIndex());
+      });
     }
   });
   mf.addEventListener("move-out", (e) => {
     if (e.detail.direction === "upward") {
+      lastMoveOutDirection = "upward";
       e.preventDefault();
       moveToPrevCell(getIndex());
     } else if (e.detail.direction === "downward") {
+      lastMoveOutDirection = "downward";
       e.preventDefault();
       moveToNextCell(getIndex());
     }
