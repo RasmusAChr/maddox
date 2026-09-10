@@ -19,6 +19,7 @@ TRANSFORMATIONS = standard_transformations + (
 
 _CLEAR = re.compile(r"^clear\((.*)\)$", re.DOTALL)
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_DECIMAL_SIG_FIGS = 6
 
 # Functions whose arguments name the variable to operate on: which argument
 # positions (or "rest" for every argument after the expression), and whether a
@@ -38,6 +39,37 @@ def _build_sympy_globals():
     globals_dict = {}
     exec("from sympy import *", globals_dict)
     return globals_dict
+
+
+def _decimal_approx_latex(value):
+    """"<exact> \\approx <decimal>" latex for an exact, non-integer real
+    number; None if `value` isn't one (e.g. it's symbolic, already a float,
+    a plain integer, or complex)."""
+    if not isinstance(value, sympy.Basic) or isinstance(value, (sympy.Integer, sympy.Float)):
+        return None
+    if not value.is_number or not value.is_real:
+        return None
+    try:
+        approx = sympy.N(value, _DECIMAL_SIG_FIGS)
+    except Exception:
+        return None
+    return sympy.latex(value) + r" \approx " + sympy.latex(approx)
+
+
+def _with_decimal_approximations(value, latex):
+    """Append a decimal approximation next to any exact, non-integer number
+    in `value` -- either the value itself, or (matching solve()'s usual
+    return shape) each element of a flat list of numbers."""
+    if isinstance(value, list):
+        fragments = []
+        changed = False
+        for element in value:
+            frag = _decimal_approx_latex(element)
+            fragments.append(frag if frag is not None else sympy.latex(element))
+            changed = changed or frag is not None
+        return r"\left[ " + ", ".join(fragments) + r"\right]" if changed else latex
+    frag = _decimal_approx_latex(value)
+    return frag if frag is not None else latex
 
 
 def _variable_names(arg, all_elements):
@@ -92,6 +124,8 @@ class Engine:
             latex = sympy.latex(value)
         except Exception as e:
             return {"output_latex": None, "error": f"Could not render result: {e}"}
+
+        latex = _with_decimal_approximations(value, latex)
 
         return {"output_latex": latex, "error": None}
 

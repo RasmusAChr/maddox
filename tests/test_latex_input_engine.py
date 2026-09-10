@@ -46,7 +46,11 @@ def run(latex):
 def test_latex_evaluates_to_the_expected_value(latex, expected):
     result = run(latex)
     assert result["error"] is None
-    assert result["output_latex"] == sympy.latex(expected)
+    # Exact non-integer numbers (e.g. the 1/2 from the integrate() row) get a
+    # " \approx <decimal>" suffix appended -- see _with_decimal_approximations
+    # in engine.py -- so check the exact value is a prefix rather than the
+    # whole string.
+    assert result["output_latex"].startswith(sympy.latex(expected))
 
 
 @pytest.mark.parametrize("latex, fragments", [

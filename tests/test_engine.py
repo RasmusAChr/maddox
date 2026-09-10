@@ -23,6 +23,34 @@ def test_equation_and_solve():
     assert result["output_latex"] == sympy.latex([sympy.Integer(-2), sympy.Integer(2)])
 
 
+def test_solve_appends_a_decimal_approximation_to_non_integer_solutions():
+    engine = Engine()
+    result = engine.evaluate("solve(3x=10, x)")
+    assert result["error"] is None
+    assert result["output_latex"] == r"\left[ \frac{10}{3} \approx 3.33333\right]"
+
+
+def test_solve_with_only_integer_solutions_is_unchanged():
+    engine = Engine()
+    result = engine.evaluate("solve(2x=10, x)")
+    assert result["error"] is None
+    assert result["output_latex"] == sympy.latex([sympy.Integer(5)])
+
+
+def test_bare_fraction_gets_a_decimal_approximation():
+    engine = Engine()
+    result = engine.evaluate("10/3")
+    assert result["error"] is None
+    assert result["output_latex"] == r"\frac{10}{3} \approx 3.33333"
+
+
+def test_complex_solutions_are_not_given_a_decimal_approximation():
+    engine = Engine()
+    result = engine.evaluate("solve(x^2 = -1, x)")
+    assert result["error"] is None
+    assert result["output_latex"] == sympy.latex([-sympy.I, sympy.I])
+
+
 def test_matrix_operations():
     engine = Engine()
     engine.evaluate("A:=Matrix([[1,2],[3,4]])")
