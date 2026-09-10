@@ -229,6 +229,23 @@ function insertCellAfter(index) {
   focusStart(mf);
 }
 
+// Retries `focusFn` (which should focus `target`) with backoff until
+// `target` actually has focus. On WebKitGTK (Linux), focusing a field right
+// after a sibling field's DOM node was removed can throw internally inside
+// MathLive (its focus-tracking gets confused by the removal) and/or land on
+// <body> instead, recovering on its own only after tens to ~100ms -- a
+// single deferred attempt isn't reliably enough. Harmless elsewhere: the
+// first attempt succeeds immediately and no retry fires.
+function ensureFocused(target, focusFn, attemptsLeft = 5, delay = 20) {
+  try {
+    focusFn();
+  } catch (e) {
+    // Swallow and retry below; see comment above.
+  }
+  if (document.activeElement === target || attemptsLeft <= 1) return;
+  setTimeout(() => ensureFocused(target, focusFn, attemptsLeft - 1, delay * 2), delay);
+}
+
 function removeCell(index) {
   const mf = cellEditors[index];
   cellWrapper(mf).remove();
@@ -237,9 +254,9 @@ function removeCell(index) {
   for (let j = index; j < cellEditors.length; j++) reindexCell(j);
   syncTexts();
   if (index > 0) {
-    moveToPrevCell(index);
+    ensureFocused(cellEditors[index - 1], () => moveToPrevCell(index));
   } else {
-    focusStart(cellEditors[0]);
+    ensureFocused(cellEditors[0], () => focusStart(cellEditors[0]));
   }
 }
 
