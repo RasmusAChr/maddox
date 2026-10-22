@@ -1,0 +1,53 @@
+# 0004 — Keyboard model: nothing should need the mouse
+
+**Status:** accepted, 2026-10-22. The owner's goal: "minimize mouse touch".
+
+## Principles
+
+1. Every feature has a key. Every dialog or panel works fully from the
+   keyboard: on open, focus goes to the obvious place; ↑/↓ select; Enter
+   acts; Esc returns to the notebook.
+2. Focus is never lost. A click on empty space never moves focus to
+   `<body>` (the mousedown handler in `main.ts`). A click on empty
+   notebook space puts the caret in the entry it hit, or in the last entry.
+3. Deleting never leaves broken structure. Matrix cells always show a box.
+   Bracket edges delete a whole `f(…)` call, not one bracket.
+4. Global shortcuts are handled in a capture-phase `keydown` on `window`
+   (`main.ts`). Entry shortcuts are handled in a capture-phase listener on
+   the math-field host (`Notebook.onKeyDown`). Both run before MathLive's
+   own handler, and MathLive bindings that conflict are removed in
+   `Notebook.configure`.
+
+## Key map
+
+| Keys | Where | Action |
+|---|---|---|
+| Enter | cell | Evaluate every maths line, go to the next cell |
+| Shift+Enter | cell | New line in the same cell |
+| `#` at the start of a line | cell | The line is text |
+| Ctrl+Enter | cell | New cell below |
+| Ctrl+Shift+Enter | anywhere | Run all (resets the engine first) |
+| ↑ / ↓ at the first or last line | cell | Previous / next cell |
+| Backspace in an empty cell | cell | Delete the cell |
+| Ctrl+Shift+Backspace | cell | Delete the cell |
+| Esc | while computing | Cancel (restarts the engine, clearing variables) |
+| Ctrl+M | anywhere | Matrix size dialog (Tab between fields, Enter inserts) |
+| Alt+↓/↑, Alt+→/← | in a matrix | Add a row below/above, a column right/left |
+| Alt+Shift+↓/→ | in a matrix | Delete the current row / column |
+| Tab | cell | Next empty box |
+| Backspace / Delete at a bracket edge | cell | Empty brackets: delete the call. Otherwise: select the call, press again to delete |
+| Ctrl+Backspace / Ctrl+Delete at a bracket edge | cell | Delete the whole call |
+| Ctrl+P (or Ctrl+K) | anywhere | Search templates and app actions |
+| Ctrl+B | anywhere | Toggle the template sidebar. Opening focuses its search field; closing returns to the cell |
+| ↑ / ↓, Enter, Esc | sidebar search field | Move the selection; insert, or toggle "More"; back to the cell |
+| Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S | anywhere | New / Open / Save / Save as |
+| F1 (or Ctrl+/) | anywhere | Shortcut list |
+
+Clicking a result pastes it into the cell being edited.
+
+## Removed MathLive defaults
+
+| MathLive key | Its action | Why removed |
+|---|---|---|
+| Ctrl/Alt+Enter, Alt+Tab | add a matrix row / column | turns a plain expression into a matrix by surprise |
+| Esc | raw-LaTeX mode | Esc means cancel here (typing `\` still opens LaTeX mode) |

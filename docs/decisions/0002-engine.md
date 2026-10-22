@@ -1,0 +1,42 @@
+# 0002 — Engine: Giac (WebAssembly) in a Web Worker
+
+**Status:** accepted, 2026-10-22.
+
+## Decision
+
+- **Which build.** We use Giac compiled to WebAssembly by its author,
+  Bernard Parisse (`giacwasm.js`, about 19 MB with the wasm embedded).
+  `app/scripts/fetch-giac.mjs` downloads it during `npm install` from
+  `www-fourier.univ-grenoble-alpes.fr/~parisse/giacjs.tar.gz` and checks a
+  pinned sha256. If upstream republishes, install fails on purpose: review
+  the new build, then update the hash. The file is never committed.
+- **Where it runs.** It runs in a module Web Worker
+  (`app/src/engine/giac.worker.ts`). The script is a classic Emscripten
+  script, so it is loaded with fetch plus indirect `eval`. That is why the
+  Tauri CSP allows `'unsafe-eval'` and `'wasm-unsafe-eval'`.
+- **Cancelling.** Esc kills the worker and starts a new one
+  (`Engine.cancel()`). That clears every user variable, and the UI says so.
+- **Evaluation** is in `app/src/engine/giac-session.ts`:
+  - Every input is stored with `maddox_result:=(…)`, so its LaTeX and
+    decimal value can be read back without evaluating it twice.
+  - The display uses `latex(regroup(…))`. `regroup` collects like terms
+    (x+x becomes 2x), as Xcas does by default. It is not a full simplify,
+    so `(x²−1)/(x−1)` stays as typed; the user can call `simplify()`.
+  - A decimal approximation is shown only when it adds information: the
+    exact form is not already a decimal, and the value is purely numeric.
+  - `ans` maps to the variable `maddox_ans`.
+- **Input conversion.** MathLive produces LaTeX, and
+  `app/src/engine/latex-to-giac.ts` converts it. TI conventions apply:
+  `log` is base 10, and `xy` is one variable.
+
+## Licence
+
+Giac is GPL-3.0, so Maddox is GPL-3.0-or-later (`app/LICENSE`).
+
+## Alternatives considered
+
+- Linking native Giac into Rust: faster startup, but building Giac on
+  Windows is hard (GMP/MPFR via MSYS2). Revisit if WebAssembly speed or
+  memory becomes a problem. The engine sits behind `Engine`, so swapping it
+  is local.
+- SymPy (legacy) and CortexJS Compute Engine: too slow, or not a real CAS.
