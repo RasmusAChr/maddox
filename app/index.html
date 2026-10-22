@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" />
+    <title>Maddox</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand" aria-label="Maddox">M</div>
+      <div class="doc-title"><span id="doc-name">Untitled</span><span id="dirty" class="dirty" hidden title="Unsaved changes">●</span></div>
+      <nav class="actions" aria-label="Commands">
+        <button data-action="search" title="Search templates and commands">Search <kbd>Ctrl P</kbd></button>
+        <button data-action="templates" title="Show or hide the template sidebar" aria-pressed="false">Templates <kbd>Ctrl B</kbd></button>
+        <button data-action="matrix" title="Insert a matrix">Matrix <kbd>Ctrl M</kbd></button>
+        <button data-action="run-all" title="Re-run every entry from the top">Run all <kbd>Ctrl ⇧ ↵</kbd></button>
+        <span class="divider"></span>
+        <button data-action="new" title="New notebook (Ctrl+N)">New</button>
+        <button data-action="open" title="Open (Ctrl+O)">Open</button>
+        <button data-action="save" title="Save (Ctrl+S)">Save</button>
+        <button data-action="help" class="icon" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts">?</button>
+      </nav>
+    </header>
+
+    <div class="workspace">
+      <aside id="templates" class="templates" aria-label="Templates"></aside>
+      <main id="notebook" class="notebook" aria-label="Calculations"></main>
+    </div>
+
+    <footer class="statusbar">
+      <span id="engine-status" class="engine-status" data-status="loading">Loading engine…</span>
+      <span id="hints" class="hints"></span>
+      <span id="message" class="message" role="status"></span>
+    </footer>
+
+    <dialog id="search-dialog" class="palette" aria-label="Search">
+      <input type="search" placeholder="Search — solve, derivative, matrix, save…" spellcheck="false" autocomplete="off" />
+      <div class="catalog-list" role="listbox"></div>
+      <div class="dialog-foot"><kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>Enter</kbd> insert · <kbd>Esc</kbd> close</div>
+    </dialog>
+
+    <dialog id="matrix-dialog" class="small-dialog" aria-label="Insert matrix">
+      <h2>Matrix</h2>
+      <div class="matrix-size">
+        <label>Rows <input type="number" min="1" max="10" /></label>
+        <span class="times">×</span>
+        <label>Columns <input type="number" min="1" max="10" /></label>
+      </div>
+      <div class="matrix-preview" role="img"></div>
+      <div class="dialog-foot"><kbd>Tab</kbd> switch · <kbd>↑</kbd><kbd>↓</kbd> change · <kbd>Enter</kbd> insert</div>
+    </dialog>
+
+    <dialog id="help-dialog" class="help-dialog" aria-label="Keyboard shortcuts">
+      <h2>Keyboard shortcuts</h2>
+      <div class="help-columns">
+        <section>
+          <h3>Entries</h3>
+          <dl>
+            <dt><kbd>Enter</kbd></dt><dd>Evaluate, go to next entry</dd>
+            <dt><kbd>Shift</kbd> <kbd>Enter</kbd></dt><dd>New line in the same entry</dd>
+            <dt><kbd>#</kbd></dt><dd>At the start of a line: the line is text</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Enter</kbd></dt><dd>New entry below</dd>
+            <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Previous / next entry</dd>
+            <dt><kbd>Backspace</kbd></dt><dd>Delete an empty entry</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Backspace</kbd></dt><dd>Delete this entry</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Enter</kbd></dt><dd>Run all from the top</dd>
+            <dt><kbd>Esc</kbd></dt><dd>Cancel a long computation</dd>
+          </dl>
+        </section>
+        <section>
+          <h3>Matrices</h3>
+          <dl>
+            <dt><kbd>Ctrl</kbd> <kbd>M</kbd></dt><dd>Insert a matrix of any size</dd>
+            <dt><kbd>Alt</kbd> <kbd>↓</kbd> / <kbd>↑</kbd></dt><dd>Add a row below / above</dd>
+            <dt><kbd>Alt</kbd> <kbd>→</kbd> / <kbd>←</kbd></dt><dd>Add a column right / left</dd>
+            <dt><kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>↓</kbd></dt><dd>Delete this row</dd>
+            <dt><kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>→</kbd></dt><dd>Delete this column</dd>
+            <dt><kbd>Tab</kbd></dt><dd>Next empty box</dd>
+          </dl>
+          <h3>Typing maths</h3>
+          <dl>
+            <dt><kbd>/</kbd></dt><dd>Fraction</dd>
+            <dt><kbd>^</kbd> <kbd>_</kbd></dt><dd>Power / subscript</dd>
+            <dt><code>sqrt</code> <code>int</code> <code>sum</code> <code>lim</code></dt><dd>Templates</dd>
+            <dt><code>:=</code></dt><dd>Assign, e.g. <code>a:=5</code>, <code>f(x):=x^2</code></dd>
+            <dt><code>ans</code></dt><dd>The previous result</dd>
+          </dl>
+        </section>
+        <section>
+          <h3>App</h3>
+          <dl>
+            <dt><kbd>Ctrl</kbd> <kbd>P</kbd></dt><dd>Search templates and commands</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>B</kbd></dt><dd>Show or hide the template sidebar</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>N</kbd></dt><dd>New notebook</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>O</kbd></dt><dd>Open</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>S</kbd></dt><dd>Save</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>S</kbd></dt><dd>Save as</dd>
+            <dt><kbd>F1</kbd></dt><dd>This list</dd>
+          </dl>
+          <p class="help-note">Enter evaluates every maths line of an entry; each result appears next to its line.</p>
+          <p class="help-note">Click a result to paste it into the entry you are editing.</p>
+        </section>
+      </div>
+      <form method="dialog"><button>Close</button></form>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
