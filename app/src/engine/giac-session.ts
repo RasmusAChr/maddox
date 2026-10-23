@@ -85,7 +85,8 @@ export class GiacSession {
     this.takePrinted();
   }
 
-  evaluate(giac: string): EvalResult {
+  /** `mode` overrides the answer mode for this one input (a cell switched with Alt+Enter). */
+  evaluate(giac: string, mode: AnswerMode = this.options.answerMode): EvalResult {
     // restart returns the names it cleared, RESULT among them, so storing
     // that list in RESULT is a "recursive definition" error.
     if (giac.trim() === "restart") {
@@ -124,8 +125,8 @@ export class GiacSession {
     }
     this.caseval(`${ANS_VARIABLE}:=${RESULT}`);
     this.takePrinted();
-    if (this.options.answerMode === "exact") return { ok: true, latex, approxLatex: null };
-    if (this.options.answerMode === "approx") {
+    if (mode === "exact") return { ok: true, latex, approxLatex: null };
+    if (mode === "approx") {
       // The decimal form takes the exact form's place, when there is one.
       return { ok: true, latex: showApprox(latex, approxText) ? approxLatex : latex, approxLatex: null };
     }

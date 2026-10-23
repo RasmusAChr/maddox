@@ -26,6 +26,7 @@
 | Shift+Enter | cell | New line in the same cell |
 | `#` at the start of a line | cell | The line is text |
 | Ctrl+Enter | cell | New cell below |
+| Alt+Enter | cell | Show this cell's answers as decimals (exact ones when the setting is "Decimals only"), or follow the setting again. Saved with the cell, marked ≈ (or =) |
 | Ctrl+Shift+Enter | anywhere | Run all (resets the engine first) |
 | ↑ / ↓ at the first or last line | cell | Previous / next cell |
 | Ctrl+← / Ctrl+→ | cell | Jump by word: a run of letters or digits, an operator, a function name, or a whole structure such as `(…)`, a fraction or a matrix. At a group's edge, leave the group |

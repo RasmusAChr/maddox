@@ -753,6 +753,29 @@ const gaps = await page.$$eval(".entry", (els) => {
 });
 check("stacked results don't touch", gaps.length === 2 && gaps.every((g) => g >= 6), JSON.stringify(gaps));
 
+// 29. Alt+Enter switches one cell to decimals (≈ marker, saved with the
+// cell), and back to the answers setting.
+await setAndRun("\\frac{7}{8}");
+await page.keyboard.press("ArrowUp");
+await page.keyboard.press("Alt+Enter");
+await waitIdle();
+await page.waitForTimeout(100);
+const chipOf = (needle) => page.$$eval(".entry", (els, n) => {
+  const el = els.find((e) => e.querySelector("math-field")?.value.includes(n));
+  const c = el?.querySelector(".answers-chip");
+  return c && !c.hidden ? c.textContent : null;
+}, needle);
+check("Alt+Enter shows the cell as decimals", (await resultFor("frac{7}{8}")) === "0.875", await resultFor("frac{7}{8}"));
+check("the switched cell shows ≈", (await chipOf("frac{7}{8}")) === "≈", await chipOf("frac{7}{8}"));
+check("Alt+Enter keeps the caret in the cell", (await current()).includes("frac{7}{8}"), await current());
+await page.waitForTimeout(600);
+const switched = await page.evaluate(() => localStorage.getItem("maddox.session"));
+check("the switch is saved with the cell", /frac\{7\}\{8\}","answers":"approx"/.test(switched ?? ""), switched?.slice(-200));
+await page.keyboard.press("Alt+Enter");
+await waitIdle();
+await page.waitForTimeout(100);
+check("Alt+Enter again follows the setting", (await resultFor("frac{7}{8}")) !== "0.875" && (await chipOf("frac{7}{8}")) === null, await resultFor("frac{7}{8}"));
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

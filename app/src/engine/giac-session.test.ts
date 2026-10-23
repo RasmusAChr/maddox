@@ -176,6 +176,14 @@ describe("answer modes and digits", () => {
     session.configure({ answerMode: "auto" });
   });
 
+  it("one input can override the mode (a cell switched with Alt+Enter)", () => {
+    expect(session.evaluate(latexToGiac("\\frac{1}{3}"), "approx")).toMatchObject({ ok: true, latex: "0.333333", approxLatex: null });
+    expect(run("\\frac{1}{3}")).toMatchObject({ ok: true, latex: "\\frac{1}{3}", approxLatex: "0.333333" });
+    session.configure({ answerMode: "approx" });
+    expect(session.evaluate(latexToGiac("\\frac{1}{3}"), "exact")).toMatchObject({ ok: true, latex: "\\frac{1}{3}", approxLatex: null });
+    session.configure({ answerMode: "auto" });
+  });
+
   it("digits follow the setting", () => {
     session.configure({ digits: 10 });
     expect(run("\\pi")).toMatchObject({ ok: true, approxLatex: "3.141592654" });

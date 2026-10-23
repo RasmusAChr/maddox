@@ -1,8 +1,8 @@
-import type { EvalResult, SessionOptions } from "./giac-session";
+import type { AnswerMode, EvalResult, SessionOptions } from "./giac-session";
 
 export type WorkerRequest =
   | { type: "init"; url: string }
-  | { type: "eval"; id: number; giac: string }
+  | { type: "eval"; id: number; giac: string; mode?: AnswerMode }
   | { type: "reset"; id: number }
   | { type: "options"; id: number; options: Partial<SessionOptions> };
 

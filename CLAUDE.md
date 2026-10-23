@@ -72,6 +72,10 @@ docs updated, a short report of what changed.
   in `settingsList()` in `main.ts`. Keep the quick ways (chip, shortcuts,
   Ctrl+P actions) next to it. "Reopen last notebook: Off" still restores
   unsaved work.
+- **Alt+Enter switches one cell** to the other answer form (decimals, or
+  exact when the setting is "Decimals only") and back. The cell shows ≈
+  (or =) and the choice is saved with it (`"answers"` in the file).
+  Ctrl+Enter stays "new cell below". Decided 2026-10-23.
 - Full key map: `docs/decisions/0004-keyboard-model.md`, and the F1 dialog
   in `app/index.html`.
 

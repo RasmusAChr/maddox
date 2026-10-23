@@ -547,6 +547,26 @@ button {
   display: none;
 }
 
+/* A cell switched with Alt+Enter to decimals (≈) or exact answers (=):
+   a small marker in the cell's right margin, out of the flex flow. */
+.answers-chip {
+  position: absolute;
+  top: 6px;
+  right: 5px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font: 600 11px/1.5 ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  cursor: pointer;
+}
+
+.answers-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* One row per input line; notebook.ts lines each row up with its line.
    Never a scroll container: the cell grows to fit its results, and results
    that don't fit beside the input wrap onto a row of their own below it. */

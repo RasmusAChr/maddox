@@ -1,6 +1,7 @@
 // Saving and opening notebooks: native dialogs under Tauri, a download and a
 // file picker in a plain browser (used during development).
 import type { AngleMode } from "./engine/giac-session";
+import type { Cell } from "./notebook/notebook";
 import { textToLatex } from "./notebook/lines";
 
 const FORMAT = "maddox-notebook";
@@ -10,13 +11,15 @@ const EXTENSION = "maddox";
 export const isTauri = "__TAURI_INTERNALS__" in window;
 
 /** What a .maddox file holds: the cells, and settings that change results. */
-export type NotebookDoc = { cells: string[]; angle: AngleMode };
+export type NotebookDoc = { cells: Cell[]; angle: AngleMode };
 
-// Each entry is {"latex": ...}: one cell, possibly several lines.
-// "settings" was added after version 1 shipped; readers treat it as optional.
+// Each entry is {"latex": ...}: one cell, possibly several lines, plus
+// "answers": "exact" | "approx" when the cell was switched with Alt+Enter.
+// "settings" and "answers" were added after version 1 shipped; readers treat
+// them as optional.
 export function serialize(doc: NotebookDoc): string {
   return JSON.stringify(
-    { format: FORMAT, version: VERSION, settings: { angle: doc.angle }, entries: doc.cells.map((latex) => ({ latex })) },
+    { format: FORMAT, version: VERSION, settings: { angle: doc.angle }, entries: doc.cells },
     null,
     2,
   );
@@ -33,12 +36,12 @@ export function readAngle(settings: unknown): AngleMode {
  * and {"text"} notes from a short-lived build with separate text blocks,
  * which become cells of # text lines.
  */
-export function toCells(entries: unknown[]): string[] {
-  return entries.map((e: any) => {
-    if (typeof e === "string") return e;
-    if (typeof e?.latex === "string") return e.latex;
-    if (typeof e?.text === "string") return textToLatex(e.text);
-    return "";
+export function toCells(entries: unknown[]): Cell[] {
+  return entries.map((e: any): Cell => {
+    if (typeof e === "string") return { latex: e };
+    if (typeof e?.text === "string") return { latex: textToLatex(e.text) };
+    const latex = typeof e?.latex === "string" ? e.latex : "";
+    return e?.answers === "exact" || e?.answers === "approx" ? { latex, answers: e.answers } : { latex };
   });
 }
 

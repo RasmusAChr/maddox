@@ -50,7 +50,7 @@ let dirty = false;
 // after the keystroke, so `dirty` alone can lag: a Ctrl+N right after typing
 // would discard the edit unasked. Comparing the content cannot lag.
 let savedContent: string | null = null;
-const currentContent = () => JSON.stringify(notebook.latexList);
+const currentContent = () => JSON.stringify(notebook.cells);
 
 // Degrees or radians, saved in each notebook. A new notebook starts in the
 // mode last used (degrees the very first time).
@@ -86,7 +86,7 @@ function markDirty() {
   clearTimeout(autosaveTimer);
   autosaveTimer = window.setTimeout(() => {
     try {
-      localStorage.setItem(SESSION_KEY, sessionRecord(notebook.latexList, dirty, angle));
+      localStorage.setItem(SESSION_KEY, sessionRecord(notebook.cells, dirty, angle));
     } catch {
       // Storage can be unavailable; autosave is only a convenience.
     }
@@ -116,7 +116,7 @@ function restoreSession(onlyIfUnsaved = false): boolean {
 /** Saves the notebook (asking for a name when it has none); true once it is on disk. */
 async function save(saveAs = false): Promise<boolean> {
   try {
-    const written = await saveNotebook({ cells: notebook.latexList, angle }, saveAs ? null : path);
+    const written = await saveNotebook({ cells: notebook.cells, angle }, saveAs ? null : path);
     if (!written) return false;
     path = written;
     dirty = false;
@@ -135,7 +135,7 @@ async function save(saveAs = false): Promise<boolean> {
 
 function markDirtyFree() {
   try {
-    localStorage.setItem(SESSION_KEY, sessionRecord(notebook.latexList, false, angle));
+    localStorage.setItem(SESSION_KEY, sessionRecord(notebook.cells, false, angle));
   } catch {
     // see markDirty
   }
@@ -222,10 +222,12 @@ async function newNotebook() {
 // notebook. Settings that change answers re-run the notebook at once.
 applyTheme();
 void engine.configure({ solveStyle: prefs.solveStyle, digits: prefs.digits, answerMode: prefs.answerMode });
+notebook.answerMode = prefs.answerMode;
 
 function setAnswerPref<K extends "solveStyle" | "digits" | "answerMode">(key: K, value: (typeof prefs)[K]) {
   setPref(key, value);
   void engine.configure({ [key]: value });
+  notebook.answerMode = prefs.answerMode;
   void notebook.runAll();
 }
 
@@ -434,6 +436,7 @@ function searchItems(): SearchItem[] {
       undefined,
       "solve answers format style sets textbook equations",
     ),
+    action("Switch this cell: exact / decimal", "Show this cell's answers in the other form, or follow the setting again", () => notebook.toggleAnswers(), "Alt+Enter", "approximate approx decimal exact numeric evalf cell answers"),
     action("Settings", "Angles, answers, digits, theme, zoom, startup", settings, "Ctrl+,", "preferences options configure theme digits"),
     action("Show or hide templates", "The template sidebar", ACTIONS.templates, "Ctrl+B", "sidebar panel"),
     action("Keyboard shortcuts", "List every shortcut", help, "F1", "help keys"),

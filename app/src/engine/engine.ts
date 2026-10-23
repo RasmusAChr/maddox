@@ -1,4 +1,4 @@
-import type { AngleMode, EvalResult, SessionOptions } from "./giac-session";
+import type { AngleMode, AnswerMode, EvalResult, SessionOptions } from "./giac-session";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
 
 export type EngineStatus = "loading" | "ready" | "busy" | "failed";
@@ -62,7 +62,7 @@ export class Engine {
     this.onStatus(status);
   }
 
-  private request(msg: { type: "eval"; giac: string } | { type: "reset" } | { type: "options"; options: Partial<SessionOptions> }): Promise<EvalResult> {
+  private request(msg: { type: "eval"; giac: string; mode?: AnswerMode } | { type: "reset" } | { type: "options"; options: Partial<SessionOptions> }): Promise<EvalResult> {
     return this.ready.then(
       () =>
         new Promise<EvalResult>((resolve) => {
@@ -75,8 +75,9 @@ export class Engine {
     );
   }
 
-  evaluate(giac: string): Promise<EvalResult> {
-    return this.request({ type: "eval", giac });
+  /** `mode` overrides the answer mode for this one input. */
+  evaluate(giac: string, mode?: AnswerMode): Promise<EvalResult> {
+    return this.request({ type: "eval", giac, mode });
   }
 
   async reset(): Promise<void> {

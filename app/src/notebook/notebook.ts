@@ -1,6 +1,6 @@
 import { MathfieldElement, convertLatexToMarkup } from "mathlive";
 import type { Engine } from "../engine/engine";
-import type { EvalResult } from "../engine/giac-session";
+import type { AnswerMode, EvalResult } from "../engine/giac-session";
 import { latexToGiac, UnsupportedLatex } from "../engine/latex-to-giac";
 import { OPERATOR_NAMES } from "../ui/commands";
 import { isTextLine, splitLines } from "./lines";
@@ -17,7 +17,17 @@ type Entry = {
   /** The input the shown results belong to; null when nothing was run. */
   evaluatedLatex: string | null;
   results: LineResult[];
+  /** Set when Alt+Enter switched this cell away from the global answer mode. */
+  answers: Answers | null;
+  /** The ≈ marker shown while `answers` is set. */
+  chip: HTMLElement;
 };
+
+/** A cell's own answer form, overriding the global setting. */
+export type Answers = "exact" | "approx";
+
+/** One cell as saved: its input, and its own answer form if it has one. */
+export type Cell = { latex: string; answers?: Answers };
 
 // Shortcuts MathLive applies while typing. Its defaults include surprises for
 // a calculator (e.g. "in" becomes ∈), so start from a short allowlist.
@@ -43,16 +53,19 @@ const MATRIX_KEYS: Record<string, MatrixAction> = {
 
 export type Context = { matrix: MatrixInfo | null };
 
-// Injected into each math-field's shadow root: text lines (# …) read as
-// headings. MathLive renders every text-mode character as span.ML__text.
 /** Minimum space, in px, between the results of one multi-line cell. */
 const RESULT_GAP = 8;
-const FIELD_CSS =`.ML__text { font-weight: 600; letter-spacing: 0.005em; }`;
+
+// Injected into each math-field's shadow root: text lines (# …) read as
+// headings. MathLive renders every text-mode character as span.ML__text.
+const FIELD_CSS = `.ML__text { font-weight: 600; letter-spacing: 0.005em; }`;
 
 export class Notebook {
   private entries: Entry[] = [];
   private active: Entry | null = null;
   private shortcuts: Record<string, any> | null = null;
+  /** The global answer mode (settings); Alt+Enter switches a cell to the other form. */
+  answerMode: AnswerMode = "auto";
   private resizeObserver = new ResizeObserver((records) => {
     for (const r of records) {
       const entry = this.entries.find((e) => e.el === r.target);
@@ -86,14 +99,44 @@ export class Notebook {
     return this.entries.map((e) => e.mf.value);
   }
 
+  get cells(): Cell[] {
+    return this.entries.map((e) => (e.answers ? { latex: e.mf.value, answers: e.answers } : { latex: e.mf.value }));
+  }
+
   /** Replaces every entry. Always leaves at least one. */
-  load(latexList: string[]) {
+  load(cells: Cell[]) {
     for (const e of this.entries) this.resizeObserver.unobserve(e.el);
     this.container.replaceChildren();
     this.entries = [];
     this.active = null;
-    const list = latexList.length ? latexList : [""];
-    list.forEach((latex, i) => this.createEntry(latex, i));
+    const list = cells.length ? cells : [{ latex: "" }];
+    list.forEach((cell, i) => this.createEntry(cell.latex, i, cell.answers ?? null));
+  }
+
+  /**
+   * Alt+Enter: the cell shows the other form of its answers (decimals, or
+   * exact ones when the global setting is "Decimals only"), or goes back to
+   * the global setting. Saved with the cell; re-runs it.
+   */
+  toggleAnswers(entry = this.active ?? this.entries[this.entries.length - 1]) {
+    entry.answers = entry.answers ? null : this.answerMode === "approx" ? "exact" : "approx";
+    this.showAnswersChip(entry);
+    this.onMessage(
+      entry.answers === "approx" ? "This cell shows decimals. Alt+Enter switches back."
+        : entry.answers === "exact" ? "This cell shows exact answers. Alt+Enter switches back."
+        : "This cell follows the answers setting again.",
+    );
+    this.onChange();
+    focusImmediately(entry.mf);
+    void this.evaluate(entry);
+  }
+
+  private showAnswersChip(entry: Entry) {
+    entry.chip.hidden = !entry.answers;
+    entry.chip.textContent = entry.answers === "exact" ? "=" : "≈";
+    entry.chip.title = entry.answers === "exact"
+      ? "This cell shows exact answers (Alt+Enter switches back)"
+      : "This cell shows decimals (Alt+Enter switches back)";
   }
 
   focusLast() {
@@ -135,7 +178,7 @@ export class Notebook {
 
   // ---- entries ------------------------------------------------------------
 
-  private createEntry(latex: string, index: number): Entry {
+  private createEntry(latex: string, index: number, answers: Answers | null = null): Entry {
     const el = document.createElement("div");
     el.className = "entry";
     const mf = new MathfieldElement();
@@ -143,9 +186,15 @@ export class Notebook {
     const resultEl = document.createElement("div");
     resultEl.className = "entry-result";
     resultEl.setAttribute("aria-live", "polite");
-    el.append(mf, resultEl);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "answers-chip";
+    chip.addEventListener("mousedown", (e) => e.preventDefault()); // keep focus in the cell
+    el.append(mf, resultEl, chip);
 
-    const entry: Entry = { el, mf, resultEl, evaluatedLatex: null, results: [] };
+    const entry: Entry = { el, mf, resultEl, evaluatedLatex: null, results: [], answers, chip };
+    chip.addEventListener("click", () => this.toggleAnswers(entry));
+    this.showAnswersChip(entry);
     const next = this.entries[index];
     this.container.insertBefore(el, next ? next.el : null);
     this.entries.splice(index, 0, entry);
@@ -237,6 +286,12 @@ export class Notebook {
       e.stopPropagation();
     };
     const mod = e.ctrlKey || e.metaKey;
+
+    if (e.key === "Enter" && e.altKey && !mod && !e.shiftKey) {
+      claim();
+      this.toggleAnswers(entry);
+      return;
+    }
 
     if (e.key === "Enter" && !e.altKey) {
       if (mod && e.shiftKey) return; // run all: handled globally
@@ -352,7 +407,7 @@ export class Notebook {
       if (entry.results[i] !== "pending") continue;
       let result: EvalResult;
       try {
-        result = await this.engine.evaluate(latexToGiac(lines[i]));
+        result = await this.engine.evaluate(latexToGiac(lines[i]), entry.answers ?? undefined);
       } catch (err) {
         if (!(err instanceof UnsupportedLatex)) throw err;
         result = { ok: false, error: err.message };
