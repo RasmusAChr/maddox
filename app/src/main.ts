@@ -26,6 +26,21 @@ const engine = new Engine(new URL("giac/giacwasm.js", document.baseURI).href);
 const notebook = new Notebook($("#sheet"), engine);
 void applyZoom();
 
+// Room to scroll the last cell up off the bottom edge, but only once the
+// sheet is taller than the window: a notebook that fits gets no scrollbar.
+{
+  const scroller = $("#notebook");
+  const sheet = $("#sheet");
+  const fit = () => {
+    // 28: the sheet's bottom margin when not tall (style.css).
+    const needed = sheet.offsetHeight + parseFloat(getComputedStyle(sheet).marginTop) + 28;
+    scroller.classList.toggle("tall", needed > scroller.clientHeight);
+  };
+  const observer = new ResizeObserver(fit);
+  observer.observe(sheet);
+  observer.observe(scroller);
+}
+
 // ---- document state -----------------------------------------------------------
 
 const SESSION_KEY = "maddox.session";

@@ -472,12 +472,17 @@ button {
 /* The notebook reads as a document: one sheet, centred. */
 .sheet {
   width: min(var(--sheet-width), 100% - 48px);
-  margin: 28px auto 40vh;
+  margin: 28px auto;
   overflow: clip;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--sheet);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+/* Taller than the window (main.ts): room to scroll the last cell up. */
+.notebook.tall .sheet {
+  margin-bottom: 40vh;
 }
 
 @media (max-width: 700px) {

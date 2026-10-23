@@ -703,6 +703,26 @@ const unsavedKept = await page.$$eval(".entry math-field", (els) => els.map((e) 
 check("…but unsaved work is still restored", unsavedKept.some((v) => v.includes("7") && v.includes("6")), JSON.stringify(unsavedKept));
 await page.evaluate(() => localStorage.removeItem("maddox.prefs"));
 
+// 26. A notebook that fits has no scrollbar; a tall one gets room to scroll
+// the last cell up off the bottom edge.
+const scrollRoom = () => page.evaluate(() => {
+  const nb = document.querySelector("#notebook");
+  return nb.scrollHeight - nb.clientHeight;
+});
+check("a notebook that fits doesn't scroll", (await scrollRoom()) <= 0, await scrollRoom());
+await page.evaluate(() =>
+  localStorage.setItem("maddox.session", JSON.stringify({ entries: Array.from({ length: 40 }, (_, i) => `${i}+1`), path: null, dirty: true, angle: "deg" })),
+);
+await page.reload();
+await page.waitForSelector("math-field");
+await waitIdle();
+const tallRoom = await page.evaluate(() => {
+  const nb = document.querySelector("#notebook");
+  const sheet = document.querySelector("#sheet");
+  return nb.scrollHeight - (sheet.offsetTop + sheet.offsetHeight) - nb.clientHeight * 0.3;
+});
+check("a tall notebook can scroll its end up the screen", tallRoom > 0, tallRoom);
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 
