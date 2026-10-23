@@ -1,7 +1,8 @@
 import { MathfieldElement, convertLatexToMarkup } from "mathlive";
 import type { Engine } from "../engine/engine";
 import type { AnswerMode, EvalResult } from "../engine/giac-session";
-import { latexToGiac, UnsupportedLatex } from "../engine/latex-to-giac";
+import { lineNames } from "../engine/dependencies";
+import { ANS_VARIABLE, latexToGiac, UnsupportedLatex } from "../engine/latex-to-giac";
 import { OPERATOR_NAMES } from "../ui/commands";
 import { isTextLine, splitLines } from "./lines";
 import { editMatrix, matrixAtCaret, matrixLatex, type MatrixAction, type MatrixInfo } from "./matrix";
@@ -90,6 +91,7 @@ export class Notebook {
     document.fonts?.addEventListener("loadingdone", () => this.relayout());
     void document.fonts?.ready.then(() => this.relayout());
     engine.onRestart = () => {
+      this.recalculation++;
       for (const e of this.entries) if (e.evaluatedLatex !== null) e.el.classList.add("stale");
       this.onMessage("Cancelled. The engine restarted, so variables were cleared — Ctrl+Shift+Enter re-runs everything.");
     };
@@ -174,6 +176,7 @@ export class Notebook {
 
   async runAll() {
     if (this.engine.status === "failed") return;
+    this.recalculation++;
     await this.engine.reset();
     for (const entry of [...this.entries]) {
       if (!this.entries.includes(entry)) continue;
@@ -260,12 +263,15 @@ export class Notebook {
   private removeEntry(entry: Entry) {
     const index = this.entries.indexOf(entry);
     if (index < 0 || this.entries.length === 1) return;
+    const defined = entry.evaluatedLatex === null ? [] : [...cellNames(entry.evaluatedLatex).assigns];
     this.resizeObserver.unobserve(entry.el);
     entry.el.remove();
     this.entries.splice(index, 1);
     if (this.active === entry) this.active = null;
     this.focus(this.entries[Math.max(0, index - 1)], index > 0 ? "end" : "start");
     this.onChange();
+    // Its definitions go with it: the cells that used them recalculate.
+    if (defined.length) void this.recalculateFrom(index, new Set(defined), defined, false);
   }
 
   private insertEntryAfter(entry: Entry): Entry {
@@ -457,7 +463,70 @@ export class Notebook {
     // Like a calculator: Enter on the last entry opens a fresh one.
     if (next) this.focus(next, "end");
     else if (entry.mf.value.trim()) this.insertEntryAfter(entry);
+    const before = entry.evaluatedLatex === null ? new Set<string>() : cellNames(entry.evaluatedLatex).assigns;
     await this.evaluate(entry);
+    if (!this.entries.includes(entry) || entry.evaluatedLatex === null) return;
+    const now = cellNames(entry.evaluatedLatex);
+    const dropped = [...before].filter((name) => !now.assigns.has(name));
+    if (now.assigns.size || dropped.length || now.stateful) {
+      await this.recalculateFrom(this.entries.indexOf(entry) + 1, new Set([...now.assigns, ...dropped]), dropped, now.stateful);
+    }
+  }
+
+  // ---- recalculation --------------------------------------------------------
+
+  /** Counts recalculations; a newer one (or Run all, or a cancel) stops an older one. */
+  private recalculation = 0;
+
+  /**
+   * After a definition changed, re-runs the cells from `start` on that use
+   * a changed name, top to bottom, and then the cells that use what those
+   * define (decision 0007). `dropped` names are no longer defined by that
+   * cell: the nearest cell above that defines them runs again, or they are
+   * cleared. `everything` (after restart, purge, assume) re-runs every cell.
+   */
+  private async recalculateFrom(start: number, changed: Set<string>, dropped: string[], everything: boolean) {
+    const run = ++this.recalculation;
+    const live = () => run === this.recalculation;
+    for (const name of dropped) {
+      const above = this.entries.slice(0, start).reverse().find((e) => e.evaluatedLatex !== null && cellNames(e.mf.value).assigns.has(name));
+      if (above) await this.rerun(above);
+      else await this.engine.evaluate(`purge(${name})`);
+      if (!live()) return;
+    }
+    let previousRan = true;
+    for (const entry of this.entries.slice(start)) {
+      if (!live()) return;
+      if (!this.entries.includes(entry) || entry.evaluatedLatex === null) {
+        previousRan = false;
+        continue;
+      }
+      const names = cellNames(entry.mf.value);
+      const uses = [...names.reads].some((n) => changed.has(n)) || (previousRan && names.reads.has(ANS_VARIABLE));
+      // A cell that defines a changed name itself runs again to put its own value back.
+      const redefines = [...names.assigns].some((n) => changed.has(n));
+      if (!everything && !uses && !redefines && !names.stateful) {
+        previousRan = false;
+        continue;
+      }
+      await this.rerun(entry);
+      if (!live()) return;
+      for (const n of names.assigns) {
+        if (everything || uses) changed.add(n);
+        else changed.delete(n);
+      }
+      previousRan = true;
+    }
+  }
+
+  /** Evaluates a cell again; results that changed flash briefly. */
+  private async rerun(entry: Entry) {
+    const before = resultsKey(entry);
+    await this.evaluate(entry);
+    if (resultsKey(entry) === before || !this.entries.includes(entry)) return;
+    entry.el.classList.remove("recalculated");
+    void entry.el.offsetWidth; // restart the animation
+    entry.el.classList.add("recalculated");
   }
 
   /** Evaluates every maths line of the cell in order; text and empty lines get no result. */
@@ -621,4 +690,28 @@ function ensureFocused(target: HTMLElement, attempt: () => void, attemptsLeft = 
   }
   if (document.activeElement === target || attemptsLeft <= 1) return;
   setTimeout(() => ensureFocused(target, attempt, attemptsLeft - 1, delay * 2), delay);
+}
+
+/** What a cell's maths lines assign and use, all lines together. */
+function cellNames(latex: string): { assigns: Set<string>; reads: Set<string>; stateful: boolean } {
+  const names = { assigns: new Set<string>(), reads: new Set<string>(), stateful: false };
+  for (const line of splitLines(latex)) {
+    if (!line || isTextLine(line)) continue;
+    let giac: string;
+    try {
+      giac = latexToGiac(line);
+    } catch {
+      continue; // shows its own error, defines nothing
+    }
+    const found = lineNames(giac);
+    found.assigns.forEach((n) => names.assigns.add(n));
+    found.reads.forEach((n) => names.reads.add(n));
+    names.stateful ||= found.stateful;
+  }
+  return names;
+}
+
+/** The results as text, to tell whether a re-run changed anything. */
+function resultsKey(entry: Entry): string {
+  return JSON.stringify(entry.results);
 }

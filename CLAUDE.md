@@ -83,6 +83,10 @@ docs updated, a short report of what changed.
   exact when the setting is "Decimals only") and back. The cell shows ≈
   (or =) and the choice is saved with it (`"answers"` in the file).
   Ctrl+Enter stays "new cell below". Decided 2026-10-23.
+- **Changing a definition recalculates.** Enter on `r := 4` re-runs the
+  cells below that use r (and what they define); a deleted definition is
+  cleared. Changed results flash briefly. Top to bottom only. Decided
+  2026-10-24, see `docs/decisions/0007-recalculation.md`.
 - Full key map: `docs/decisions/0004-keyboard-model.md`, and the F1 dialog
   in `app/index.html`.
 
@@ -133,7 +137,8 @@ npm run tauri build  # installers in src-tauri/target/release/bundle/
 | `app/src/engine/latex-to-giac.ts` | LaTeX (from MathLive) → Giac syntax |
 | `app/src/engine/giac-session.ts` | evaluate, errors, `ans`, decimals, LaTeX cleanup |
 | `app/src/engine/engine.ts`, `giac.worker.ts` | worker protocol; `cancel()` restarts the worker |
-| `app/src/notebook/notebook.ts` | cells, keys, per-line evaluation and result layout |
+| `app/src/notebook/notebook.ts` | cells, keys, per-line evaluation, recalculation, result layout |
+| `app/src/engine/dependencies.ts` | names a line assigns and uses (for recalculation) |
 | `app/src/notebook/lines.ts` | multi-line cells, `#` text lines |
 | `app/src/notebook/matrix.ts`, `mathlive-internals.ts` | matrix editing; all MathLive private access |
 | `app/src/ui/commands.ts` | every template and its category (sidebar + search) |

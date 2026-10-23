@@ -667,6 +667,24 @@ button {
   opacity: 0.4;
 }
 
+/* A result that changed because a definition above it did (Notebook.rerun). */
+.entry.recalculated .entry-result {
+  animation: recalculated 1.2s ease-out;
+  border-radius: 6px;
+}
+
+@keyframes recalculated {
+  from {
+    background: var(--accent-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry.recalculated .entry-result {
+    animation: none;
+  }
+}
+
 /* ---- status bar ---- */
 
 .statusbar {

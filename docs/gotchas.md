@@ -219,6 +219,10 @@ Re-check this list after upgrading.
   `Process.CloseMainWindow()` (the same message as clicking X). The page
   itself may not invoke `plugin:window|close`; the capability doesn't
   allow it.
+- **e2e: `mf.focus()` from `page.evaluate` doesn't take the keyboard.**
+  The next key press still goes to the previous cell. Move with ↑/↓ (as a
+  user would) and set `document.activeElement.value`. `setAndRun` leaves an
+  empty cell between the cells it makes, so ↑ until the wanted input.
 - **Port 1420.** The owner's `tauri dev` uses it. A Vite server started by
   an agent survives the agent's task being stopped on Windows, so find it
   by command line and kill only your own.
