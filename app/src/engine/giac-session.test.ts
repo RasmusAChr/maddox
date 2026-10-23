@@ -202,6 +202,69 @@ describe("angle mode", () => {
   });
 });
 
+describe("points and vectors", () => {
+  it("(a, b, …) is a point: shown with round brackets, computed like a vector", () => {
+    session.reset();
+    expect(run("P\\coloneq\\left(1,3\\right)")).toMatchObject({ ok: true, latex: "\\left(1,\\,3\\right)", approxLatex: null });
+    run("Q\\coloneq\\left(3,8\\right)");
+    expect(run("Q-P")).toMatchObject({ ok: true, latex: "\\left(2,\\,5\\right)" });
+    expect(run("2P")).toMatchObject({ ok: true, latex: "\\left(2,\\,6\\right)" });
+    expect(run("\\frac{P+Q}{2}")).toMatchObject({ ok: true, latex: "\\left(2,\\,\\frac{11}{2}\\right)", approxLatex: "\\left(2,\\,5.5\\right)" });
+    expect(run("\\left|Q-P\\right|")).toMatchObject({ ok: true, latex: "\\sqrt{29}" });
+    expect(run("P\\cdot Q")).toMatchObject({ ok: true, latex: "27" });
+    expect(run("\\left(1,2,3,4\\right)+\\left(1,1,1,1\\right)")).toMatchObject({ ok: true, latex: "\\left(2,\\,3,\\,4,\\,5\\right)" });
+  });
+
+  it("decimals in a point are rounded per coordinate (not 8,15,6)", () => {
+    expect(run("\\left(8,15\\right)")).toMatchObject({ ok: true, latex: "\\left(8,\\,15\\right)", approxLatex: null });
+    expect(run("\\left(1.5,\\frac{1}{3}\\right)")).toMatchObject({ ok: true, latex: "\\left(1.5,\\,0.333333\\right)" });
+  });
+
+  it("a number before a point multiplies it; a function is called", () => {
+    run("k\\coloneq3");
+    expect(run("k\\left(1,2\\right)")).toMatchObject({ ok: true, latex: "\\left(3,\\,6\\right)" });
+    run("g\\left(a,b\\right)\\coloneq a+b");
+    expect(run("g\\left(1,2\\right)")).toMatchObject({ ok: true, latex: "3" });
+  });
+
+  it("lists of points stay lists; lists and matrices are unchanged", () => {
+    expect(run("\\left[\\left(1,3\\right),\\left(3,8\\right)\\right]")).toMatchObject({
+      ok: true,
+      latex: "\\left[\\left(1,\\,3\\right),\\,\\left(3,\\,8\\right)\\right]",
+    });
+    expect(run("\\left[1,3\\right]")).toMatchObject({ ok: true, latex: "[1,3]" });
+    const m = run("\\begin{pmatrix}1&3\\\\3&8\\end{pmatrix}");
+    expect(m.ok && m.latex).toContain("pmatrix");
+  });
+
+  it("matrix times point; a point or list with a column matrix gives a column", () => {
+    run("X\\coloneq\\begin{pmatrix}1&1\\\\1&3\\end{pmatrix}");
+    expect(run("X\\cdot\\left(2,1\\right)")).toMatchObject({ ok: true, latex: "\\left(3,\\,5\\right)" });
+    // A list written by the user stays a list.
+    expect(run("X\\cdot\\left[2,1\\right]")).toMatchObject({ ok: true, latex: "[3,5]" });
+    const col = run("\\left(1,3\\right)+\\begin{pmatrix}1\\\\3\\end{pmatrix}");
+    expect(col.ok && col.latex.replace(/\s/g, "")).toBe("\\begin{pmatrix}2\\\\6\\end{pmatrix}");
+    run("P\\coloneq\\left(1,3\\right)");
+    const named = run("P-\\begin{pmatrix}1\\\\3\\end{pmatrix}");
+    expect(named.ok && named.latex.replace(/\s/g, "")).toBe("\\begin{pmatrix}0\\\\0\\end{pmatrix}");
+    const list = run("\\left[1,3\\right]+\\begin{pmatrix}1\\\\3\\end{pmatrix}");
+    expect(list.ok && list.latex.replace(/\s/g, "")).toBe("\\begin{pmatrix}2\\\\6\\end{pmatrix}");
+  });
+
+  it("positions count from 1", () => {
+    run("P\\coloneq\\left(1,3\\right)");
+    expect(run("P\\left[1\\right]")).toMatchObject({ ok: true, latex: "1" });
+    expect(run("P\\left[2\\right]")).toMatchObject({ ok: true, latex: "3" });
+    run("M\\coloneq\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}");
+    expect(run("M\\left[2,1\\right]")).toMatchObject({ ok: true, latex: "3" });
+  });
+
+  it("points survive a reset (the helpers are defined again)", () => {
+    session.reset();
+    expect(run("\\left(1,3\\right)")).toMatchObject({ ok: true, latex: "\\left(1,\\,3\\right)" });
+  });
+});
+
 describe("cleanLatex", () => {
   it.each([
     ["\\frac{-1}{2}", "-\\frac{1}{2}"],

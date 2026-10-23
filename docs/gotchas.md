@@ -87,7 +87,8 @@ Re-check this list after upgrading.
   `GiacSession.resolveCalls` decides:
   - a call if `type(name)` is `func` (built-in or user-defined), or if the
     brackets are followed by `:=` (a definition such as `f(x):=…`);
-  - otherwise `name*(…)`.
+  - otherwise `name*(…)`, or `name*ggbvect[…]` when the brackets hold a
+    comma (b times a point).
 
   Names from `\operatorname{…}` (solve, det, …) are always calls.
 - **`ans` is reserved**, and `Ans` follows internal calls. We use our own
@@ -106,7 +107,26 @@ Re-check this list after upgrading.
   eigenvects and trace, and `findError` turns those printed warnings into
   errors.
 - **Indexing is 0-based** in Giac's default mode: `L[0]` is the first
-  element (used by `formatSolve`).
+  element (used by `formatSolve`). What the user types counts from 1: the
+  converter turns `v[1]` into `v[0]` (`fromOne` in `latex-to-giac.ts`).
+  Session code that builds Giac input itself still writes 0-based indexes.
+- **`(1,3)` is a sequence, not a point.** It prints as `1,3`, `Q-P` and
+  `P+Q` give silently wrong numbers, and `evalf(seq, 6)` makes the 6 one
+  more element (`8,15,6`). Maddox writes points as `ggbvect[1,3]`, Giac's
+  GeoGebra vector (subtype 27). See decision 0005.
+  - `ggbvect` keeps its subtype through `+ − ·` scalar, `/`, `cross`,
+    `regroup` and `evalf`. Matrix × point returns a plain list, so
+    `GiacSession.evaluate` turns that back into a point.
+  - `latex()` prints it as the text `ggbvect[1,3]`, so `shapedLatex`
+    renders points, lists of points and sequences itself.
+  - `change_subtype` is not in this build. `ggbvect[op(v)]` makes a point
+    from a list.
+  - A point or flat list plus a column matrix gives `poly1[…]` garbage
+    (`[1,3]+[[1],[3]]`) or, for `-`, a point. `GiacSession` checks the
+    operands first (`maddox_kind`) and turns both into columns
+    (`asColumns`).
+  - Giac's loop syntax inside `caseval` definitions is fragile (`local` in a
+    `for` fails to parse). The session helpers use `when(…)` and `apply`.
 - **Display simplification.** Autosimplify settings do not affect
   `caseval`. Results are wrapped in `regroup()` for display.
 - **Loading under Node.** The script declares `var Module` at the top

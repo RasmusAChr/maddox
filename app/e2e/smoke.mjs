@@ -723,6 +723,26 @@ const tallRoom = await page.evaluate(() => {
 });
 check("a tall notebook can scroll its end up the screen", tallRoom > 0, tallRoom);
 
+// 27. Points: (a, b) typed at the keyboard is a point, shown with round
+// brackets, and computes like a vector; positions count from 1.
+const typeAndRun = async (text) => {
+  await page.keyboard.press("Control+Enter");
+  await page.keyboard.type(text);
+  await page.keyboard.press("Enter");
+  await waitIdle();
+  await page.waitForTimeout(100);
+};
+await typeAndRun("Pa:=(1,3");
+check("a typed point shows as (1, 3)", (await resultFor("Pa\\coloneq")) === "\\left(1,\\,3\\right)", await resultFor("Pa\\coloneq"));
+await typeAndRun("Qa:=(3,8");
+await typeAndRun("Qa-Pa");
+check("Q − P computes like a vector", (await resultFor("Qa-Pa")) === "\\left(2,\\,5\\right)", await resultFor("Qa-Pa"));
+await typeAndRun("Qa[2");
+check("Qa[2] is the second coordinate", (await resultFor("Qa\\left\\lbrack2")) === "8", await resultFor("Qa\\left\\lbrack2"));
+await typeAndRun("(8,15");
+const pointApprox = await page.$$eval(".entry", (els) => els.find((e) => e.querySelector("math-field")?.value === "\\left(8,15\\right)")?.querySelector(".approx")?.textContent ?? null);
+check("a whole-number point has no stray decimal (not 8,15,6)", pointApprox === null, pointApprox);
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

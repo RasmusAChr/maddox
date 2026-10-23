@@ -14,7 +14,11 @@ const cases: [string, string][] = [
   // a typed name before "(" is left for the engine to decide (call or product)
   ["f\\left(3\\right)", `f${CALL_OR_PRODUCT}(3)`],
   ["3x\\left(4y+8z\\right)", `3*x${CALL_OR_PRODUCT}(4*y+8*z)`],
-  ["v\\left[1\\right]", "v[1]"],
+  // positions count from 1, as in maths notation
+  ["v\\left[1\\right]", "v[0]"],
+  ["M\\left[2,1\\right]", "M[1,0]"],
+  ["M\\left[1\\right]\\left[2\\right]", "M[0][1]"],
+  ["v_2\\left[k+1\\right]", "v_2[(k+1)-1]"],
   ["5!", "5!"],
   ["x^{2}y", "x^(2)*y"],
   ["x_1+x_{2}", "x_1+x_2"],
@@ -73,6 +77,20 @@ const cases: [string, string][] = [
   ["\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}^{-1}", "[[1,2],[3,4]]^(-1)"],
   ["\\begin{pmatrix}\\frac{1}{2}&x^2\\end{pmatrix}", "[[((1)/(2)),x^(2)]]"],
   ["\\left[1,2,3\\right]", "[1,2,3]"],
+  // round brackets with a comma are a point, of any length
+  ["\\left(1,3\\right)", "ggbvect[1,3]"],
+  ["P_1\\coloneq\\left(1,3\\right)", "P_1:=ggbvect[1,3]"],
+  ["\\left(1,2,3,4\\right)", "ggbvect[1,2,3,4]"],
+  ["(1,3)", "ggbvect[1,3]"],
+  ["2\\left(1,3\\right)", "2*ggbvect[1,3]"],
+  ["\\left(1,3\\right)\\left(3,8\\right)", "ggbvect[1,3]*ggbvect[3,8]"],
+  ["\\left[\\left(1,3\\right),\\left(3,8\\right)\\right]", "[ggbvect[1,3],ggbvect[3,8]]"],
+  ["\\left(\\frac{1}{2},x\\right)", "ggbvect[((1)/(2)),x]"],
+  // …but not a call's arguments, a function's parameters, or braces
+  ["f\\left(1,3\\right)", `f${CALL_OR_PRODUCT}(1,3)`],
+  ["\\operatorname{subst}\\left(x,x=2\\right)", "subst(x,x=2)"],
+  ["\\left(x,y\\right)\\to x+y", "(x,y)->x+y"],
+  ["\\left\\{1,2\\right\\}", "(1,2)"],
   // degrees: ° is a factor the session sets per angle mode
   ["30^{\\circ}", "30*maddox_deg"],
   ["30^\\circ", "30*maddox_deg"],
@@ -93,6 +111,7 @@ describe("latexToGiac", () => {
     ["\\differentialD x", /d on its own/],
     ["\\mathbb{R}", /Unsupported/],
     ["1&2", /outside a matrix/],
+    ["v\\left[0\\right]", /start at 1/],
   ];
   it.each(errors)("rejects %s", (latex, message) => {
     expect(() => latexToGiac(latex)).toThrow(UnsupportedLatex);

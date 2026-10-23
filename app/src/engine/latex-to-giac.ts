@@ -11,8 +11,35 @@
 //
 // Multi-letter runs stay one name ("xy" is the variable xy), matching the
 // TI-Nspire and Giac convention.
+//
+// Round brackets holding a comma are a point (a vector of any length):
+// (1,3) becomes POINT[1,3], Giac's GeoGebra vector, which keeps its kind
+// through arithmetic so results show as (…) again. Not after a function name
+// (a call), and not before -> ((x,y)->x+y is a function). Square brackets
+// after a name index from 1, as in maths notation: v[1] is the first element.
 
 export class UnsupportedLatex extends Error {}
+
+/** Giac's point type: a vector that prints and computes like one. */
+export const POINT = "ggbvect";
+
+/** Splits on commas that are not inside (), [] or {}. */
+export function splitTopLevel(s: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if ("([{".includes(c)) depth++;
+    else if (")]}".includes(c)) depth--;
+    else if (c === "," && depth === 0) {
+      parts.push(s.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(s.slice(start));
+  return parts;
+}
 
 /** What "ans" (the previous result) becomes; Giac reserves the name ans. */
 export const ANS_VARIABLE = "maddox_ans";
@@ -33,7 +60,16 @@ type Token = { kind: "cmd" | "char"; value: string };
 //   post:  a postfix that ends an operand (^(...), !) but cannot start one
 //   op:    an operator or punctuation
 type Kind = "value" | "name" | "fname" | "post" | "op";
-type Piece = { text: string; kind: Kind };
+type Piece = {
+  text: string;
+  kind: Kind;
+  /** A round-bracket group with a comma: its inside, e.g. "1,3". */
+  tuple?: string;
+  /** A square-bracket group: its inside. */
+  bracket?: string;
+  /** An index, v[…], so a following […] indexes further: M[1][2]. */
+  index?: boolean;
+};
 
 const GREEK = new Set([
   "alpha", "beta", "gamma", "delta", "epsilon", "varepsilon", "zeta", "eta",
@@ -111,18 +147,26 @@ class Emitter {
 
   push(p: Piece) {
     const prev = this.pieces[this.pieces.length - 1];
+    // (x,y)->x+y: the brackets hold a function's parameters, not a point.
+    if (p.text === "->" && prev?.tuple !== undefined) prev.text = `(${prev.tuple})`;
+    let asPoint = p.tuple !== undefined;
     if (prev && endsOperand(prev) && startsOperand(p)) {
       const named = prev.kind === "name" || prev.kind === "fname";
-      if (named && p.text.startsWith("[")) {
+      if ((named || prev.index) && p.bracket !== undefined) {
         // indexing: v[1]
+        p = { ...p, text: `[${fromOne(p.bracket)}]`, index: true };
       } else if (prev.kind === "fname" && p.text.startsWith("(")) {
         // a command: solve(...)
+        asPoint = false;
       } else if (prev.kind === "name" && p.text.startsWith("(")) {
+        // GiacSession decides; it makes b(1,3) a product with a point.
         this.pieces.push({ text: CALL_OR_PRODUCT, kind: "op" });
+        asPoint = false;
       } else {
         this.pieces.push({ text: "*", kind: "op" });
       }
     }
+    if (asPoint) p = { ...p, text: `${POINT}[${p.tuple}]` };
     this.pieces.push(p);
   }
 
@@ -251,7 +295,7 @@ class Converter {
         const close = c === "(" ? ")" : "]";
         const inner = this.convertUntil(atChar(close));
         this.expectChar(close);
-        out.push({ text: c + inner + close, kind: "value" });
+        out.push(group(c, inner, close));
         return;
       }
       case ")":
@@ -444,7 +488,9 @@ class Converter {
     // An unclosed fence still in progress, e.g. \left(x\right. while typing.
     const left = o || (c === "]" ? "[" : "(");
     const right = c || (left === "[" ? "]" : ")");
-    out.push({ text: left + inner + right, kind: "value" });
+    // \left\{…\right\} also becomes "(…)", but braces are not a point.
+    const brace = open.value === "{" || open.value === "lbrace";
+    out.push(brace ? { text: left + inner + right, kind: "value" } : group(left, inner, right));
   }
 
   private frac(out: Emitter, stop?: Stop) {
@@ -550,6 +596,29 @@ class Converter {
     const matrix = "[" + rows.map((r) => "[" + r.join(",") + "]").join(",") + "]";
     out.push({ text: env === "vmatrix" ? `det(${matrix})` : matrix, kind: "value" });
   }
+}
+
+/** A bracketed group, marked as a point or a square-bracket group for Emitter.push. */
+function group(open: string, inner: string, close: string): Piece {
+  const piece: Piece = { text: open + inner + close, kind: "value" };
+  if (open === "(" && close === ")" && splitTopLevel(inner).length > 1) piece.tuple = inner;
+  if (open === "[" && close === "]") piece.bracket = inner;
+  return piece;
+}
+
+/** Index positions as written (from 1) to Giac's (from 0): v[1] is v[0]. */
+function fromOne(inside: string): string {
+  return splitTopLevel(inside)
+    .map((position) => {
+      const p = position.trim();
+      if (p === "") throw new UnsupportedLatex("Write a position inside the brackets, e.g. v[1]");
+      if (/^\d+$/.test(p)) {
+        if (Number(p) === 0) throw new UnsupportedLatex("Positions start at 1: the first element is [1]");
+        return String(Number(p) - 1);
+      }
+      return `(${p})-1`;
+    })
+    .join(",");
 }
 
 function unwrapTextLike(raw: string): string {
