@@ -325,6 +325,23 @@ describe("units", () => {
     expect(result("1\\mathrm{in}\\to\\mathrm{cm}")).toMatchObject({ ok: true, latex: "2.54\\,\\mathrm{cm}" });
   });
 
+  it("convert temperatures with →, through kelvin", () => {
+    const deg = (n: string, c: string) => `${n}\\,^{\\circ}\\mathrm{${c}}`;
+    expect(result("20\\mathrm{°C}\\to\\mathrm{°F}")).toMatchObject({ ok: true, latex: deg("68", "F") });
+    expect(result("100\\mathrm{°F}\\to\\mathrm{°C}")).toMatchObject({ ok: true, latex: deg("\\frac{340}{9}", "C"), approxLatex: deg("37.7778", "C") });
+    expect(result("0\\mathrm{^\\circ C}\\to\\mathrm{K}")).toMatchObject({ ok: true, latex: "273.15\\,\\mathrm{K}" });
+    expect(result("300\\mathrm{K}\\to\\mathrm{°C}")).toMatchObject({ ok: true, latex: deg("26.85", "C") });
+    expect(result("-40\\mathrm{°C}\\to\\mathrm{°F}")).toMatchObject({ ok: true, latex: deg("-40", "F") });
+  });
+
+  it("temperatures only convert; other uses are explained", () => {
+    for (const bad of ["20\\mathrm{°C}+5\\mathrm{°C}", "2\\cdot20\\mathrm{°C}", "20\\mathrm{°C}", "5\\mathrm{m}\\to\\mathrm{°C}"]) {
+      expect(result(bad)).toMatchObject({ ok: false, error: expect.stringMatching(/Temperatures can only be converted/) });
+    }
+    // ° alone is still the angle
+    expect(result("\\sin\\left(30^{\\circ}\\right)")).toMatchObject({ ok: true, latex: "\\frac{1}{2}" });
+  });
+
   it("units are not variables, and mistakes are explained", () => {
     run("m\\coloneq2");
     expect(result("5\\mathrm{m}")).toMatchObject({ ok: true, latex: "5\\,\\mathrm{m}" });

@@ -159,7 +159,11 @@ Re-check this list after upgrading.
   - `convert(a, _m/_s)` works; the `=>` operator fails with `_m/_s`.
   - `usimplify` names units (kg·m/s² is N) but makes the number a decimal;
     `tidyUnits` keeps the exact number when the factor is 1.
-  - °C/°F don't convert (affine scales); not supported yet.
+  - °C/°F are affine scales, so `convert` can't do them: `maddox_temp`
+    goes through kelvin. A result is the unevaluated call `maddox_degF(68)`;
+    its `sommet` is `of`, `evalf` does not look inside it, and `string()`
+    is how it is recognised. MathLive writes a typed ° in unit mode as
+    `\mathrm{\degree C}`.
 - **Display simplification.** Autosimplify settings do not affect
   `caseval`. Results are wrapped in `regroup()` for display.
 - **Loading under Node.** The script declares `var Module` at the top

@@ -422,7 +422,7 @@ export class Notebook {
   }
 
   /**
-   * A key in unit mode. Letters, digits and ^ (m²) are part of the unit; /
+   * A key in unit mode. Letters, digits, ° (°C) and ^ (m²) are part of the unit; /
    * stays inline (km/h, not a fraction); * is a · between units (MathLive
    * would serialise a \cdot inside the upright group as plain letters).
    * Space or Esc leaves unit mode; any other key leaves it and does its
@@ -431,6 +431,10 @@ export class Notebook {
   private unitKey(entry: Entry, e: KeyboardEvent): boolean {
     if (e.ctrlKey || e.metaKey || e.altKey || ["Shift", "Backspace", "Delete", "CapsLock"].includes(e.key)) return false;
     if (/^[A-Za-z0-9^]$/.test(e.key)) return false;
+    if (e.key === "°") {
+      entry.mf.insert("°"); // °C, °F: part of the unit, not the angle sign
+      return true;
+    }
     if (e.key === "/") {
       entry.mf.insert("/");
       return true;

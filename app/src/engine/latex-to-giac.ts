@@ -783,19 +783,37 @@ function unitToGiac(text: string): string {
   const source = text
     .replace(/\\Omega\s*/g, "Ω")
     .replace(/\\mu\s*|µ/g, "u")
+    // °C and °F as MathLive or the keyboard write them: ° alone is the angle, so these stay one token.
+    .replace(/\^\s*\{?\\(?:circ|degree)\}?\s*|\\(?:circ|degree)\s*|º|˚/g, "°")
+    .replace(/℃/g, "°C")
+    .replace(/℉/g, "°F")
     .replace(/\\cdot|·|\\,|\\ |~/g, "*")
     .replace(/[{}]/g, "")
     .trim();
   let giac = "";
-  for (const m of source.matchAll(/([A-Za-zΩ]+)|(\^\s*-?\d+(?:\.\d+)?)|([*/()])|(\s+)|(.)/gy)) {
-    if (m[1]) giac += `_${UNIT_ALIASES[m[1]] ?? m[1]}`;
-    else if (m[2]) giac += `^(${m[2].slice(1).trim()})`;
-    else if (m[3]) giac += m[3];
-    else if (m[4]) giac += "*";
+  for (const m of source.matchAll(/(°\s*[CF])|([A-Za-zΩ]+)|(\^\s*-?\d+(?:\.\d+)?)|([*/()])|(\s+)|(.)/gy)) {
+    if (m[1]) giac += `_deg${m[1].slice(-1)}`;
+    else if (m[2]) giac += `_${UNIT_ALIASES[m[2]] ?? m[2]}`;
+    else if (m[3]) giac += `^(${m[3].slice(1).trim()})`;
+    else if (m[4]) giac += m[4];
+    else if (m[5]) giac += "*";
     else throw new UnsupportedLatex(`Unsupported unit: ${text}`);
   }
   if (!giac) throw new UnsupportedLatex("The unit is empty");
   return `(${giac.replace(/\*+/g, "*").replace(/^\*|\*$/g, "")})`;
+}
+
+/**
+ * 20 °C → °F or K, and back. The scales have an offset, so Giac's convert()
+ * can't do it: maddox_temp (GiacSession) does. Null when it isn't a plain
+ * number with a temperature unit going to another one.
+ */
+function temperatureConversion(source: string, target: string): string | null {
+  const to = /^\(_(degC|degF|K)\)$/.exec(target)?.[1];
+  const from = /^(.*?)\*?\(_(degC|degF|K)\)$/s.exec(source);
+  if (!to || !from || from[2] === to || from[1].includes("_")) return null;
+  const scale = (name: string) => name.slice(-1);
+  return `maddox_temp(${from[1] || "1"},"${scale(from[2])}","${scale(to)}")`;
 }
 
 /** expr -> unit, at the top level, converts: 72 km/h → m/s. */
@@ -808,6 +826,8 @@ function conversion(giac: string): string {
     else if (depth === 0 && c === ">" && giac[i - 1] === "-") {
       // Only units (and powers) after the arrow; (x,y)->x+y stays a function.
       const target = giac.slice(i + 1);
+      const temperature = temperatureConversion(giac.slice(0, i - 1), target);
+      if (temperature) return temperature;
       const rest = target.replace(/_[A-Za-z]+/g, "");
       if (rest === target || !/^[\d*/^().\-]*$/.test(rest)) return giac;
       return `convert(${giac.slice(0, i - 1)},${target})`;

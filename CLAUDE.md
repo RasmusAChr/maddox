@@ -62,7 +62,8 @@ docs updated, a short report of what changed.
   `docs/decisions/0005-points-and-vectors.md`.
 - **Units are upright, typed with Ctrl+U** (`5 m/s`; italic m is a
   variable), and `→` converts (`72 km/h → m/s`). Results use a named SI
-  unit when exact (N, J, V). No °C/°F yet. Decided 2026-10-23, see
+  unit when exact (N, J, V). °C/°F only convert (`20 °C → °F`), no
+  arithmetic. Decided 2026-10-23, see
   `docs/decisions/0006-units.md`.
 - **% is always hundredths**: `20%` is 0.2, so `150+20%` is 150.2 (as on
   the Nspire and in Excel, not a shop calculator). Decided 2026-10-23.

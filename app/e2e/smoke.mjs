@@ -864,6 +864,31 @@ await waitIdle();
 await page.waitForTimeout(100);
 check("an unknown unit is explained", (await resultOfCurrent()) === "Unknown unit: xyz", await resultOfCurrent());
 
+// 32. Temperatures: ° inside unit mode makes °C / °F, → converts, and nothing
+// else is allowed with them.
+await page.keyboard.type("20");
+await page.keyboard.press("Control+u");
+await page.keyboard.type("°C");
+await page.keyboard.press(" ");
+await page.keyboard.type("->");
+await page.keyboard.press("Control+u");
+await page.keyboard.type("°F");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(100);
+check("20 °C → °F is 68 °F", (await resultOfCurrent()) === "68\\,^{\\circ}\\mathrm{F}", await resultOfCurrent());
+await page.keyboard.type("20");
+await page.keyboard.press("Control+u");
+await page.keyboard.type("°C");
+await page.keyboard.press(" ");
+await page.keyboard.type("+5");
+await page.keyboard.press("Control+u");
+await page.keyboard.type("°C");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(100);
+check("20 °C + 5 °C is explained", /Temperatures can only be converted/.test(await resultOfCurrent()), await resultOfCurrent());
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

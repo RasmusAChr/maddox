@@ -131,6 +131,11 @@ const cases: [string, string][] = [
   // → followed only by units converts; (x,y)→x+y stays a function
   ["72\\mathrm{km/h}\\to\\mathrm{m/s}", "convert(72*(_km/_h),(_m/_s))"],
   ["1\\mathrm{kWh}\\to\\mathrm{J}", "convert(1*(_kWh),(_J))"],
+  // temperatures: °C and °F are one unit each; → between them is maddox_temp
+  ["20\\mathrm{°C}", "20*(_degC)"],
+  ["20\\mathrm{^\\circ F}", "20*(_degF)"],
+  ["20\\mathrm{°C}\\to\\mathrm{°F}", 'maddox_temp(20,"C","F")'],
+  ["300\\mathrm{K}\\to\\mathrm{^{\\circ}C}", 'maddox_temp(300,"K","C")'],
   ["\\left(x,y\\right)\\to x\\mathrm{m}", "(x,y)->x*(_m)"],
   // upright names that are not units: the d of dx, and a call
   ["\\frac{\\mathrm{d}}{\\mathrm{d}x}x^2", "diff(x^(2),x)"],

@@ -73,6 +73,16 @@ export class GiacSession {
       "maddox_kind(v):=when(type(v)!=DOM_LIST || size(v)==0,0,when(subtype(v)==27,3,when(type(v[0])!=DOM_LIST,1," +
         "when(subtype(v[0])!=27 && coldim(v)==1,2,0))))",
     );
+    // 20 °C → °F. The scales have an offset, so go through kelvin. K comes back as a real
+    // unit; °C and °F as maddox_degC(x) / maddox_degF(x), which Giac leaves alone and
+    // temperatureLatex draws. 5463/20 is 273.15 and 45967/100 is 459.67, kept exact.
+    // °C ↔ K alone is only the offset, written as a decimal so 0 °C is 273.15 K, not 5463/20.
+    this.caseval(
+      "maddox_temp(x,a,b):=begin local k; " +
+        "if (a==\"C\" && b==\"K\") return (x+273.15)*(1_K); if (a==\"K\" && b==\"C\") return maddox_degC(x-273.15); " +
+        "k:=when(a==\"C\",x+5463/20,when(a==\"F\",(x+45967/100)*5/9,x));" +
+        "return when(b==\"K\",k*(1_K),when(b==\"C\",maddox_degC(k-5463/20),maddox_degF(k*9/5-45967/100))) end",
+    );
     this.takePrinted();
   }
 
@@ -96,6 +106,7 @@ export class GiacSession {
     giac = this.resolveCalls(giac);
     const notSquare = this.squareCheck(giac);
     if (notSquare) return { ok: false, error: notSquare };
+    if (/_deg[CF]/.test(giac)) return { ok: false, error: "Temperatures can only be converted with →, e.g. 20 °C → K. Use K to calculate." };
     const unknown = this.unknownUnit(giac);
     if (unknown) return { ok: false, error: unknown };
     this.takePrinted();
@@ -116,7 +127,8 @@ export class GiacSession {
 
     // approx(…, 20) asks for its own number of digits: don't round that.
     let latex = this.exactLatex(RESULT, !askedForDigits(giac));
-    const approxText = this.caseval(`evalf(${RESULT})`);
+    // evalf does not look inside maddox_degC(x), so ask for the number itself.
+    const approxText = this.caseval(`evalf(${this.temperatureScale(RESULT) ? `op(${RESULT})[1]` : RESULT})`);
     let approxLatex = this.decimalLatex(RESULT);
     const solve = solveCall(giac);
     if (solve) {
@@ -224,7 +236,22 @@ export class GiacSession {
     return unit ? `${value}\\,${unit}` : value;
   }
 
+  /** "C" or "F" when the value is a maddox_degC(x) / maddox_degF(x) temperature. */
+  private temperatureScale(expr: string): string | undefined {
+    const scale = /^"?maddox_deg([CF])\(/.exec(this.caseval(`string(${expr})`))?.[1];
+    this.takePrinted();
+    return scale;
+  }
+
+  /** 68 °F: a temperature from maddox_temp, with the scale upright. */
+  private temperatureLatex(expr: string, number: (item: string) => string): string | null {
+    const scale = this.temperatureScale(expr);
+    return scale ? `${number(`op(${expr})[1]`)}\\,^{\\circ}\\mathrm{${scale}}` : null;
+  }
+
   private exactLatex(expr: string, roundDecimals = true): string {
+    const degrees = this.temperatureLatex(expr, (item) => this.exactLatex(item, false));
+    if (degrees !== null) return roundDecimals && /\d\.\d/.test(degrees) ? this.decimalLatex(expr) : degrees;
     const unit = this.unitLatex(expr, (item) => this.exactLatex(item, false));
     if (unit !== null) return roundDecimals && /\d\.\d/.test(unit) ? this.decimalLatex(expr) : unit;
     const shaped = this.shapedLatex(expr, (item) => this.exactLatex(item, false));
@@ -235,6 +262,8 @@ export class GiacSession {
   }
 
   private decimalLatex(expr: string): string {
+    const degrees = this.temperatureLatex(expr, (item) => this.decimalLatex(item));
+    if (degrees !== null) return degrees;
     const unit = this.unitLatex(expr, (item) => this.decimalLatex(item));
     if (unit !== null) return unit;
     const shaped = this.shapedLatex(expr, (item) => this.decimalLatex(item));

@@ -30,10 +30,24 @@ apart from variables (m is also mass, or the slope in y = mx + b), convert
 3. **Results** show a named SI unit when they are exactly one
    (3 kg · 9.81 m/s² is 29.43 N, 2 A · 3 Ω is 6 V), otherwise the units as
    they combine (m², m/s). Units that cancel disappear (5 m / 1 m is 5).
-4. **Not yet:** temperatures (°C, °F), whose scales don't start at zero;
-   Giac can't convert them, and ° is the angle degree.
+4. **Temperatures convert only** (added 2026-10-23). `°C` and `°F` are
+   units typed in unit mode (Ctrl+U, then `°C`; Ctrl+P also has them).
+   `20 °C → °F` is 68 °F, `0 °C → K` is 273.15 K, `300 K → °C` is 26.85 °C.
+   Any other use (`20 °C + 5 °C`, `2 · 20 °C`, a bare `20 °C`) is an error
+   telling the student to convert, or to calculate in K. Why: the scales
+   have an offset, so adding or scaling them is not physics, and Giac's
+   `convert` can't do it. Options B (absolute temperatures with K
+   differences) and C (treat °C like any unit) were considered; B can grow
+   from this. °F results stay exact (`100 °F → °C` is 340/9), °C ↔ K uses
+   the decimal offset 273.15.
 
 ## Consequences
+
+- Temperatures: the converter reads `°C`/`°F` (also `\degree C`, `^\circ C`) in
+  an upright group as `_degC`/`_degF`; `conversion` turns `n °C → °F` into
+  `maddox_temp(n,"C","F")`. The session defines `maddox_temp`, which
+  returns `maddox_degC(x)`/`maddox_degF(x)` (drawn by `temperatureLatex`)
+  or a real K unit. Any `_degC` left over is the error above.
 
 - Converter: `\mathrm{…}` is a unit (`unitToGiac`), except `\mathrm{d}`
   (the d of dx) and an upright name before brackets (a call). `conversion`
