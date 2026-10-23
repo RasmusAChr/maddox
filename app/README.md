@@ -67,6 +67,7 @@ Press F1 in the app for the full list. The important keys:
 | Ctrl+B | Show or hide the template sidebar (collapses to a rail of category icons) |
 | Esc | Cancel a running computation |
 | Ctrl+Shift+A | Degrees / radians for this notebook (`30deg` types 30°, which is always degrees) |
+| Ctrl+, | Settings: angles, exact/decimal answers, solve style, digits, theme, zoom, startup |
 
 ## Notes
 

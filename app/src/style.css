@@ -26,6 +26,7 @@
   color-scheme: light;
 }
 
+/* Dark: follows the system unless the Theme setting says otherwise. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #17181b;
@@ -48,6 +49,28 @@
     --leader: #3c3e47;
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #17181b;
+  --surface: #1f2024;
+  --surface-2: #26272c;
+  --text: #ececef;
+  --muted: #9a9aa3;
+  --border: #33343a;
+  --accent: #8ea2ff;
+  --accent-soft: #262c47;
+  --result: #6fd3a5;
+  --error: #ff8a7a;
+  --error-soft: #3a2224;
+  --kbd-bg: #2b2c31;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --page: #131417;
+  --sheet: #1c1d21;
+  --active: #22242d;
+  --rule: #2a2b31;
+  --leader: #3c3e47;
+  color-scheme: dark;
 }
 
 * {
@@ -956,4 +979,117 @@ dialog h2 {
   border-radius: 8px;
   background: var(--surface-2);
   cursor: pointer;
+}
+
+/* ---- settings (Ctrl+,) ---- */
+
+.settings-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  margin-top: 8vh;
+}
+
+.settings-dialog > h2 {
+  padding: 16px 18px 0;
+}
+
+.settings-list {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding: 0 10px 10px;
+}
+
+.settings-section {
+  margin: 14px 8px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px;
+  border-radius: 8px;
+  outline: none;
+}
+
+.setting:focus {
+  background: var(--accent-soft);
+}
+
+.setting-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.setting-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.setting-hint:empty {
+  display: none;
+}
+
+.setting-control {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.seg button,
+.stepper-button,
+.action-button {
+  padding: 5px 10px;
+  border: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--border);
+}
+
+.seg button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.stepper-button,
+.action-button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.stepper-button {
+  width: 30px;
+  padding: 5px 0;
+}
+
+.stepper-value {
+  min-width: 48px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.action-button:disabled {
+  color: var(--muted);
+  cursor: default;
 }

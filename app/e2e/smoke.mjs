@@ -618,6 +618,91 @@ await setAndRun(String.raw`\operatorname{inv}\left(\begin{pmatrix}1&2\\2&4\end{p
 const invError = await page.$$eval(".entry", (els) => els.find((e) => e.querySelector("math-field")?.value.includes("inv"))?.querySelector(".error")?.textContent ?? null);
 check("errors are in plain words", invError === "This matrix can't be inverted: its determinant is 0.", invError);
 
+// 25. Settings (Ctrl+,): ↑/↓ choose, ←/→ change at once, Esc back to the cell.
+const approxOf = (latex) =>
+  page.$$eval(".entry", (els, latex) => els.find((e) => e.querySelector("math-field")?.value === latex)?.querySelector(".approx")?.textContent ?? null, latex);
+const focusedSetting = () => page.evaluate(() => document.activeElement?.closest(".setting")?.dataset.id ?? null);
+const openSettingsAt = async (id) => {
+  await page.keyboard.press("Control+,");
+  await page.waitForSelector("#settings-dialog[open]");
+  for (let i = 0; i < 12 && (await focusedSetting()) !== id; i++) await page.keyboard.press("ArrowDown");
+};
+const settled = async () => {
+  await page.waitForTimeout(150);
+  await waitIdle();
+  await page.waitForTimeout(150);
+};
+await setAndRun(String.raw`9\pi`);
+await page.keyboard.press("Control+,");
+await page.waitForSelector("#settings-dialog[open]");
+check("Ctrl+, opens settings on the first setting", (await focusedSetting()) === "angle", await focusedSetting());
+await openSettingsAt("digits");
+await page.keyboard.press("ArrowRight");
+await settled();
+check("→ on digits gives 8 digits at once", (await approxOf("9\\pi"))?.includes("28.274334"), await approxOf("9\\pi"));
+check("the dialog stays open while changing", await page.isVisible("#settings-dialog[open]"));
+await page.keyboard.press("ArrowLeft");
+await page.keyboard.press("ArrowUp");
+await page.keyboard.press("ArrowUp");
+check("↑ moves to the answers setting", (await focusedSetting()) === "answer-mode", await focusedSetting());
+await page.keyboard.press("ArrowRight");
+await settled();
+check("Exact only hides the decimal", (await approxOf("9\\pi")) === null, await approxOf("9\\pi"));
+await page.keyboard.press("ArrowLeft");
+await settled();
+check("Exact + decimal shows it again with 6 digits", (await approxOf("9\\pi"))?.includes("28.2743") && !(await approxOf("9\\pi")).includes("28.27433"), await approxOf("9\\pi"));
+await openSettingsAt("theme");
+await page.keyboard.press("ArrowRight");
+check("Theme → Light sets the theme", (await page.evaluate(() => document.documentElement.dataset.theme)) === "light");
+await page.keyboard.press("ArrowRight");
+const darkBg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--sheet").trim());
+check("Theme → Dark switches the colours", darkBg === "#1c1d21", darkBg);
+await page.keyboard.press("ArrowLeft");
+await page.keyboard.press("ArrowLeft");
+check("Theme → System follows the system again", (await page.evaluate(() => document.documentElement.dataset.theme)) === undefined);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(150);
+check("Esc closes settings back into the cell", !(await page.isVisible("#settings-dialog[open]")) && (await page.evaluate(() => document.activeElement?.tagName === "MATH-FIELD")));
+await page.keyboard.type("5");
+check("typing works after settings closed", (await page.evaluate(() => document.activeElement?.value)) === "5", await page.evaluate(() => document.activeElement?.value));
+await page.keyboard.press("Backspace");
+await page.click('[data-action="settings"]');
+await page.waitForSelector("#settings-dialog[open]");
+check("the gear button opens settings", await page.isVisible("#settings-dialog[open]"));
+await page.click('#settings-dialog [data-id="angle"] .seg button:last-child');
+await settled();
+check("clicking Radians changes the notebook's mode", (await chip()) === "RAD", await chip());
+await page.click('#settings-dialog [data-id="angle"] .seg button:first-child');
+await settled();
+await page.keyboard.press("Escape");
+const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("maddox.prefs") ?? "{}"));
+check("settings are remembered", stored.digits === 6 && stored.answerMode === "auto" && stored.theme === "system", JSON.stringify(stored));
+// Reopen last notebook: Off starts empty, but unsaved work is still restored.
+await page.waitForTimeout(150);
+await openSettingsAt("reopen");
+await page.keyboard.press("ArrowRight");
+await page.keyboard.press("Escape");
+await page.waitForTimeout(150);
+const cleanSave = page.waitForEvent("download", { timeout: 5000 }).catch(() => null);
+await page.keyboard.press("Control+s");
+await cleanSave;
+await page.waitForTimeout(200);
+await page.reload();
+await page.waitForSelector("math-field");
+await waitIdle();
+const afterReload = await page.$$eval(".entry math-field", (els) => els.map((e) => e.value));
+check("Reopen last: Off starts an empty notebook", afterReload.length === 1 && afterReload[0] === "", JSON.stringify(afterReload));
+await page.waitForTimeout(300);
+await page.keyboard.type("7*6");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(700); // autosave waits 400 ms
+await page.reload();
+await page.waitForSelector("math-field");
+const unsavedKept = await page.$$eval(".entry math-field", (els) => els.map((e) => e.value));
+check("…but unsaved work is still restored", unsavedKept.some((v) => v.includes("7") && v.includes("6")), JSON.stringify(unsavedKept));
+await page.evaluate(() => localStorage.removeItem("maddox.prefs"));
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

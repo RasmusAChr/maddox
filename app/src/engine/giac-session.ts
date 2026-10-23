@@ -13,9 +13,16 @@ export type AngleMode = "deg" | "rad";
 /** How solve answers read: "x = 2 or x = 3" (textbook) or "x ∈ {2, 3}" (sets). */
 export type SolveStyle = "textbook" | "sets";
 
+/**
+ * Which forms an answer shows: auto = exact, plus a decimal when it adds
+ * something; exact = exact only; approx = decimals only.
+ */
+export type AnswerMode = "auto" | "exact" | "approx";
+
 export type SessionOptions = {
   angle: AngleMode;
   solveStyle: SolveStyle;
+  answerMode: AnswerMode;
   /** Significant digits for decimal answers. */
   digits: number;
 };
@@ -30,7 +37,7 @@ const OR = "\\text{ or }";
 const AND = "\\text{ and }";
 
 export class GiacSession {
-  private options: SessionOptions = { angle: "rad", solveStyle: "textbook", digits: 6 };
+  private options: SessionOptions = { angle: "rad", solveStyle: "textbook", answerMode: "auto", digits: 6 };
 
   constructor(
     private caseval: Caseval,
@@ -87,6 +94,11 @@ export class GiacSession {
     }
     this.caseval(`${ANS_VARIABLE}:=${RESULT}`);
     this.takePrinted();
+    if (this.options.answerMode === "exact") return { ok: true, latex, approxLatex: null };
+    if (this.options.answerMode === "approx") {
+      // The decimal form takes the exact form's place, when there is one.
+      return { ok: true, latex: showApprox(latex, approxText) ? approxLatex : latex, approxLatex: null };
+    }
     return { ok: true, latex, approxLatex: showApprox(latex, approxText) ? approxLatex : null };
   }
 

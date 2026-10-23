@@ -163,6 +163,26 @@ describe("readable answers", () => {
   });
 });
 
+describe("answer modes and digits", () => {
+  it("auto shows both, exact only the exact form, approx only decimals", () => {
+    session.configure({ answerMode: "auto", digits: 6 });
+    expect(run("\\frac{1}{3}")).toMatchObject({ ok: true, latex: "\\frac{1}{3}", approxLatex: "0.333333" });
+    session.configure({ answerMode: "exact" });
+    expect(run("\\frac{1}{3}")).toMatchObject({ ok: true, latex: "\\frac{1}{3}", approxLatex: null });
+    session.configure({ answerMode: "approx" });
+    expect(run("\\frac{1}{3}")).toMatchObject({ ok: true, latex: "0.333333", approxLatex: null });
+    expect(run("\\operatorname{solve}\\left(x^2=2,x\\right)")).toMatchObject({ ok: true, latex: "x=-1.41421\\text{ or }x=1.41421" });
+    expect(run("x+1")).toMatchObject({ ok: true, latex: "x+1", approxLatex: null });
+    session.configure({ answerMode: "auto" });
+  });
+
+  it("digits follow the setting", () => {
+    session.configure({ digits: 10 });
+    expect(run("\\pi")).toMatchObject({ ok: true, approxLatex: "3.141592654" });
+    session.configure({ digits: 6 });
+  });
+});
+
 describe("angle mode", () => {
   it("degrees: trig reads and returns degrees, and survives a reset", () => {
     session.setAngle("deg");

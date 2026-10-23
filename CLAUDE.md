@@ -59,6 +59,14 @@ docs updated, a short report of what changed.
   owner decided this on 2026-10-23: students learn the international
   convention. Commas separate arguments and list items. Don't add a
   decimal-comma mode.
+- **One settings dialog (Ctrl+, or ⚙).** Sections: this notebook (angles),
+  answers (exact/decimal/both, solve style, digits), appearance (theme,
+  zoom), startup and files. ↑/↓ choose, ←/→ change, changes apply at once,
+  no Save. Everything except the angle is a preference of this computer
+  (`app/src/settings.ts`, key `maddox.prefs`). A new setting is one entry
+  in `settingsList()` in `main.ts`. Keep the quick ways (chip, shortcuts,
+  Ctrl+P actions) next to it. "Reopen last notebook: Off" still restores
+  unsaved work.
 - Full key map: `docs/decisions/0004-keyboard-model.md`, and the F1 dialog
   in `app/index.html`.
 
@@ -114,7 +122,8 @@ npm run tauri build  # installers in src-tauri/target/release/bundle/
 | `app/src/notebook/matrix.ts`, `mathlive-internals.ts` | matrix editing; all MathLive private access |
 | `app/src/ui/commands.ts` | every template and its category (sidebar + search) |
 | `app/src/ui/templates.ts`, `dialogs.ts`, `search.ts` | sidebar, Ctrl+P / matrix / help dialogs, matching |
-| `app/src/main.ts` | app shell: files, status bar, global keys, click handling |
+| `app/src/settings.ts`, `ui/settings-dialog.ts` | preferences of this computer; the Ctrl+, dialog |
+| `app/src/main.ts` | app shell: files, status bar, global keys, click handling, the settings list |
 
 ## Read before changing things
 

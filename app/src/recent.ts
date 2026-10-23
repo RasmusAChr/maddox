@@ -27,6 +27,10 @@ export function rememberFile(path: string) {
   store([path, ...recentFiles().filter((p) => !same(p, path))]);
 }
 
+export function clearRecentFiles() {
+  store([]);
+}
+
 /** Drops a file that could not be opened (moved or deleted). */
 export function forgetFile(path: string) {
   store(recentFiles().filter((p) => !same(p, path)));

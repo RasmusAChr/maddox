@@ -3,14 +3,16 @@ import "mathlive/static.css";
 import "./style.css";
 import { MathfieldElement } from "mathlive";
 import { Engine, type EngineStatus } from "./engine/engine";
-import type { AngleMode, SolveStyle } from "./engine/giac-session";
+import type { AngleMode, AnswerMode, SolveStyle } from "./engine/giac-session";
 import { fileName, isTauri, launchFile, openNotebook, readAngle, readNotebookAt, saveNotebook, setWindowTitle, toCells, type NotebookDoc } from "./files";
-import { forgetFile, recentFiles, rememberFile } from "./recent";
+import { clearRecentFiles, forgetFile, recentFiles, rememberFile } from "./recent";
+import { applyTheme, DIGIT_CHOICES, prefs, setPref, type Theme } from "./settings";
+import { openSettings, type Setting } from "./ui/settings-dialog";
 import { Notebook, type Context } from "./notebook/notebook";
 import { CATALOG, CATEGORIES, type CatalogItem } from "./ui/commands";
 import { askUnsaved, openHelp, openMatrixDialog, openSearch, type SearchItem } from "./ui/dialogs";
 import { renderTemplates, toggleTemplates } from "./ui/templates";
-import { applyZoom, zoom } from "./zoom";
+import { applyZoom, zoom, zoomLevel } from "./zoom";
 
 // Fonts come from mathlive/fonts.css above, bundled by Vite.
 MathfieldElement.fontsDirectory = null;
@@ -76,11 +78,13 @@ function markDirty() {
   }, 400);
 }
 
-function restoreSession(): boolean {
+/** onlyIfUnsaved: "Reopen last notebook" is off, but unsaved work is never dropped. */
+function restoreSession(onlyIfUnsaved = false): boolean {
   try {
     const saved = JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null");
     const entries = saved?.entries ?? saved?.blocks;
     if (!Array.isArray(entries)) return false;
+    if (onlyIfUnsaved && !saved.dirty) return false;
     notebook.load(toCells(entries));
     path = saved.path ?? null;
     dirty = Boolean(saved.dirty);
@@ -197,29 +201,89 @@ async function newNotebook() {
   loadDocument({ cells: [], angle: lastAngle() }, null);
 }
 
-// ---- solve style --------------------------------------------------------------------
+// ---- settings -----------------------------------------------------------------------
 
-// A display preference of this computer, not of the notebook: the answers are
-// the same, only written differently.
-const SOLVE_STYLE_KEY = "maddox.solve-style";
-let solveStyle: SolveStyle = (() => {
-  try {
-    return localStorage.getItem(SOLVE_STYLE_KEY) === "sets" ? "sets" : "textbook";
-  } catch {
-    return "textbook";
-  }
-})();
-void engine.configure({ solveStyle });
+// Preferences of this computer (settings.ts); the angle mode belongs to the
+// notebook. Settings that change answers re-run the notebook at once.
+applyTheme();
+void engine.configure({ solveStyle: prefs.solveStyle, digits: prefs.digits, answerMode: prefs.answerMode });
+
+function setAnswerPref<K extends "solveStyle" | "digits" | "answerMode">(key: K, value: (typeof prefs)[K]) {
+  setPref(key, value);
+  void engine.configure({ [key]: value });
+  void notebook.runAll();
+}
 
 function toggleSolveStyle() {
-  solveStyle = solveStyle === "textbook" ? "sets" : "textbook";
-  try {
-    localStorage.setItem(SOLVE_STYLE_KEY, solveStyle);
-  } catch {
-    // Only a convenience.
-  }
-  void engine.configure({ solveStyle });
-  void notebook.runAll();
+  setAnswerPref("solveStyle", prefs.solveStyle === "textbook" ? "sets" : "textbook");
+}
+
+function settingsList(): Setting[] {
+  return [
+    {
+      kind: "choice", id: "angle", section: "This notebook", label: "Angles",
+      hint: "For sin, cos, tan and their inverses. Saved in the notebook. Ctrl+Shift+A",
+      options: [{ value: "deg", label: "Degrees" }, { value: "rad", label: "Radians" }],
+      get: () => angle,
+      set: (v) => v !== angle && toggleAngle(),
+    },
+    {
+      kind: "choice", id: "answer-mode", section: "Answers (this computer)", label: "Answers",
+      hint: "Exact answers, decimals, or both",
+      options: [{ value: "auto", label: "Exact + decimal" }, { value: "exact", label: "Exact only" }, { value: "approx", label: "Decimals only" }],
+      get: () => prefs.answerMode,
+      set: (v) => setAnswerPref("answerMode", v as AnswerMode),
+    },
+    {
+      kind: "choice", id: "solve-style", section: "Answers (this computer)", label: "Solve answers",
+      options: [{ value: "textbook", label: "x = 2 or x = 3" }, { value: "sets", label: "x ∈ {2, 3}" }],
+      get: () => prefs.solveStyle,
+      set: (v) => setAnswerPref("solveStyle", v as SolveStyle),
+    },
+    {
+      kind: "choice", id: "digits", section: "Answers (this computer)", label: "Decimal digits",
+      hint: "Significant digits; approx(…, n) still gives n",
+      options: DIGIT_CHOICES.map((d) => ({ value: String(d), label: String(d) })),
+      get: () => String(prefs.digits),
+      set: (v) => setAnswerPref("digits", Number(v)),
+    },
+    {
+      kind: "choice", id: "theme", section: "Appearance", label: "Theme",
+      options: [{ value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
+      get: () => prefs.theme,
+      set: (v) => {
+        setPref("theme", v as Theme);
+        applyTheme();
+      },
+    },
+    {
+      kind: "stepper", id: "zoom", section: "Appearance", label: "Zoom", hint: "Ctrl + / Ctrl − / Ctrl 0",
+      display: () => `${Math.round(zoomLevel() * 100)}%`,
+      step: async (dir) => {
+        await zoom(dir);
+        requestAnimationFrame(() => notebook.relayout());
+      },
+    },
+    {
+      kind: "choice", id: "reopen", section: "Startup and files", label: "Reopen last notebook",
+      hint: "Off starts empty; unsaved work is always restored",
+      options: [{ value: "on", label: "On" }, { value: "off", label: "Off" }],
+      get: () => (prefs.reopenLast ? "on" : "off"),
+      set: (v) => setPref("reopenLast", v === "on"),
+    },
+    {
+      kind: "action", id: "recent", section: "Startup and files", label: "Recent files",
+      hint: isTauri ? "The list behind Ctrl+Shift+O" : "Kept in the desktop app",
+      button: () => (recentFiles().length ? `Clear ${recentFiles().length}` : "Empty"),
+      enabled: () => recentFiles().length > 0,
+      run: clearRecentFiles,
+    },
+  ];
+}
+
+/** Ctrl+, or the gear button. */
+function settings() {
+  openSettings($("#settings-dialog"), settingsList(), refocus);
 }
 
 // ---- angle mode -------------------------------------------------------------------
@@ -349,12 +413,13 @@ function searchItems(): SearchItem[] {
     action("Save as…", "Save under a new name", () => void save(true), "Ctrl+Shift+S", "file"),
     action(angle === "deg" ? "Switch to radians" : "Switch to degrees", "Angle mode for sin, cos, tan and their inverses", toggleAngle, "Ctrl+Shift+A", "angle mode degrees radians deg rad trig"),
     action(
-      solveStyle === "textbook" ? "Show solve answers as sets" : "Show solve answers as equations",
-      solveStyle === "textbook" ? "x ∈ {2, 3} instead of x = 2 or x = 3" : "x = 2 or x = 3 instead of x ∈ {2, 3}",
+      prefs.solveStyle === "textbook" ? "Show solve answers as sets" : "Show solve answers as equations",
+      prefs.solveStyle === "textbook" ? "x ∈ {2, 3} instead of x = 2 or x = 3" : "x = 2 or x = 3 instead of x ∈ {2, 3}",
       toggleSolveStyle,
       undefined,
       "solve answers format style sets textbook equations",
     ),
+    action("Settings", "Angles, answers, digits, theme, zoom, startup", settings, "Ctrl+,", "preferences options configure theme digits"),
     action("Show or hide templates", "The template sidebar", ACTIONS.templates, "Ctrl+B", "sidebar panel"),
     action("Keyboard shortcuts", "List every shortcut", help, "F1", "help keys"),
   ];
@@ -379,6 +444,7 @@ renderTemplates($("#templates"), useItem, refocus);
 
 const ACTIONS: Record<string, () => void> = {
   templates: toggleTemplates,
+  settings,
   search,
   matrix,
   help,
@@ -425,6 +491,7 @@ window.addEventListener(
     if (!mod || e.altKey) return;
     if (e.shiftKey && e.key === "Enter") return run(ACTIONS["run-all"]);
     if (e.shiftKey && key === "a") return run(toggleAngle);
+    if (e.key === ",") return run(settings);
     if (key === "p" || key === "k") return run(search);
     // By character, not physical key: on a Danish keyboard "+" has its own
     // key (whose code is "Minus"), on a US one it is "=".
@@ -467,7 +534,7 @@ if (isTauri) {
 
 // ---- start ----------------------------------------------------------------------
 
-if (!restoreSession()) {
+if (!restoreSession(!prefs.reopenLast)) {
   notebook.load([]);
   savedContent = currentContent();
   setAngle(angle);

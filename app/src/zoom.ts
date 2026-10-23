@@ -18,6 +18,8 @@ function read(): number {
   return 1;
 }
 
+export const zoomLevel = () => level;
+
 export async function applyZoom() {
   if (isTauri) {
     const { getCurrentWebview } = await import("@tauri-apps/api/webview");

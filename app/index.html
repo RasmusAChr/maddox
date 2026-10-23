@@ -19,6 +19,7 @@
         <button data-action="new" title="New notebook (Ctrl+N)">New</button>
         <button data-action="open" title="Open (Ctrl+O)">Open</button>
         <button data-action="save" title="Save (Ctrl+S)">Save</button>
+        <button data-action="settings" class="icon" title="Settings (Ctrl+,)" aria-label="Settings">⚙</button>
         <button data-action="help" class="icon" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts">?</button>
       </nav>
     </header>
@@ -62,6 +63,12 @@
         <button type="button" data-choice="discard">Don't save <kbd>D</kbd></button>
         <button type="button" data-choice="cancel">Cancel <kbd>Esc</kbd></button>
       </div>
+    </dialog>
+
+    <dialog id="settings-dialog" class="settings-dialog" aria-label="Settings">
+      <h2>Settings</h2>
+      <div class="settings-list"></div>
+      <div class="dialog-foot"><kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>←</kbd><kbd>→</kbd> change · <kbd>Esc</kbd> close · changes apply at once</div>
     </dialog>
 
     <dialog id="help-dialog" class="help-dialog" aria-label="Keyboard shortcuts">
@@ -113,6 +120,7 @@
             <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>S</kbd></dt><dd>Save as</dd>
             <dt><kbd>Ctrl</kbd> <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd></dt><dd>Zoom in / out / reset</dd>
             <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>A</kbd></dt><dd>Degrees / radians (saved in the notebook)</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>,</kbd></dt><dd>Settings</dd>
             <dt><kbd>F1</kbd></dt><dd>This list</dd>
           </dl>
           <p class="help-note">Enter evaluates every maths line of an entry; each result appears next to its line.</p>

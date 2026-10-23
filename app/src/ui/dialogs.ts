@@ -6,7 +6,7 @@ import { queryWords, score, type Searchable } from "./search";
  * event fires a task later, after focus is already back in the entry, and a
  * key typed in between would land before the inserted text.
  */
-function openDialog(dialog: HTMLDialogElement, onCancel: () => void) {
+export function openDialog(dialog: HTMLDialogElement, onCancel: () => void) {
   let finished = false;
   dialog.addEventListener(
     "close",
