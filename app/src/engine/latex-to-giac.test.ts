@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { latexToGiac, UnsupportedLatex } from "./latex-to-giac";
+import { CALL_OR_PRODUCT, latexToGiac, UnsupportedLatex } from "./latex-to-giac";
 
 const cases: [string, string][] = [
   // arithmetic and juxtaposition
@@ -11,7 +11,10 @@ const cases: [string, string][] = [
   ["2\\pi r", "2*pi*r"],
   ["\\left(x+1\\right)x", "(x+1)*x"],
   ["\\left(x+1\\right)\\left(x-1\\right)", "(x+1)*(x-1)"],
-  ["f\\left(3\\right)", "f(3)"],
+  // a typed name before "(" is left for the engine to decide (call or product)
+  ["f\\left(3\\right)", `f${CALL_OR_PRODUCT}(3)`],
+  ["3x\\left(4y+8z\\right)", `3*x${CALL_OR_PRODUCT}(4*y+8*z)`],
+  ["v\\left[1\\right]", "v[1]"],
   ["5!", "5!"],
   ["x^{2}y", "x^(2)*y"],
   ["x_1+x_{2}", "x_1+x_2"],
@@ -47,7 +50,7 @@ const cases: [string, string][] = [
   ["x\\ne 3", "x!=3"],
   ["a\\coloneq 5", "a:=5"],
   ["a:=5", "a:=5"],
-  ["f(x)\\coloneq x^2+1", "f(x):=x^(2)+1"],
+  ["f(x)\\coloneq x^2+1", `f${CALL_OR_PRODUCT}(x):=x^(2)+1`],
   ["\\alpha+\\beta", "alpha+beta"],
   // calculus
   ["\\frac{d}{dx}x^{3}", "diff(x^(3),x)"],

@@ -388,6 +388,81 @@ await page.keyboard.press("ArrowDown");
 check("so ↓ still selects", (await page.$$("#templates .selected")).length === 1);
 await page.keyboard.press("Control+b");
 
+// 17. Ctrl+←/→ jump like in a text editor and never get stuck at a group edge.
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("AT:=transpose(A");
+// Mark the caret with a "?" and read the value back.
+const caretAt = () => page.evaluate(() => {
+  const f = document.activeElement;
+  const p = f.position;
+  f.insert("?");
+  const v = f.value.replace(/\s/g, "");
+  f.executeCommand("undo");
+  f.position = p;
+  return v;
+});
+await page.keyboard.press("End");
+const leftStops = [];
+for (let i = 0; i < 4; i++) {
+  await page.keyboard.press("Control+ArrowLeft");
+  leftStops.push(await caretAt());
+}
+check(
+  "Ctrl+← jumps over (A), transpose, :=, AT",
+  leftStops[0].includes("}?\\left(") && leftStops[1].includes("\\coloneq?\\operatorname") &&
+    leftStops[2].startsWith("AT?\\coloneq") && leftStops[3].startsWith("?AT"),
+  JSON.stringify(leftStops),
+);
+await page.keyboard.press("Control+ArrowRight");
+await page.keyboard.press("Control+ArrowRight");
+await page.keyboard.press("Control+ArrowRight");
+check("Ctrl+→ goes back to before (A)", (await caretAt()).includes("}?\\left("), await caretAt());
+await page.keyboard.press("ArrowRight"); // into the brackets
+await page.keyboard.press("Control+ArrowRight");
+await page.keyboard.press("Control+ArrowRight");
+check("Ctrl+→ leaves the brackets at their edge", (await caretAt()).endsWith("\\right)?"), await caretAt());
+await page.keyboard.press("Control+Shift+ArrowLeft");
+check("Shift+Ctrl+← selects by the same jumps", await page.evaluate(() => document.activeElement.getValue(document.activeElement.selection, "latex").includes("\\left(A\\right)")));
+
+// 18. A name before brackets multiplies unless it is a function.
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("expand(3x(4y+8z");
+await page.keyboard.press("Enter");
+await waitIdle();
+const products = await page.$$eval(".entry .exact", (els) => els.map((e) => e.dataset.latex));
+check("3x(4y+8z) multiplies", products.includes("12\\cdot x\\cdot y+24\\cdot x\\cdot z"), JSON.stringify(products.slice(-2)));
+
+// 19. Results never scroll: tall ones grow the cell, too-wide ones wrap below
+// the input, and only a result wider than the whole cell scrolls (on its own).
+const setAndRun = async (latex) => {
+  await page.keyboard.press("Control+Enter");
+  await page.evaluate((l) => { document.activeElement.value = l; }, latex);
+  await page.keyboard.press("Enter");
+  await waitIdle();
+  await page.waitForTimeout(100);
+};
+// Finds the cell by its content: new cells go below the current one, which
+// may be anywhere in the notebook by now.
+const layoutOf = (needle) => page.$$eval(".entry", (els, n) => {
+  const el = els.find((e) => e.querySelector("math-field")?.value.includes(n));
+  const r = el.querySelector(".entry-result");
+  const cs = getComputedStyle(r);
+  const rows = [...r.children];
+  return {
+    scrollContainer: cs.overflowX !== "visible" || cs.overflowY !== "visible",
+    cellFits: el.getBoundingClientRect().bottom >= r.getBoundingClientRect().bottom,
+    wide: rows.map((x) => x.classList.contains("wide")),
+    wrapped: r.getBoundingClientRect().top >= el.querySelector("math-field").getBoundingClientRect().bottom - 1,
+  };
+}, needle);
+await setAndRun(String.raw`M\coloneq\begin{pmatrix}1&2\\3&4\\5&6\end{pmatrix}`);
+let lay = await layoutOf("M\\coloneq");
+check("tall matrix result: no scrolling, cell grows", !lay.scrollContainer && lay.cellFits && !lay.wide[0] && !lay.wrapped, JSON.stringify(lay));
+await setAndRun(String.raw`\operatorname{expand}\left(\left(a+b+c\right)^{6}\right)`);
+lay = await layoutOf("a+b+c");
+check("huge result: wraps below and scrolls on its own", lay.wrapped && lay.wide[0] === true, JSON.stringify(lay));
+check("the page never scrolls sideways", await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

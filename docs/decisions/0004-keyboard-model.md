@@ -28,6 +28,8 @@
 | Ctrl+Enter | cell | New cell below |
 | Ctrl+Shift+Enter | anywhere | Run all (resets the engine first) |
 | ↑ / ↓ at the first or last line | cell | Previous / next cell |
+| Ctrl+← / Ctrl+→ | cell | Jump by word: a run of letters or digits, an operator, a function name, or a whole structure such as `(…)`, a fraction or a matrix. At a group's edge, leave the group |
+| Shift+Ctrl+← / → | cell | Select by the same jumps |
 | Backspace in an empty cell | cell | Delete the cell |
 | Ctrl+Shift+Backspace | cell | Delete the cell |
 | Esc | while computing | Cancel (restarts the engine, clearing variables) |

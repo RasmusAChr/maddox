@@ -152,6 +152,61 @@ export function deleteAtBrackets(mf: MathfieldElement, key: "Backspace" | "Delet
   }
 }
 
+/** A letter or digit; runs of these form one "word" for Ctrl+arrows. */
+function isWordAtom(atom: any): boolean {
+  return atom?.type === "mord" && typeof atom.value === "string" && /^[\p{L}\p{N}.]$/u.test(atom.value);
+}
+
+/**
+ * Ctrl+←/→: move like Ctrl+arrows in a text editor. MathLive's own binding
+ * jumps to the start/end of the current group and so gets stuck at a group
+ * edge, e.g. right before the "(" of transpose(A).
+ *
+ * One jump crosses a run of letters/digits, or one whole atom (an operator,
+ * a function name, brackets with their content, a fraction, a matrix). At the
+ * edge of a group (inside brackets, a numerator, a matrix cell) the jump
+ * leaves the group. With `extend`, the selection grows instead (Shift).
+ */
+export function moveByWord(mf: MathfieldElement, direction: "left" | "right", extend: boolean) {
+  try {
+    const model = internal(mf).model;
+    const root = model.root;
+    const here = model.at(model.position);
+    let target: number | null = null;
+
+    if (direction === "left") {
+      if (here.type === "first") {
+        // At the start of a group: step out to just before it.
+        const parent = here.parent;
+        if (parent && parent !== root) target = model.offsetOf(parent.leftSibling ?? parent);
+      } else {
+        let atom = here;
+        if (isWordAtom(atom)) while (isWordAtom(atom.leftSibling)) atom = atom.leftSibling;
+        target = model.offsetOf(atom.leftSibling);
+      }
+    } else {
+      const next = here.rightSibling;
+      if (!next) {
+        // At the end of a group: step out to just after it.
+        const parent = here.parent;
+        if (parent && parent !== root) target = model.offsetOf(parent);
+      } else {
+        let atom = next;
+        if (isWordAtom(atom)) while (isWordAtom(atom.rightSibling)) atom = atom.rightSibling;
+        target = model.offsetOf(atom);
+      }
+    }
+    if (target === null || target < 0) return;
+    if (extend) {
+      mf.selection = { ranges: [[model.anchor, target]], direction: direction === "left" ? "backward" : "forward" };
+    } else {
+      mf.position = target;
+    }
+  } catch {
+    // leave the caret where it is
+  }
+}
+
 export type LineBox = { top: number; bottom: number };
 
 /** The on-screen vertical extent of each line of the cell, in document order. */

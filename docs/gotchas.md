@@ -53,6 +53,11 @@ Re-check this list after upgrading.
   `solve(…)` removes only `(`, leaving `\left.`. Delete on empty `()`
   removes only `)`. Ctrl+Backspace at a group's start does nothing. Fix:
   `deleteAtBrackets()`; a function name is any atom with `isFunction`.
+- **Ctrl+←/→ get stuck.** MathLive binds them to move to the start or end
+  of the current group, so at a group's edge (e.g. right before the `(` of
+  `transpose(A)`) they do nothing. Its Alt+arrows (word moves) step through
+  the letters inside a function name. Fix: `moveByWord()`, which crosses
+  one atom or one letter run per press and leaves a group at its edge.
 - **Forcing a re-render.** After editing the model directly, request a
   render with `mf.placeholderSymbol = mf.placeholderSymbol` (a public
   setter that calls `requestUpdate`).
@@ -70,8 +75,16 @@ Re-check this list after upgrading.
   `latex(regroup(maddox_result))` and `evalf(…)` separately.
 - **No implicit multiplication between brackets.** `(x+1)x` and
   `sin(x)cos(x)` are syntax errors, and `x y` too. The converter inserts
-  `*` between touching operands, except for a name directly followed by
-  `(`, which Giac resolves itself (call versus product).
+  `*` between touching operands.
+- **A name before `(` is ambiguous, and Giac guesses wrong.** `3*x(4*y+8*z)`
+  calls `x` as a function and returns `12*y+24*z`. The converter marks a
+  typed name followed by `(` with `CALL_OR_PRODUCT`, and
+  `GiacSession.resolveCalls` decides:
+  - a call if `type(name)` is `func` (built-in or user-defined), or if the
+    brackets are followed by `:=` (a definition such as `f(x):=…`);
+  - otherwise `name*(…)`.
+
+  Names from `\operatorname{…}` (solve, det, …) are always calls.
 - **`ans` is reserved**, and `Ans` follows internal calls. We use our own
   `maddox_ans`.
 - **`restart` breaks the result holder.** It returns the names it cleared,
@@ -95,6 +108,20 @@ Re-check this list after upgrading.
     so ↑/↓ also move between cells when the caret provably did not move.
   - Focusing a field right after removing a sibling can throw or land on
     `<body>`, so `ensureFocused()` retries with backoff.
+- **Scrollbars around results.** `overflow-x: auto` on one axis forces
+  `overflow-y: auto` on the other, so the result column became a scroll box
+  as soon as a matrix's brackets overhung by a pixel. The result column must
+  never be a scroll container:
+  - results that don't fit wrap below the input;
+  - only a single result wider than the whole cell gets `.wide`
+    (its own sideways scroll), decided in `Notebook.layoutResults` against
+    the cell's width, not the row's (glyph overhang gives false positives);
+  - results are right-aligned with an auto margin, not
+    `justify-content: flex-end`, which overflows off the left edge where it
+    can't be scrolled or measured.
+- **The page grew wider than the window.** A grid column sized `auto`
+  grows to the widest content (a huge result), pushing the notebook
+  off-screen. `body` uses `grid-template-columns: minmax(0, 1fr)`.
 - **Clicks on empty space.** They move focus to `<body>`. The global
   `mousedown` handler in `main.ts` prevents that, except on real controls
   and scrollbars.

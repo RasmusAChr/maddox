@@ -70,6 +70,21 @@ describe("GiacSession", () => {
     expect(run("b")).toMatchObject({ ok: true, latex: "b" });
   });
 
+  it("treats name(…) as a call only for functions", () => {
+    // the reported bug: x is not a function, so this is 3·x·(4y+8z)
+    expect(run("\\operatorname{expand}\\left(3x\\left(4y+8z\\right)\\right)")).toMatchObject({
+      ok: true,
+      latex: "12\\cdot x\\cdot y+24\\cdot x\\cdot z",
+    });
+    expect(run("h\\left(x\\right)\\coloneq x^2").ok).toBe(true); // a definition stays a call
+    expect(run("h\\left(3\\right)")).toMatchObject({ ok: true, latex: "9" });
+    expect(run("k\\coloneq 5").ok).toBe(true); // a number is not a function
+    expect(run("k\\left(2\\right)")).toMatchObject({ ok: true, latex: "10" });
+    expect(run("abs\\left(-3\\right)")).toMatchObject({ ok: true, latex: "3" }); // built-in typed as letters
+    expect(run("\\operatorname{purge}\\left(h\\right)").ok).toBe(true);
+    expect(run("\\operatorname{purge}\\left(k\\right)").ok).toBe(true);
+  });
+
   it("makes the previous result available as ans", () => {
     run("\\frac{1}{3}");
     expect(run("3\\cdot ans")).toMatchObject({ ok: true, latex: "1" });

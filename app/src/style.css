@@ -49,6 +49,9 @@ body {
 body {
   display: grid;
   grid-template-rows: auto 1fr auto;
+  /* One column exactly as wide as the window: an auto column would grow to
+     fit the widest result and push the notebook off-screen. */
+  grid-template-columns: minmax(0, 1fr);
   background: var(--bg);
   color: var(--text);
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Ubuntu, Cantarell, "Noto Sans", sans-serif;
@@ -160,6 +163,7 @@ button {
 
 .workspace {
   display: flex;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -461,17 +465,24 @@ button {
   display: none;
 }
 
-/* One row per input line; notebook.ts lines each row up with its line. */
+/* One row per input line; notebook.ts lines each row up with its line.
+   Never a scroll container: the cell grows to fit its results, and results
+   that don't fit beside the input wrap onto a row of their own below it. */
 .entry-result {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  align-self: stretch;
   margin-left: auto;
+  min-width: 0;
   max-width: 100%;
-  overflow-x: auto;
   color: var(--result);
   font-size: var(--math-size);
+}
+
+/* Multi-line cells: results are placed line by line from the top. */
+.entry.multi-line .entry-input,
+.entry.multi-line .entry-result {
+  align-self: flex-start;
 }
 
 .entry-result:empty {
@@ -482,9 +493,47 @@ button {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: 4px 18px;
   flex-shrink: 0;
+  max-width: 100%;
+}
+
+/* Right-aligned with an auto margin, not justify-content: flex-end, so that
+   a result too wide to fit overflows to the right (scrollable, measurable)
+   instead of off the left edge. */
+.result-line > :first-child {
+  margin-left: auto;
+}
+
+/* Last resort: one result wider than the whole cell scrolls sideways, on
+   its own, with a thin scrollbar that shows only on hover. */
+.result-line.wide {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Room to scroll the last terms out of the fade below. */
+  padding: 6px 40px 6px 0;
+  /* Fade the right edge so it is clear the result continues. */
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.result-line.wide:hover {
+  scrollbar-color: var(--muted) transparent;
+}
+
+.result-line.wide::-webkit-scrollbar {
+  height: 6px;
+}
+
+.result-line.wide::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: transparent;
+}
+
+.result-line.wide:hover::-webkit-scrollbar-thumb {
+  background: var(--muted);
 }
 
 .result-line .exact {

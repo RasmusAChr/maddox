@@ -2,9 +2,12 @@
 //
 // Juxtaposition needs care: Giac has no implicit multiplication between
 // arbitrary operands ("(x+1)x" and "sin(x)cos(x)" are syntax errors), so the
-// converter emits explicit "*" between adjacent operands. The one exception is
-// a name followed by "(": that is left alone so Giac can decide between a call
-// (f(2) for a defined f) and a product (x(x+1)).
+// converter emits explicit "*" between adjacent operands.
+//
+// A typed name followed by "(" is ambiguous: f(2) is a call if f is a
+// function, but 3x(4y+8z) is a product. Only the engine knows which names are
+// functions, so the converter puts CALL_OR_PRODUCT there and GiacSession
+// decides. Names from \operatorname{...} (solve, det, ...) are always calls.
 //
 // Multi-letter runs stay one name ("xy" is the variable xy), matching the
 // TI-Nspire and Giac convention.
@@ -14,14 +17,18 @@ export class UnsupportedLatex extends Error {}
 /** What "ans" (the previous result) becomes; Giac reserves the name ans. */
 export const ANS_VARIABLE = "maddox_ans";
 
+/** Marks "name(" where only the engine can tell a call from a product. */
+export const CALL_OR_PRODUCT = "\u0002";
+
 type Token = { kind: "cmd" | "char"; value: string };
 
 // What a piece of output is, for deciding whether "*" goes between two pieces.
 //   value: a complete operand (number, name, parenthesised group)
-//   name:  an identifier; a following "(" makes it a call
+//   name:  a typed identifier; a following "(" may be a call or a product
+//   fname: a command name from \operatorname{...}; a following "(" is a call
 //   post:  a postfix that ends an operand (^(...), !) but cannot start one
 //   op:    an operator or punctuation
-type Kind = "value" | "name" | "post" | "op";
+type Kind = "value" | "name" | "fname" | "post" | "op";
 type Piece = { text: string; kind: Kind };
 
 const GREEK = new Set([
@@ -91,7 +98,7 @@ function endsOperand(p: Piece): boolean {
 }
 
 function startsOperand(p: Piece): boolean {
-  return p.kind === "value" || p.kind === "name";
+  return p.kind === "value" || p.kind === "name" || p.kind === "fname";
 }
 
 /** Joins pieces, inserting "*" wherever two operands touch. */
@@ -101,8 +108,16 @@ class Emitter {
   push(p: Piece) {
     const prev = this.pieces[this.pieces.length - 1];
     if (prev && endsOperand(prev) && startsOperand(p)) {
-      const isCall = prev.kind === "name" && /^[([]/.test(p.text);
-      if (!isCall) this.pieces.push({ text: "*", kind: "op" });
+      const named = prev.kind === "name" || prev.kind === "fname";
+      if (named && p.text.startsWith("[")) {
+        // indexing: v[1]
+      } else if (prev.kind === "fname" && p.text.startsWith("(")) {
+        // a command: solve(...)
+      } else if (prev.kind === "name" && p.text.startsWith("(")) {
+        this.pieces.push({ text: CALL_OR_PRODUCT, kind: "op" });
+      } else {
+        this.pieces.push({ text: "*", kind: "op" });
+      }
     }
     this.pieces.push(p);
   }
@@ -288,7 +303,7 @@ class Converter {
     if (TEXT_LIKE.has(name)) {
       const text = unwrapTextLike(this.rawGroup()).trim();
       if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(text)) throw new UnsupportedLatex(`Unsupported name: ${text}`);
-      out.push({ text, kind: "name" });
+      out.push({ text, kind: "fname" });
       return;
     }
     switch (name) {

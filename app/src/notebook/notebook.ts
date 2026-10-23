@@ -5,7 +5,7 @@ import { latexToGiac, UnsupportedLatex } from "../engine/latex-to-giac";
 import { OPERATOR_NAMES } from "../ui/commands";
 import { isTextLine, splitLines } from "./lines";
 import { editMatrix, matrixAtCaret, matrixLatex, type MatrixAction, type MatrixInfo } from "./matrix";
-import { atLineStart, breakLine, deleteAtBrackets, fillEmptyMatrixCells, focusImmediately, lineBoxes } from "./mathlive-internals";
+import { atLineStart, breakLine, deleteAtBrackets, fillEmptyMatrixCells, focusImmediately, lineBoxes, moveByWord } from "./mathlive-internals";
 
 /** What one line of a cell shows on the right: nothing (text or empty line), a result, or "computing". */
 type LineResult = EvalResult | "pending" | null;
@@ -237,6 +237,13 @@ export class Notebook {
       return;
     }
 
+    if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && mod && !e.altKey) {
+      claim();
+      moveByWord(entry.mf, e.key === "ArrowLeft" ? "left" : "right", e.shiftKey);
+      this.emitContext(entry);
+      return;
+    }
+
     if (e.altKey && !mod && e.key in MATRIX_KEYS) {
       const vertical = e.key === "ArrowUp" || e.key === "ArrowDown";
       const action = e.shiftKey ? (vertical ? "removeRow" : "removeColumn") : MATRIX_KEYS[e.key];
@@ -376,26 +383,45 @@ export class Notebook {
   }
 
   /**
-   * Lines each result up with its input line. Each result row is given the
-   * vertical span of its line; a result taller than its line pushes the
-   * following ones down rather than overlapping them.
+   * Places results without ever scrolling the result column:
+   * - A one-line cell: flexbox centres the result on the input, and the cell
+   *   grows to fit a tall result.
+   * - A multi-line cell: each result is centred on its own line. A result
+   *   taller than the room it has pushes the following ones down.
+   * - If the results don't fit beside the input, the flex row wraps them onto
+   *   a full-width row below it, where they simply stack.
+   * - A single result wider than the whole cell gets its own sideways scroll
+   *   ("wide"), the last resort.
    */
   private layoutResults(entry: Entry) {
     const rows = [...entry.resultEl.children] as HTMLElement[];
-    if (!rows.length) return;
-    const boxes = lineBoxes(entry.mf);
-    if (boxes.length !== rows.length) {
-      for (const row of rows) row.style.cssText = "";
-      return;
+    for (const row of rows) {
+      row.style.marginTop = "";
+      row.classList.remove("wide");
     }
+    const multi = rows.length > 1;
+    entry.el.classList.toggle("multi-line", multi);
+    if (!rows.length) return;
+
+    const boxes = lineBoxes(entry.mf);
+    const mfRect = entry.mf.getBoundingClientRect();
     const top = entry.resultEl.getBoundingClientRect().top;
-    let y = top;
-    rows.forEach((row, i) => {
-      const box = boxes[i];
-      row.style.marginTop = `${Math.max(0, box.top - y)}px`;
-      row.style.minHeight = `${Math.max(0, box.bottom - box.top)}px`;
-      y = Math.max(y, box.top) + Math.max(row.offsetHeight, box.bottom - box.top);
-    });
+    const wrapped = top >= mfRect.bottom - 1;
+    if (multi && !wrapped && boxes.length === rows.length) {
+      let y = top;
+      rows.forEach((row, i) => {
+        const height = row.offsetHeight;
+        const center = (boxes[i].top + boxes[i].bottom) / 2;
+        const rowTop = Math.max(y, center - height / 2);
+        row.style.marginTop = `${rowTop - y}px`;
+        y = rowTop + height;
+      });
+    }
+    // Compare with the whole cell, not the row: glyphs that overhang by a
+    // pixel would otherwise flag ordinary results as too wide.
+    const style = getComputedStyle(entry.el);
+    const cellWidth = entry.el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    for (const row of rows) row.classList.toggle("wide", row.scrollWidth > cellWidth + 1);
   }
 
   /** Pastes a result into the entry being edited (or the last one). */

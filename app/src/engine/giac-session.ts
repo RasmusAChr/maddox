@@ -7,7 +7,7 @@ export type EvalResult =
 
 export type Caseval = (input: string) => string;
 
-import { ANS_VARIABLE } from "./latex-to-giac";
+import { ANS_VARIABLE, CALL_OR_PRODUCT } from "./latex-to-giac";
 
 // Every result is stored here so its LaTeX and decimal value can be read back
 // without evaluating the input twice (which would repeat side effects).
@@ -27,6 +27,7 @@ export class GiacSession {
       this.reset();
       return { ok: true, latex: "\\text{All variables cleared}", approxLatex: null };
     }
+    giac = this.resolveCalls(giac);
     this.takePrinted();
     const raw = this.caseval(`${RESULT}:=(${giac})`);
     const error = findError(raw, this.takePrinted());
@@ -42,11 +43,40 @@ export class GiacSession {
     return { ok: true, latex, approxLatex: showApprox(latex, approxText) ? approxLatex : null };
   }
 
+  /**
+   * Decides each "name(" the converter could not: a call when the name is a
+   * function (built in or defined by the user) or is being defined (f(x):=…),
+   * otherwise a product, so 3x(4y+8z) multiplies.
+   */
+  private resolveCalls(giac: string): string {
+    if (!giac.includes(CALL_OR_PRODUCT)) return giac;
+    const isFunction = new Map<string, boolean>();
+    const out = giac.replace(new RegExp(`([A-Za-z_][A-Za-z0-9_]*)${CALL_OR_PRODUCT}\\(`, "g"), (_m, name: string, offset: number) => {
+      const open = offset + name.length + CALL_OR_PRODUCT.length;
+      const close = matchingParen(giac, open);
+      if (close >= 0 && /^\s*:=/.test(giac.slice(close + 1))) return `${name}(`;
+      if (!isFunction.has(name)) isFunction.set(name, this.caseval(`type(${name})`) === "func");
+      return isFunction.get(name) ? `${name}(` : `${name}*(`;
+    });
+    this.takePrinted();
+    return out;
+  }
+
   /** Forgets every variable and function the user defined. */
   reset() {
     this.caseval("restart");
     this.takePrinted();
   }
+}
+
+/** Index of the ")" matching the "(" at `open`, or -1. */
+function matchingParen(s: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < s.length; i++) {
+    if (s[i] === "(") depth++;
+    else if (s[i] === ")" && --depth === 0) return i;
+  }
+  return -1;
 }
 
 function findError(raw: string, printed: string[]): string | null {
