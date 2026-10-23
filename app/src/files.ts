@@ -1,5 +1,6 @@
 // Saving and opening notebooks: native dialogs under Tauri, a download and a
 // file picker in a plain browser (used during development).
+import type { AngleMode } from "./engine/giac-session";
 import { textToLatex } from "./notebook/lines";
 
 const FORMAT = "maddox-notebook";
@@ -8,9 +9,23 @@ const EXTENSION = "maddox";
 
 export const isTauri = "__TAURI_INTERNALS__" in window;
 
+/** What a .maddox file holds: the cells, and settings that change results. */
+export type NotebookDoc = { cells: string[]; angle: AngleMode };
+
 // Each entry is {"latex": ...}: one cell, possibly several lines.
-export function serialize(cells: string[]): string {
-  return JSON.stringify({ format: FORMAT, version: VERSION, entries: cells.map((latex) => ({ latex })) }, null, 2);
+// "settings" was added after version 1 shipped; readers treat it as optional.
+export function serialize(doc: NotebookDoc): string {
+  return JSON.stringify(
+    { format: FORMAT, version: VERSION, settings: { angle: doc.angle }, entries: doc.cells.map((latex) => ({ latex })) },
+    null,
+    2,
+  );
+}
+
+/** A file's angle mode. Files from before the setting existed were made in
+ * radians (the only mode then), so they open in radians. */
+export function readAngle(settings: unknown): AngleMode {
+  return (settings as any)?.angle === "deg" ? "deg" : "rad";
 }
 
 /**
@@ -27,7 +42,7 @@ export function toCells(entries: unknown[]): string[] {
   });
 }
 
-export function parse(text: string): string[] {
+export function parse(text: string): NotebookDoc {
   let data: any;
   try {
     data = JSON.parse(text);
@@ -36,7 +51,7 @@ export function parse(text: string): string[] {
   }
   if (data?.format !== FORMAT || !Array.isArray(data.entries)) throw new Error("This is not a Maddox notebook");
   if (data.version > VERSION) throw new Error("This notebook was made by a newer version of Maddox");
-  return toCells(data.entries);
+  return { cells: toCells(data.entries), angle: readAngle(data.settings) };
 }
 
 export function fileName(path: string | null): string {
@@ -45,8 +60,8 @@ export function fileName(path: string | null): string {
 }
 
 /** Returns the path written to, or null if the user cancelled. */
-export async function saveNotebook(cells: string[], path: string | null): Promise<string | null> {
-  const text = serialize(cells);
+export async function saveNotebook(doc: NotebookDoc, path: string | null): Promise<string | null> {
+  const text = serialize(doc);
   if (isTauri) {
     const { save } = await import("@tauri-apps/plugin-dialog");
     const { writeTextFile } = await import("@tauri-apps/plugin-fs");
@@ -65,7 +80,7 @@ export async function saveNotebook(cells: string[], path: string | null): Promis
 }
 
 /** Reads a notebook by path (desktop app only): a recent file, or one the app was launched with. */
-export async function readNotebookAt(path: string): Promise<string[]> {
+export async function readNotebookAt(path: string): Promise<NotebookDoc> {
   const { readTextFile } = await import("@tauri-apps/plugin-fs");
   return parse(await readTextFile(path));
 }
@@ -77,13 +92,13 @@ export async function launchFile(): Promise<string | null> {
   return (await invoke<string | null>("launch_file")) ?? null;
 }
 
-export async function openNotebook(): Promise<{ cells: string[]; path: string } | null> {
+export async function openNotebook(): Promise<{ doc: NotebookDoc; path: string } | null> {
   if (isTauri) {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const { readTextFile } = await import("@tauri-apps/plugin-fs");
     const path = await open({ multiple: false, directory: false, filters: [{ name: "Maddox notebook", extensions: [EXTENSION] }] });
     if (typeof path !== "string") return null;
-    return { cells: parse(await readTextFile(path)), path };
+    return { doc: parse(await readTextFile(path)), path };
   }
   const file = await new Promise<File | null>((resolve) => {
     const input = document.createElement("input");
@@ -94,7 +109,7 @@ export async function openNotebook(): Promise<{ cells: string[]; path: string } 
     input.click();
   });
   if (!file) return null;
-  return { cells: parse(await file.text()), path: file.name };
+  return { doc: parse(await file.text()), path: file.name };
 }
 
 export async function setWindowTitle(title: string) {

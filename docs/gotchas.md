@@ -95,6 +95,8 @@ Re-check this list after upgrading.
 - **`restart` breaks the result holder.** It returns the names it cleared,
   including `maddox_result`, so `maddox_result:=(restart)` is a "recursive
   definition" error. `GiacSession.evaluate` special-cases a bare `restart`.
+- **`restart` resets the angle mode to radians.** It also clears
+  `maddox_deg`. `GiacSession.reset()` re-applies both.
 - **Display simplification.** Autosimplify settings do not affect
   `caseval`. Results are wrapped in `regroup()` for display.
 - **Loading under Node.** The script declares `var Module` at the top

@@ -1,4 +1,4 @@
-import type { EvalResult } from "./giac-session";
+import type { AngleMode, EvalResult } from "./giac-session";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
 
 export type EngineStatus = "loading" | "ready" | "busy" | "failed";
@@ -20,6 +20,7 @@ export class Engine {
   private nextId = 1;
   private pending = new Map<number, Pending>();
   private ready!: Promise<void>;
+  private angle: AngleMode = "rad";
 
   constructor(private giacUrl: string) {
     this.start();
@@ -48,6 +49,8 @@ export class Engine {
     });
     this.ready.catch(() => {});
     this.send({ type: "init", url: this.giacUrl });
+    // A restarted worker (after cancel) starts in radians: restore the mode.
+    if (this.angle !== "rad") void this.setAngle(this.angle);
   }
 
   private send(msg: WorkerRequest) {
@@ -59,7 +62,7 @@ export class Engine {
     this.onStatus(status);
   }
 
-  private request(msg: { type: "eval"; giac: string } | { type: "reset" }): Promise<EvalResult> {
+  private request(msg: { type: "eval"; giac: string } | { type: "reset" } | { type: "angle"; mode: AngleMode }): Promise<EvalResult> {
     return this.ready.then(
       () =>
         new Promise<EvalResult>((resolve) => {
@@ -78,6 +81,12 @@ export class Engine {
 
   async reset(): Promise<void> {
     await this.request({ type: "reset" });
+  }
+
+  /** Degrees or radians; kept across resets and cancels. */
+  async setAngle(mode: AngleMode): Promise<void> {
+    this.angle = mode;
+    await this.request({ type: "angle", mode });
   }
 
   get isBusy() {

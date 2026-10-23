@@ -26,6 +26,7 @@ const KEPT_SHORTCUTS = [
   "sqrt", "int", "sum", "prod", "lim", "dx", "dy", "dt",
   "sin", "cos", "tan", "arcsin", "arccos", "arctan", "sinh", "cosh", "tanh", "cot", "sec", "csc",
   "ln", "<=", ">=", "!=", ":=",
+  "deg", // after a number: 30deg becomes 30°
 ];
 const EXTRA_SHORTCUTS: Record<string, string> = {
   log: "\\log", // MathLive's default asks for a base; log is base 10 here.

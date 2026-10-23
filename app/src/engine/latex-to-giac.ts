@@ -20,6 +20,10 @@ export const ANS_VARIABLE = "maddox_ans";
 /** Marks "name(" where only the engine can tell a call from a product. */
 export const CALL_OR_PRODUCT = "\u0002";
 
+/** What ° becomes: 30° is 30*maddox_deg. GiacSession sets it to pi/180 in
+ * radian mode and to 1 in degree mode, so 30° means 30 degrees in both. */
+export const DEGREE_VARIABLE = "maddox_deg";
+
 type Token = { kind: "cmd" | "char"; value: string };
 
 // What a piece of output is, for deciding whether "*" goes between two pieces.
@@ -260,6 +264,12 @@ class Converter {
         return;
       }
       case "^":
+        // 30^{\circ} (or 30^\circ) is how a degree sign is often written.
+        if (this.isCmd("circ") || (this.isChar("{") && this.isCmd("circ", 1) && this.isChar("}", 2))) {
+          this.i += this.isCmd("circ") ? 1 : 3;
+          out.push({ text: `*${DEGREE_VARIABLE}`, kind: "post" });
+          return;
+        }
         out.push({ text: `^(${this.arg()})`, kind: "post" });
         return;
       case "_": {
@@ -338,6 +348,9 @@ class Converter {
         return this.bigOperator(name === "sum" ? "sum" : "product", out, stop);
       case "lim":
         return this.limit(out, stop);
+      case "degree":
+        out.push({ text: `*${DEGREE_VARIABLE}`, kind: "post" });
+        return;
       case "differentialD":
         // Only meaningful inside d/dx; latexToGiac rejects any that survive.
         out.push({ text: DIFFERENTIAL, kind: "name" });

@@ -3,7 +3,8 @@ import "mathlive/static.css";
 import "./style.css";
 import { MathfieldElement } from "mathlive";
 import { Engine, type EngineStatus } from "./engine/engine";
-import { fileName, isTauri, launchFile, openNotebook, readNotebookAt, saveNotebook, setWindowTitle, toCells } from "./files";
+import type { AngleMode } from "./engine/giac-session";
+import { fileName, isTauri, launchFile, openNotebook, readAngle, readNotebookAt, saveNotebook, setWindowTitle, toCells, type NotebookDoc } from "./files";
 import { forgetFile, recentFiles, rememberFile } from "./recent";
 import { Notebook, type Context } from "./notebook/notebook";
 import { CATALOG, CATEGORIES, type CatalogItem } from "./ui/commands";
@@ -33,7 +34,26 @@ let dirty = false;
 // would discard the edit unasked. Comparing the content cannot lag.
 let savedContent: string | null = null;
 const currentContent = () => JSON.stringify(notebook.latexList);
-const hasUnsavedChanges = () => dirty || currentContent() !== savedContent;
+
+// Degrees or radians, saved in each notebook. A new notebook starts in the
+// mode last used (degrees the very first time).
+const ANGLE_KEY = "maddox.angle";
+let angle: AngleMode = lastAngle();
+let savedAngle: AngleMode = angle;
+
+function lastAngle(): AngleMode {
+  try {
+    return localStorage.getItem(ANGLE_KEY) === "rad" ? "rad" : "deg";
+  } catch {
+    return "deg";
+  }
+}
+
+const hasUnsavedChanges = () => dirty || currentContent() !== savedContent || angle !== savedAngle;
+
+/** What the autosave keeps between runs. */
+const sessionRecord = (entries: unknown[], isDirty: boolean, mode: AngleMode) =>
+  JSON.stringify({ entries, path, dirty: isDirty, angle: mode });
 
 function updateTitle() {
   const name = fileName(path);
@@ -49,7 +69,7 @@ function markDirty() {
   clearTimeout(autosaveTimer);
   autosaveTimer = window.setTimeout(() => {
     try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ entries: notebook.latexList, path, dirty }));
+      localStorage.setItem(SESSION_KEY, sessionRecord(notebook.latexList, dirty, angle));
     } catch {
       // Storage can be unavailable; autosave is only a convenience.
     }
@@ -65,6 +85,9 @@ function restoreSession(): boolean {
     path = saved.path ?? null;
     dirty = Boolean(saved.dirty);
     savedContent = dirty ? null : currentContent();
+    // Sessions saved before the setting existed keep the default.
+    setAngle(saved.angle === undefined ? angle : readAngle(saved));
+    savedAngle = angle;
     return true;
   } catch {
     return false;
@@ -74,11 +97,12 @@ function restoreSession(): boolean {
 /** Saves the notebook (asking for a name when it has none); true once it is on disk. */
 async function save(saveAs = false): Promise<boolean> {
   try {
-    const written = await saveNotebook(notebook.latexList, saveAs ? null : path);
+    const written = await saveNotebook({ cells: notebook.latexList, angle }, saveAs ? null : path);
     if (!written) return false;
     path = written;
     dirty = false;
     savedContent = currentContent();
+    savedAngle = angle;
     updateTitle();
     markDirtyFree();
     if (isTauri) rememberFile(written);
@@ -92,7 +116,7 @@ async function save(saveAs = false): Promise<boolean> {
 
 function markDirtyFree() {
   try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ entries: notebook.latexList, path, dirty: false }));
+    localStorage.setItem(SESSION_KEY, sessionRecord(notebook.latexList, false, angle));
   } catch {
     // see markDirty
   }
@@ -125,17 +149,19 @@ function forgetUnsavedEdits() {
   clearTimeout(autosaveTimer);
   try {
     if (savedContent === null) localStorage.removeItem(SESSION_KEY);
-    else localStorage.setItem(SESSION_KEY, JSON.stringify({ entries: JSON.parse(savedContent), path, dirty: false }));
+    else localStorage.setItem(SESSION_KEY, sessionRecord(JSON.parse(savedContent), false, savedAngle));
   } catch {
     // see markDirty
   }
 }
 
-function loadDocument(cells: string[], newPath: string | null) {
-  notebook.load(cells);
+function loadDocument(doc: NotebookDoc, newPath: string | null) {
+  notebook.load(doc.cells);
   path = newPath;
   dirty = false;
   savedContent = currentContent();
+  setAngle(doc.angle); // before runAll below: the engine runs requests in order
+  savedAngle = doc.angle;
   updateTitle();
   markDirtyFree();
   if (isTauri && newPath) rememberFile(newPath);
@@ -148,7 +174,7 @@ async function open() {
   try {
     const doc = await openNotebook();
     if (!doc) return refocus();
-    loadDocument(doc.cells, doc.path);
+    loadDocument(doc.doc, doc.path);
   } catch (err) {
     showMessage(`Could not open: ${err instanceof Error ? err.message : err}`);
   }
@@ -168,8 +194,31 @@ async function openPath(filePath: string) {
 
 async function newNotebook() {
   if (!(await confirmDiscard())) return refocus();
-  loadDocument([], null);
-  void engine.reset();
+  loadDocument({ cells: [], angle: lastAngle() }, null);
+}
+
+// ---- angle mode -------------------------------------------------------------------
+
+/** Applies a mode to the engine and the status-bar chip (no re-run, no save). */
+function setAngle(mode: AngleMode) {
+  angle = mode;
+  void engine.setAngle(mode);
+  const chip = $("#angle-chip");
+  chip.textContent = mode === "deg" ? "DEG" : "RAD";
+  chip.title = `Angles in ${mode === "deg" ? "degrees" : "radians"}: click or Ctrl+Shift+A to switch`;
+  chip.setAttribute("aria-label", chip.title);
+}
+
+/** Ctrl+Shift+A or the chip: switch mode, remember it, and re-run everything. */
+function toggleAngle() {
+  setAngle(angle === "deg" ? "rad" : "deg");
+  try {
+    localStorage.setItem(ANGLE_KEY, angle);
+  } catch {
+    // Only a convenience: the notebook itself records its mode.
+  }
+  markDirty();
+  void notebook.runAll();
 }
 
 // ---- status bar -----------------------------------------------------------------
@@ -181,11 +230,21 @@ const STATUS_TEXT: Record<EngineStatus, string> = {
   failed: "Engine failed to load",
 };
 
+// data-status is the engine's true state (tests and Esc rely on it). What is
+// shown waits ~300 ms before saying "Computing…", so re-running a notebook,
+// which flips busy/ready per cell in milliseconds, doesn't flicker.
+let busyTimer: number | undefined;
 engine.onStatus = (status) => {
   const el = $("#engine-status");
   el.dataset.status = status;
-  el.textContent = STATUS_TEXT[status];
   el.title = status === "failed" ? engine.error ?? "" : "";
+  const show = () => {
+    el.dataset.shown = status;
+    el.textContent = STATUS_TEXT[status];
+  };
+  clearTimeout(busyTimer);
+  if (status === "busy") busyTimer = window.setTimeout(show, 300);
+  else show();
 };
 
 const HINTS = "<kbd>Enter</kbd> evaluate · <kbd>Shift ↵</kbd> new line · <kbd>#</kbd> heading · <kbd>Ctrl P</kbd> search · <kbd>F1</kbd> all shortcuts";
@@ -263,6 +322,7 @@ function searchItems(): SearchItem[] {
     action("Open recent…", "A notebook you opened or saved lately", openRecent, "Ctrl+Shift+O", "recent file history"),
     action("Save", "Save the notebook", ACTIONS.save, "Ctrl+S", "file"),
     action("Save as…", "Save under a new name", () => void save(true), "Ctrl+Shift+S", "file"),
+    action(angle === "deg" ? "Switch to radians" : "Switch to degrees", "Angle mode for sin, cos, tan and their inverses", toggleAngle, "Ctrl+Shift+A", "angle mode degrees radians deg rad trig"),
     action("Show or hide templates", "The template sidebar", ACTIONS.templates, "Ctrl+B", "sidebar panel"),
     action("Keyboard shortcuts", "List every shortcut", help, "F1", "help keys"),
   ];
@@ -332,6 +392,7 @@ window.addEventListener(
     if (e.key === "F1" || (mod && key === "/")) return run(help);
     if (!mod || e.altKey) return;
     if (e.shiftKey && e.key === "Enter") return run(ACTIONS["run-all"]);
+    if (e.shiftKey && key === "a") return run(toggleAngle);
     if (key === "p" || key === "k") return run(search);
     // By character, not physical key: on a Danish keyboard "+" has its own
     // key (whose code is "Minus"), on a US one it is "=".
@@ -377,7 +438,11 @@ if (isTauri) {
 if (!restoreSession()) {
   notebook.load([]);
   savedContent = currentContent();
+  setAngle(angle);
 }
+const angleChip = $("#angle-chip");
+angleChip.addEventListener("mousedown", (e) => e.preventDefault()); // keep focus in the cell
+angleChip.addEventListener("click", toggleAngle);
 updateTitle();
 showContext({ matrix: null });
 notebook.focusLast();

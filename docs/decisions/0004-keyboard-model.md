@@ -45,6 +45,7 @@
 | Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S | anywhere | New / Open / Save / Save as |
 | Ctrl+Shift+O | anywhere | Open a recent notebook (the search, narrowed to recent files) |
 | Enter / D / Esc | "Save changes?" dialog | Save / don't save / cancel. Shown before New, Open, opening a recent or launch file, and closing the window, whenever there are unsaved changes |
+| Ctrl+Shift+A (or the DEG/RAD chip) | anywhere | Switch degrees / radians for this notebook, then re-run everything |
 | Ctrl++ (or Ctrl+=) / Ctrl+− / Ctrl+0 | anywhere | Zoom in / out / reset (remembered; matched by character, so `+` works on Danish and US layouts alike) |
 | F1 (or Ctrl+/) | anywhere | Shortcut list |
 

@@ -31,7 +31,8 @@
     </div>
 
     <footer class="statusbar">
-      <span id="engine-status" class="engine-status" data-status="loading">Loading engine…</span>
+      <span id="engine-status" class="engine-status" data-status="loading" data-shown="loading">Loading engine…</span>
+      <button type="button" id="angle-chip" class="mode-chip">DEG</button>
       <span id="hints" class="hints"></span>
       <span id="message" class="message" role="status"></span>
     </footer>
@@ -97,6 +98,7 @@
             <dt><code>sqrt</code> <code>int</code> <code>sum</code> <code>lim</code></dt><dd>Templates</dd>
             <dt><code>:=</code></dt><dd>Assign, e.g. <code>a:=5</code>, <code>f(x):=x^2</code></dd>
             <dt><code>ans</code></dt><dd>The previous result</dd>
+            <dt><code>30deg</code></dt><dd>30° — always degrees, in either mode</dd>
           </dl>
         </section>
         <section>
@@ -110,6 +112,7 @@
             <dt><kbd>Ctrl</kbd> <kbd>S</kbd></dt><dd>Save</dd>
             <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>S</kbd></dt><dd>Save as</dd>
             <dt><kbd>Ctrl</kbd> <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd></dt><dd>Zoom in / out / reset</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>A</kbd></dt><dd>Degrees / radians (saved in the notebook)</dd>
             <dt><kbd>F1</kbd></dt><dd>This list</dd>
           </dl>
           <p class="help-note">Enter evaluates every maths line of an entry; each result appears next to its line.</p>

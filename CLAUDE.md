@@ -51,6 +51,10 @@ docs updated, a short report of what changed.
 - **Finding things:** Ctrl+P searches every template and app action
   (Obsidian-style). Ctrl+B toggles the template sidebar, which starts
   collapsed to a single » button.
+- **Angles are per notebook.** Degrees or radians are saved in the
+  `.maddox` file and shown as a DEG/RAD chip. Ctrl+Shift+A switches and
+  re-runs everything. New notebooks start in the last-used mode (degrees
+  the first time). `30°` always means degrees.
 - Full key map: `docs/decisions/0004-keyboard-model.md`, and the F1 dialog
   in `app/index.html`.
 

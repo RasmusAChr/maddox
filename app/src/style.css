@@ -655,13 +655,30 @@ button {
   vertical-align: 1px;
 }
 
-.engine-status[data-status="loading"]::before,
-.engine-status[data-status="busy"]::before {
+.engine-status[data-shown="loading"]::before,
+.engine-status[data-shown="busy"]::before {
   background: #e0a526;
 }
 
-.engine-status[data-status="failed"]::before {
+.engine-status[data-shown="failed"]::before {
   background: var(--error);
+}
+
+/* DEG / RAD: the notebook's angle mode (Ctrl+Shift+A). */
+.mode-chip {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 11px/1.6 ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.mode-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .hints {

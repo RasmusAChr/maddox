@@ -26,7 +26,10 @@
 - **Headings.** Text lines are styled as headings (semibold) by a
   stylesheet injected into each math-field's shadow root.
 - **Saving.** A notebook is saved as a `.maddox` file: JSON
-  `{format:"maddox-notebook", version:1, entries:[{latex}]}`. A multi-line
+  `{format:"maddox-notebook", version:1, settings:{angle}, entries:[{latex}]}`.
+  `settings` is optional: a file without it was made in radians and opens in
+  radians. New notebooks start in the angle mode last used (degrees the
+  first time). A multi-line
   cell is one entry, holding `\displaylines{…}` or a bare `a\\ b` (see
   gotchas). Results are not saved; they are recomputed on open.
 

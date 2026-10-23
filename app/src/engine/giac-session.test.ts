@@ -104,6 +104,25 @@ describe("GiacSession", () => {
   });
 });
 
+describe("angle mode", () => {
+  it("degrees: trig reads and returns degrees, and survives a reset", () => {
+    session.setAngle("deg");
+    expect(run("\\sin\\left(30\\right)")).toMatchObject({ ok: true, latex: "\\frac{1}{2}" });
+    expect(run("\\arcsin\\left(\\frac12\\right)")).toMatchObject({ ok: true, latex: "30" });
+    expect(run("\\cos\\left(60^{\\circ}\\right)")).toMatchObject({ ok: true, latex: "\\frac{1}{2}" });
+    session.reset();
+    expect(run("\\tan\\left(45\\right)")).toMatchObject({ ok: true, latex: "1" });
+  });
+
+  it("radians: ° still means degrees", () => {
+    session.setAngle("rad");
+    expect(run("\\sin\\left(30^{\\circ}\\right)")).toMatchObject({ ok: true, latex: "\\frac{1}{2}" });
+    expect(run("\\sin\\left(\\frac{\\pi}{6}\\right)")).toMatchObject({ ok: true, latex: "\\frac{1}{2}" });
+    const r = run("\\sin\\left(30\\right)");
+    expect(r.ok && r.latex).not.toBe("\\frac{1}{2}");
+  });
+});
+
 describe("cleanLatex", () => {
   it.each([
     ["\\frac{-1}{2}", "-\\frac{1}{2}"],

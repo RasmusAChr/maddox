@@ -7,18 +7,39 @@ export type EvalResult =
 
 export type Caseval = (input: string) => string;
 
-import { ANS_VARIABLE, CALL_OR_PRODUCT } from "./latex-to-giac";
+/** How trigonometric functions read and return angles. */
+export type AngleMode = "deg" | "rad";
+
+import { ANS_VARIABLE, CALL_OR_PRODUCT, DEGREE_VARIABLE } from "./latex-to-giac";
 
 // Every result is stored here so its LaTeX and decimal value can be read back
 // without evaluating the input twice (which would repeat side effects).
 const RESULT = "maddox_result";
 
 export class GiacSession {
+  private angle: AngleMode = "rad";
+
   constructor(
     private caseval: Caseval,
     /** Returns and clears what Giac printed since the last call. */
     private takePrinted: () => string[],
-  ) {}
+  ) {
+    this.applyAngle();
+  }
+
+  setAngle(mode: AngleMode) {
+    this.angle = mode;
+    this.applyAngle();
+  }
+
+  // Giac's own switch (angle_radian) plus the value ° stands for. restart
+  // resets Giac to radians, so this runs again after every reset.
+  private applyAngle() {
+    const rad = this.angle === "rad";
+    this.caseval(`angle_radian:=${rad ? 1 : 0}`);
+    this.caseval(`${DEGREE_VARIABLE}:=${rad ? "pi/180" : "1"}`);
+    this.takePrinted();
+  }
 
   evaluate(giac: string): EvalResult {
     // restart returns the names it cleared, RESULT among them, so storing
@@ -66,6 +87,7 @@ export class GiacSession {
   reset() {
     this.caseval("restart");
     this.takePrinted();
+    this.applyAngle();
   }
 }
 

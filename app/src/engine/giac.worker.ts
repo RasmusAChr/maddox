@@ -46,6 +46,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   try {
     if (msg.type === "eval") {
       post({ type: "result", id: msg.id, result: session.evaluate(msg.giac) });
+    } else if (msg.type === "angle") {
+      session.setAngle(msg.mode);
+      post({ type: "result", id: msg.id, result: { ok: true, latex: "", approxLatex: null } });
     } else {
       session.reset();
       post({ type: "result", id: msg.id, result: { ok: true, latex: "", approxLatex: null } });

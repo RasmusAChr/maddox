@@ -25,6 +25,14 @@
   - A decimal approximation is shown only when it adds information: the
     exact form is not already a decimal, and the value is purely numeric.
   - `ans` maps to the variable `maddox_ans`.
+- **Angle mode** (per notebook, chosen by the owner 2026-10-23):
+  - Giac's `angle_radian` (0 = degrees) does the work.
+  - `°` converts to `*maddox_deg`, which is π/180 in radian mode and 1 in
+    degree mode, so `30°` always means 30 degrees.
+  - `GiacSession` re-applies both after every `restart`.
+  - `Engine` re-sends the mode to a restarted worker after Esc-cancel.
+  - In degree mode calculus picks up π/180 factors (d/dx sin x =
+    π/180·cos x), as on the TI-Nspire.
 - **Input conversion.** MathLive produces LaTeX, and
   `app/src/engine/latex-to-giac.ts` converts it. TI conventions apply:
   `log` is base 10, and `xy` is one variable.

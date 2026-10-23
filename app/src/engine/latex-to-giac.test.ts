@@ -73,6 +73,11 @@ const cases: [string, string][] = [
   ["\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}^{-1}", "[[1,2],[3,4]]^(-1)"],
   ["\\begin{pmatrix}\\frac{1}{2}&x^2\\end{pmatrix}", "[[((1)/(2)),x^(2)]]"],
   ["\\left[1,2,3\\right]", "[1,2,3]"],
+  // degrees: ° is a factor the session sets per angle mode
+  ["30^{\\circ}", "30*maddox_deg"],
+  ["30^\\circ", "30*maddox_deg"],
+  ["30\\degree", "30*maddox_deg"],
+  ["\\sin\\left(30^{\\circ}\\right)", "sin(30*maddox_deg)"],
 ];
 
 describe("latexToGiac", () => {
