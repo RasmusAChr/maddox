@@ -3,7 +3,7 @@ import "mathlive/static.css";
 import "./style.css";
 import { MathfieldElement } from "mathlive";
 import { Engine, type EngineStatus } from "./engine/engine";
-import type { AngleMode } from "./engine/giac-session";
+import type { AngleMode, SolveStyle } from "./engine/giac-session";
 import { fileName, isTauri, launchFile, openNotebook, readAngle, readNotebookAt, saveNotebook, setWindowTitle, toCells, type NotebookDoc } from "./files";
 import { forgetFile, recentFiles, rememberFile } from "./recent";
 import { Notebook, type Context } from "./notebook/notebook";
@@ -197,6 +197,31 @@ async function newNotebook() {
   loadDocument({ cells: [], angle: lastAngle() }, null);
 }
 
+// ---- solve style --------------------------------------------------------------------
+
+// A display preference of this computer, not of the notebook: the answers are
+// the same, only written differently.
+const SOLVE_STYLE_KEY = "maddox.solve-style";
+let solveStyle: SolveStyle = (() => {
+  try {
+    return localStorage.getItem(SOLVE_STYLE_KEY) === "sets" ? "sets" : "textbook";
+  } catch {
+    return "textbook";
+  }
+})();
+void engine.configure({ solveStyle });
+
+function toggleSolveStyle() {
+  solveStyle = solveStyle === "textbook" ? "sets" : "textbook";
+  try {
+    localStorage.setItem(SOLVE_STYLE_KEY, solveStyle);
+  } catch {
+    // Only a convenience.
+  }
+  void engine.configure({ solveStyle });
+  void notebook.runAll();
+}
+
 // ---- angle mode -------------------------------------------------------------------
 
 /** Applies a mode to the engine and the status-bar chip (no re-run, no save). */
@@ -323,6 +348,13 @@ function searchItems(): SearchItem[] {
     action("Save", "Save the notebook", ACTIONS.save, "Ctrl+S", "file"),
     action("Save as…", "Save under a new name", () => void save(true), "Ctrl+Shift+S", "file"),
     action(angle === "deg" ? "Switch to radians" : "Switch to degrees", "Angle mode for sin, cos, tan and their inverses", toggleAngle, "Ctrl+Shift+A", "angle mode degrees radians deg rad trig"),
+    action(
+      solveStyle === "textbook" ? "Show solve answers as sets" : "Show solve answers as equations",
+      solveStyle === "textbook" ? "x ∈ {2, 3} instead of x = 2 or x = 3" : "x = 2 or x = 3 instead of x ∈ {2, 3}",
+      toggleSolveStyle,
+      undefined,
+      "solve answers format style sets textbook equations",
+    ),
     action("Show or hide templates", "The template sidebar", ACTIONS.templates, "Ctrl+B", "sidebar panel"),
     action("Keyboard shortcuts", "List every shortcut", help, "F1", "help keys"),
   ];

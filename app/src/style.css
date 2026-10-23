@@ -95,9 +95,11 @@ button {
 
 /* ---- top bar ---- */
 
+/* Three columns: logo | title | buttons. The title centres in the space
+   between them, so it never runs under the buttons at any width. */
 .topbar {
-  position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr);
   align-items: center;
   gap: 12px;
   padding: 9px 16px;
@@ -117,26 +119,14 @@ button {
   font-size: 14px;
 }
 
-/* Centred in the bar on wide windows; beside the logo on narrow ones. */
 .doc-title {
-  position: absolute;
-  left: 50%;
-  max-width: 30vw;
+  min-width: 0;
   overflow: hidden;
-  transform: translateX(-50%);
   font-size: 15px;
   font-weight: 600;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@media (max-width: 1100px) {
-  .doc-title {
-    position: static;
-    max-width: none;
-    min-width: 0;
-    transform: none;
-  }
 }
 
 .dirty {

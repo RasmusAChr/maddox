@@ -261,7 +261,7 @@ await page.keyboard.type("x-y=1");
 await page.keyboard.press("Enter");
 await waitIdle();
 const sys = await page.$$eval(".entry .exact", (els) => els.map((e) => e.dataset.latex));
-check("clicking a template inserts it", sys.includes("\\begin{pmatrix}2 & 1\\end{pmatrix}"), JSON.stringify(sys.slice(-3)));
+check("clicking a template inserts it", sys.includes("x=2\\text{ and }y=1"), JSON.stringify(sys.slice(-3)));
 await page.click("#templates .templates-collapse");
 check("« collapses it again", await page.$eval("#templates", (el) => el.classList.contains("collapsed")));
 
@@ -590,6 +590,33 @@ await page.keyboard.press("Control+s");
 const angleFile = await fileSave;
 const text = angleFile ? await readFile(await angleFile.path(), "utf8") : "";
 check("the notebook file records the angle mode", /"angle": "deg"/.test(text), text.slice(0, 120));
+
+// 24. Readable answers: solve as equations (default) or sets (Ctrl+P option),
+// six-digit decimals, and errors in plain words.
+await setAndRun(String.raw`\operatorname{solve}\left(x^2-5x+6=0,x\right)`);
+check("solve answers read x = 2 or x = 3", (await resultFor("x^2-5x")) === "x=2\\text{ or }x=3", await resultFor("x^2-5x"));
+const searchRun = async (q) => {
+  await page.keyboard.press("Control+p");
+  await page.waitForSelector("#search-dialog[open]");
+  await page.keyboard.type(q);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(150);
+  await waitIdle();
+  await page.waitForTimeout(150);
+};
+await searchRun("solve answers as sets");
+check("the option switches to sets and re-runs", (await resultFor("x^2-5x")) === "x\\in\\left\\{2,\\,3\\right\\}", await resultFor("x^2-5x"));
+await searchRun("solve answers as equations");
+check("and back to equations", (await resultFor("x^2-5x")) === "x=2\\text{ or }x=3", await resultFor("x^2-5x"));
+await setAndRun(String.raw`9\pi`);
+const approx = await page.$$eval(".entry", (els) => {
+  const el = els.find((e) => e.querySelector("math-field")?.value === "9\\pi");
+  return el?.querySelector(".approx")?.textContent ?? null;
+});
+check("decimals show six significant digits", approx?.includes("28.2743") && !approx.includes("28.27433"), approx);
+await setAndRun(String.raw`\operatorname{inv}\left(\begin{pmatrix}1&2\\2&4\end{pmatrix}\right)`);
+const invError = await page.$$eval(".entry", (els) => els.find((e) => e.querySelector("math-field")?.value.includes("inv"))?.querySelector(".error")?.textContent ?? null);
+check("errors are in plain words", invError === "This matrix can't be inverted: its determinant is 0.", invError);
 
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));

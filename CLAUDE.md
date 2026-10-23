@@ -55,6 +55,10 @@ docs updated, a short report of what changed.
   `.maddox` file and shown as a DEG/RAD chip. Ctrl+Shift+A switches and
   re-runs everything. New notebooks start in the last-used mode (degrees
   the first time). `30°` always means degrees.
+- **Decimal point only.** `2.5`, never `2,5`, even on Danish setups. The
+  owner decided this on 2026-10-23: students learn the international
+  convention. Commas separate arguments and list items. Don't add a
+  decimal-comma mode.
 - Full key map: `docs/decisions/0004-keyboard-model.md`, and the F1 dialog
   in `app/index.html`.
 

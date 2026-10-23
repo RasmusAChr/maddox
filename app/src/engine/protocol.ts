@@ -1,10 +1,10 @@
-import type { AngleMode, EvalResult } from "./giac-session";
+import type { EvalResult, SessionOptions } from "./giac-session";
 
 export type WorkerRequest =
   | { type: "init"; url: string }
   | { type: "eval"; id: number; giac: string }
   | { type: "reset"; id: number }
-  | { type: "angle"; id: number; mode: AngleMode };
+  | { type: "options"; id: number; options: Partial<SessionOptions> };
 
 export type WorkerResponse =
   | { type: "ready" }

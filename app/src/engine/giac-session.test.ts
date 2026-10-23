@@ -35,20 +35,20 @@ describe("GiacSession", () => {
   it.each([
     ["\\frac{1}{3}+\\frac{1}{6}", "\\frac{1}{2}", "0.5"],
     ["2+3", "5", null],
-    ["\\sqrt{8}", "2\\cdot \\sqrt{2}", "2.82842712475"],
+    ["\\sqrt{8}", "2\\cdot \\sqrt{2}", "2.82843"],
     ["\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}^{-1}", null, expect.stringContaining("1.5")],
     ["x+x", "2\\cdot x", null],
     // templates carried over from the legacy app
-    ["\\operatorname{solve}\\left(\\left[x+y=3,x-y=1\\right],\\left[x,y\\right]\\right)", "\\begin{pmatrix}2 & 1\\end{pmatrix}", null],
+    ["\\operatorname{solve}\\left(\\left[x+y=3,x-y=1\\right],\\left[x,y\\right]\\right)", "x=2\\text{ and }y=1", null],
     ["\\operatorname{approx}\\left(\\pi,10\\right)", "3.141592654", null],
     ["\\operatorname{subst}\\left(x^2+1,x=2\\right)", "5", null],
     ["\\det\\left(\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}\\right)", "-2", null],
     ["\\operatorname{factor}\\left(x^4-1\\right)", null, null],
-    ["\\int_{0}^{1}x^{2}\\differentialD x", "\\frac{1}{3}", "0.333333333333"],
+    ["\\int_{0}^{1}x^{2}\\differentialD x", "\\frac{1}{3}", "0.333333"],
     ["\\frac{d}{dx}x\\sin x", null, null],
     ["\\lim_{x\\to 0}\\frac{\\sin x}{x}", "1", null],
     ["\\sum_{k=1}^{10}k", "55", null],
-    ["2.5\\cdot 2", "5.0", null],
+    ["2.5\\cdot 2", "5", null],
   ])("%s", (latex, exact, approx) => {
     const r = run(latex);
     expect(r.ok, JSON.stringify(r)).toBe(true);
@@ -100,7 +100,66 @@ describe("GiacSession", () => {
   it("reports errors instead of results", () => {
     expect(session.evaluate("1+*2")).toMatchObject({ ok: false, error: expect.stringMatching(/Syntax error/) });
     expect(session.evaluate("1+")).toMatchObject({ ok: false, error: expect.stringMatching(/incomplete/) });
-    expect(session.evaluate("det([[1,2],[3]])")).toMatchObject({ ok: false, error: expect.stringMatching(/Bad Argument/) });
+    expect(session.evaluate("det([[1,2],[3]])")).toMatchObject({ ok: false, error: "det needs a matrix." });
+  });
+});
+
+describe("readable answers", () => {
+  const exact = (latex: string) => {
+    const r = run(latex);
+    return r.ok ? r.latex : `ERROR: ${r.error}`;
+  };
+
+  it("textbook solve answers (the default)", () => {
+    session.configure({ angle: "rad", solveStyle: "textbook" });
+    expect(exact("\\operatorname{solve}\\left(x^2=2,x\\right)")).toBe("x=-\\sqrt{2}\\text{ or }x=\\sqrt{2}");
+    expect(exact("\\operatorname{solve}\\left(2x=4,x\\right)")).toBe("x=2");
+    expect(exact("\\operatorname{solve}\\left(x^2=-1,x\\right)")).toBe("\\text{No solution}");
+    expect(exact("\\operatorname{solve}\\left(x^2>4,x\\right)")).toBe("x<-2\\text{ or }x>2");
+    expect(exact("\\operatorname{solve}\\left(x^2<4,x\\right)")).toBe("x>-2\\text{ and }x<2");
+    expect(exact("\\operatorname{solve}\\left(\\left[x^2+y^2=1,x=y\\right],\\left[x,y\\right]\\right)")).toBe(
+      "\\left(x=\\frac{\\sqrt{2}}{2}\\text{ and }y=\\frac{\\sqrt{2}}{2}\\right)\\text{ or }\\left(x=-\\frac{\\sqrt{2}}{2}\\text{ and }y=-\\frac{\\sqrt{2}}{2}\\right)",
+    );
+  });
+
+  it("set-style solve answers (the option)", () => {
+    session.configure({ solveStyle: "sets" });
+    expect(exact("\\operatorname{solve}\\left(x^2=2,x\\right)")).toBe("x\\in\\left\\{-\\sqrt{2},\\,\\sqrt{2}\\right\\}");
+    expect(exact("\\operatorname{solve}\\left(x^2=-1,x\\right)")).toBe("\\emptyset");
+    expect(exact("\\operatorname{solve}\\left(\\left[x+y=3,x-y=1\\right],\\left[x,y\\right]\\right)")).toBe(
+      "\\left(x,\\,y\\right)=\\left(2,\\,1\\right)",
+    );
+    session.configure({ solveStyle: "textbook" });
+  });
+
+  it("π and roots read as written: π/6, √2/2", () => {
+    session.configure({ angle: "rad" });
+    expect(exact("\\operatorname{solve}\\left(\\sin\\left(x\\right)=\\frac12,x\\right)")).toBe("x=\\frac{\\pi}{6}\\text{ or }x=\\frac{5\\pi}{6}");
+    expect(exact("\\frac{\\sqrt{2}}{2}")).toBe("\\frac{\\sqrt{2}}{2}");
+  });
+
+  it("decimals: 6 significant digits, powers of ten, but approx(…, n) keeps n", () => {
+    expect(run("9\\pi")).toMatchObject({ ok: true, approxLatex: "28.2743" });
+    expect(exact("\\frac{1.0}{7000000}")).toBe("1.42857\\cdot 10^{-7}");
+    expect(exact("\\operatorname{approx}\\left(\\pi,12\\right)")).toBe("3.14159265359");
+  });
+
+  it("errors in plain words, including Giac's silently wrong answers", () => {
+    const error = (giac: string) => {
+      const r = session.evaluate(giac);
+      return r.ok ? `OK: ${r.latex}` : r.error;
+    };
+    expect(error("inv([[1,2],[2,4]])")).toBe("This matrix can't be inverted: its determinant is 0.");
+    expect(error("inv([[1,2,3],[4,5,6]])")).toBe("inv needs a square matrix.");
+    expect(error("det([[1,2,3],[4,5,6]])")).toBe("det needs a square matrix.");
+    expect(error("eigenvals([[1,2,3],[4,5,6]])")).toBe("eigenvals needs a square matrix.");
+    expect(error("[[1,2],[3,4]]*[[1,2,3]]")).toBe("The sizes don't fit together: check the number of rows and columns.");
+    expect(error("ifactor(2.5)")).toBe("ifactor needs whole numbers.");
+    expect(error("isprime(2.5)")).toBe("isprime needs whole numbers.");
+    expect(error("rref(5)")).toBe("rref needs a matrix.");
+    expect(error("[[1,2,3],[4,5,6]]^(-1)")).toBe("Powers and inverses need a square matrix.");
+    expect(error("[[1,2,3],[4,5,6]]^2")).toBe("Powers and inverses need a square matrix.");
+    expect(error("[[1,2],[3,4]]^(-1)")).toBe("OK: \\begin{pmatrix}-2 & 1 \\\\\n\\frac{3}{2} & -\\frac{1}{2}\\end{pmatrix}");
   });
 });
 

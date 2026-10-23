@@ -97,6 +97,16 @@ Re-check this list after upgrading.
   definition" error. `GiacSession.evaluate` special-cases a bare `restart`.
 - **`restart` resets the angle mode to radians.** It also clears
   `maddox_deg`. `GiacSession.reset()` re-applies both.
+- **Silently wrong answers on non-square matrices.**
+  - `inv` returns element-wise reciprocals, with no warning at all.
+  - `det` returns a number, and only prints "non-square matrix".
+  - `A^2` or `A^(-1)` returns nonsense, and only prints "^ is ambiguous".
+
+  `GiacSession.squareCheck` checks the shape before inv, det, eigenvals,
+  eigenvects and trace, and `findError` turns those printed warnings into
+  errors.
+- **Indexing is 0-based** in Giac's default mode: `L[0]` is the first
+  element (used by `formatSolve`).
 - **Display simplification.** Autosimplify settings do not affect
   `caseval`. Results are wrapped in `regroup()` for display.
 - **Loading under Node.** The script declares `var Module` at the top

@@ -33,6 +33,18 @@
   - `Engine` re-sends the mode to a restarted worker after Esc-cancel.
   - In degree mode calculus picks up π/180 factors (d/dx sin x =
     π/180·cos x), as on the TI-Nspire.
+- **Readable answers** (chosen by the owner 2026-10-23):
+  - `solve`/`csolve`/`fsolve` answers read "x = 2 or x = 3", "No solution",
+    "x = 2 and y = 1". A Ctrl+P option shows them as sets
+    ("x ∈ {2, 3}", "∅", "(x, y) = (2, 1)"). The option is a display
+    preference of the computer, not of the notebook
+    (`GiacSession.formatSolve`).
+  - Decimals show 6 significant digits and use ·10ⁿ for very small or
+    large numbers. A digits setting will come with the Settings dialog;
+    `approx(…, n)` keeps the n digits asked for.
+  - π and roots read as written: π/6, √2/2 (`cleanLatex`).
+  - Errors are in plain words (`findError`), including the cases where
+    Giac silently gives a wrong answer (see gotchas).
 - **Input conversion.** MathLive produces LaTeX, and
   `app/src/engine/latex-to-giac.ts` converts it. TI conventions apply:
   `log` is base 10, and `xy` is one variable.

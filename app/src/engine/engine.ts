@@ -1,4 +1,4 @@
-import type { AngleMode, EvalResult } from "./giac-session";
+import type { AngleMode, EvalResult, SessionOptions } from "./giac-session";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
 
 export type EngineStatus = "loading" | "ready" | "busy" | "failed";
@@ -20,7 +20,7 @@ export class Engine {
   private nextId = 1;
   private pending = new Map<number, Pending>();
   private ready!: Promise<void>;
-  private angle: AngleMode = "rad";
+  private options: Partial<SessionOptions> = {};
 
   constructor(private giacUrl: string) {
     this.start();
@@ -49,8 +49,8 @@ export class Engine {
     });
     this.ready.catch(() => {});
     this.send({ type: "init", url: this.giacUrl });
-    // A restarted worker (after cancel) starts in radians: restore the mode.
-    if (this.angle !== "rad") void this.setAngle(this.angle);
+    // A restarted worker (after cancel) starts with defaults: restore ours.
+    if (Object.keys(this.options).length) void this.configure(this.options);
   }
 
   private send(msg: WorkerRequest) {
@@ -62,7 +62,7 @@ export class Engine {
     this.onStatus(status);
   }
 
-  private request(msg: { type: "eval"; giac: string } | { type: "reset" } | { type: "angle"; mode: AngleMode }): Promise<EvalResult> {
+  private request(msg: { type: "eval"; giac: string } | { type: "reset" } | { type: "options"; options: Partial<SessionOptions> }): Promise<EvalResult> {
     return this.ready.then(
       () =>
         new Promise<EvalResult>((resolve) => {
@@ -83,10 +83,14 @@ export class Engine {
     await this.request({ type: "reset" });
   }
 
-  /** Degrees or radians; kept across resets and cancels. */
-  async setAngle(mode: AngleMode): Promise<void> {
-    this.angle = mode;
-    await this.request({ type: "angle", mode });
+  /** Angle mode, solve style, digits; kept across resets and cancels. */
+  async configure(options: Partial<SessionOptions>): Promise<void> {
+    this.options = { ...this.options, ...options };
+    await this.request({ type: "options", options });
+  }
+
+  setAngle(mode: AngleMode): Promise<void> {
+    return this.configure({ angle: mode });
   }
 
   get isBusy() {
