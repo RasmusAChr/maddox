@@ -463,6 +463,33 @@ lay = await layoutOf("a+b+c");
 check("huge result: wraps below and scrolls on its own", lay.wrapped && lay.wide[0] === true, JSON.stringify(lay));
 check("the page never scrolls sideways", await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
 
+// 20. Full-screen look: leader dots join inputs to results, # lines are
+// headings, Ctrl+/-/0 zoom.
+await setAndRun(String.raw`\frac13+\frac16`);
+const leader = await page.$$eval(".entry", (els) => {
+  const el = els.find((e) => e.querySelector("math-field")?.value.includes("frac13"));
+  const l = el?.querySelector(".leader");
+  if (!l) return null;
+  const input = el.querySelector("math-field").getBoundingClientRect();
+  const result = el.querySelector(".result-line .exact").getBoundingClientRect();
+  const r = l.getBoundingClientRect();
+  return { startsAfterInput: r.left > input.left, endsBeforeResult: r.right < result.left, width: r.width };
+});
+check("leader dots join input and result", leader?.startsAfterInput && leader.endsBeforeResult && leader.width > 32, JSON.stringify(leader));
+check("# lines are styled as headings", await page.evaluate(() => {
+  const mf = document.querySelector("math-field");
+  return [...mf.shadowRoot.querySelectorAll("style")].some((s) => s.textContent.includes(".ML__text"));
+}));
+await page.keyboard.press("Control+=");
+const zoomedIn = await page.evaluate(() => document.documentElement.style.zoom);
+await page.keyboard.press("Control+-");
+await page.keyboard.press("Control+-");
+const zoomedOut = await page.evaluate(() => document.documentElement.style.zoom);
+await page.keyboard.press("Control+0");
+const reset = await page.evaluate(() => document.documentElement.style.zoom);
+check("Ctrl+= / Ctrl+- / Ctrl+0 zoom", zoomedIn === "1.1" && zoomedOut === "0.9" && reset === "", JSON.stringify([zoomedIn, zoomedOut, reset]));
+check("zoom is remembered", await page.evaluate(() => localStorage.getItem("maddox.zoom")) === "1");
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

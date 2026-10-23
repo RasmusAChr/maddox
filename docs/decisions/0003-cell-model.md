@@ -20,7 +20,11 @@
 - **Results.** Each line's result is shown on the right, level with its
   line (`layoutResults` in `notebook.ts` measures the lines with
   `lineBoxes`). A result taller than its line pushes the following results
-  down rather than overlapping them.
+  down rather than overlapping them. Faint dotted leaders run from each
+  input line to its result (`drawLeaders`), chosen by the owner over a
+  two-column layout or results directly after the input.
+- **Headings.** Text lines are styled as headings (semibold) by a
+  stylesheet injected into each math-field's shadow root.
 - **Saving.** A notebook is saved as a `.maddox` file: JSON
   `{format:"maddox-notebook", version:1, entries:[{latex}]}`. A multi-line
   cell is one entry, holding `\displaylines{…}` or a bare `a\\ b` (see

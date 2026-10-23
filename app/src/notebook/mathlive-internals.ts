@@ -207,9 +207,9 @@ export function moveByWord(mf: MathfieldElement, direction: "left" | "right", ex
   }
 }
 
-export type LineBox = { top: number; bottom: number };
+export type LineBox = { top: number; bottom: number; left: number; right: number };
 
-/** The on-screen vertical extent of each line of the cell, in document order. */
+/** The on-screen extent of each line of the cell, in document order. */
 export function lineBoxes(mf: MathfieldElement): LineBox[] {
   try {
     const model = internal(mf).model;
@@ -223,9 +223,16 @@ export function lineBoxes(mf: MathfieldElement): LineBox[] {
       const bounds = mf.getElementInfo(offset)?.bounds;
       if (!bounds || bounds.height === 0) continue;
       const box = boxes[row];
-      boxes[row] = box ? { top: Math.min(box.top, bounds.top), bottom: Math.max(box.bottom, bounds.bottom) } : { top: bounds.top, bottom: bounds.bottom };
+      boxes[row] = box
+        ? {
+            top: Math.min(box.top, bounds.top),
+            bottom: Math.max(box.bottom, bounds.bottom),
+            left: Math.min(box.left, bounds.left),
+            right: Math.max(box.right, bounds.right),
+          }
+        : { top: bounds.top, bottom: bounds.bottom, left: bounds.left, right: bounds.right };
     }
-    return boxes.map((b) => b ?? { top: 0, bottom: 0 });
+    return boxes.map((b) => b ?? { top: 0, bottom: 0, left: 0, right: 0 });
   } catch {
     return [];
   }

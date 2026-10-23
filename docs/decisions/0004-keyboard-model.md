@@ -43,6 +43,7 @@
 | Ctrl+B | anywhere | Toggle the template sidebar. Opening focuses its search field; closing returns to the cell |
 | ↑ / ↓, Enter, Esc | sidebar search field | Move the selection; insert, or toggle "More"; back to the cell |
 | Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S | anywhere | New / Open / Save / Save as |
+| Ctrl++ (or Ctrl+=) / Ctrl+− / Ctrl+0 | anywhere | Zoom in / out / reset (remembered; matched by character, so `+` works on Danish and US layouts alike) |
 | F1 (or Ctrl+/) | anywhere | Shortcut list |
 
 Clicking a result pastes it into the cell being edited.

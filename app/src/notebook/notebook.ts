@@ -5,7 +5,7 @@ import { latexToGiac, UnsupportedLatex } from "../engine/latex-to-giac";
 import { OPERATOR_NAMES } from "../ui/commands";
 import { isTextLine, splitLines } from "./lines";
 import { editMatrix, matrixAtCaret, matrixLatex, type MatrixAction, type MatrixInfo } from "./matrix";
-import { atLineStart, breakLine, deleteAtBrackets, fillEmptyMatrixCells, focusImmediately, lineBoxes, moveByWord } from "./mathlive-internals";
+import { atLineStart, breakLine, deleteAtBrackets, fillEmptyMatrixCells, focusImmediately, lineBoxes, moveByWord, type LineBox } from "./mathlive-internals";
 
 /** What one line of a cell shows on the right: nothing (text or empty line), a result, or "computing". */
 type LineResult = EvalResult | "pending" | null;
@@ -42,6 +42,10 @@ const MATRIX_KEYS: Record<string, MatrixAction> = {
 
 export type Context = { matrix: MatrixInfo | null };
 
+// Injected into each math-field's shadow root: text lines (# …) read as
+// headings. MathLive renders every text-mode character as span.ML__text.
+const FIELD_CSS = `.ML__text { font-weight: 600; letter-spacing: 0.005em; }`;
+
 export class Notebook {
   private entries: Entry[] = [];
   private active: Entry | null = null;
@@ -61,10 +65,18 @@ export class Notebook {
   onMessage: (text: string) => void = () => {};
 
   constructor(private container: HTMLElement, private engine: Engine) {
+    // Positions measured before the maths fonts arrive are wrong; redo them.
+    document.fonts?.addEventListener("loadingdone", () => this.relayout());
+    void document.fonts?.ready.then(() => this.relayout());
     engine.onRestart = () => {
       for (const e of this.entries) if (e.evaluatedLatex !== null) e.el.classList.add("stale");
       this.onMessage("Cancelled. The engine restarted, so variables were cleared — Ctrl+Shift+Enter re-runs everything.");
     };
+  }
+
+  /** Re-places every result and leader (after fonts load or a zoom). */
+  relayout() {
+    for (const entry of this.entries) this.layoutResults(entry);
   }
 
   get latexList(): string[] {
@@ -136,6 +148,9 @@ export class Notebook {
     this.entries.splice(index, 0, entry);
     // MathLive rejects option access until the field is in the document.
     this.configure(mf);
+    const style = document.createElement("style");
+    style.textContent = FIELD_CSS;
+    mf.shadowRoot?.append(style);
     mf.value = latex;
     fillEmptyMatrixCells(mf);
     this.resizeObserver.observe(el);
@@ -151,6 +166,8 @@ export class Notebook {
       // Deleting a matrix cell's content (or its box) leaves it empty; refill it.
       fillEmptyMatrixCells(mf);
       el.classList.toggle("stale", entry.evaluatedLatex !== null && mf.value !== entry.evaluatedLatex);
+      // Lines move as you type; keep results and leader dots beside them.
+      requestAnimationFrame(() => this.layoutResults(entry));
       this.onChange();
     });
     return entry;
@@ -399,6 +416,7 @@ export class Notebook {
       row.style.marginTop = "";
       row.classList.remove("wide");
     }
+    for (const leader of entry.el.querySelectorAll(".leader")) leader.remove();
     const multi = rows.length > 1;
     entry.el.classList.toggle("multi-line", multi);
     if (!rows.length) return;
@@ -422,6 +440,39 @@ export class Notebook {
     const style = getComputedStyle(entry.el);
     const cellWidth = entry.el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     for (const row of rows) row.classList.toggle("wide", row.scrollWidth > cellWidth + 1);
+    if (!wrapped && boxes.length === rows.length) this.drawLeaders(entry, rows, boxes);
+  }
+
+  /**
+   * Faint dotted leaders from the end of each input line to its result, so
+   * the eye can follow a line across a wide sheet (as in a table of contents).
+   * Skipped where there is little gap, or a result was pushed off its line.
+   */
+  private drawLeaders(entry: Entry, rows: HTMLElement[], boxes: LineBox[]) {
+    const origin = entry.el.getBoundingClientRect();
+    const left = origin.left + entry.el.clientLeft;
+    rows.forEach((row, i) => {
+      const content = row.firstElementChild as HTMLElement | null;
+      if (!content || row.classList.contains("pending") || row.classList.contains("wide")) return;
+      const box = boxes[i];
+      const rowRect = row.getBoundingClientRect();
+      const rowCenter = (rowRect.top + rowRect.bottom) / 2;
+      // One line: the result is centred on it by flexbox, so follow the
+      // result (inputs like ∫ with limits are not symmetric). Several lines:
+      // skip a result that was pushed off its line by a taller one above.
+      const lineCenter = rows.length === 1 ? rowCenter : (box.top + box.bottom) / 2;
+      if (Math.abs(rowCenter - lineCenter) > 4) return;
+      const x1 = box.right + 16;
+      const x2 = content.getBoundingClientRect().left - 16;
+      if (x2 - x1 < 32) return;
+      const leader = document.createElement("div");
+      leader.className = "leader";
+      leader.setAttribute("aria-hidden", "true");
+      leader.style.left = `${x1 - left}px`;
+      leader.style.width = `${x2 - x1}px`;
+      leader.style.top = `${lineCenter - origin.top - entry.el.clientTop}px`;
+      entry.el.append(leader);
+    });
   }
 
   /** Pastes a result into the entry being edited (or the last one). */

@@ -8,6 +8,7 @@ import { Notebook, type Context } from "./notebook/notebook";
 import { CATALOG, CATEGORIES, type CatalogItem } from "./ui/commands";
 import { openHelp, openMatrixDialog, openSearch, type SearchItem } from "./ui/dialogs";
 import { renderTemplates, toggleTemplates } from "./ui/templates";
+import { applyZoom, zoom } from "./zoom";
 
 // Fonts come from mathlive/fonts.css above, bundled by Vite.
 MathfieldElement.fontsDirectory = null;
@@ -18,7 +19,8 @@ MathfieldElement.plonkSound = null;
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
 const engine = new Engine(new URL("giac/giacwasm.js", document.baseURI).href);
-const notebook = new Notebook($("#notebook"), engine);
+const notebook = new Notebook($("#sheet"), engine);
+void applyZoom();
 
 // ---- document state -----------------------------------------------------------
 
@@ -125,7 +127,7 @@ engine.onStatus = (status) => {
   el.title = status === "failed" ? engine.error ?? "" : "";
 };
 
-const HINTS = "<kbd>Enter</kbd> evaluate · <kbd>Shift ↵</kbd> new line · <kbd>#</kbd> at line start: text · <kbd>Ctrl P</kbd> search · <kbd>Ctrl M</kbd> matrix · <kbd>F1</kbd> shortcuts";
+const HINTS = "<kbd>Enter</kbd> evaluate · <kbd>Shift ↵</kbd> new line · <kbd>#</kbd> heading · <kbd>Ctrl P</kbd> search · <kbd>F1</kbd> all shortcuts";
 function showContext(ctx: Context) {
   const hints = $("#hints");
   if (ctx.matrix) {
@@ -250,6 +252,17 @@ window.addEventListener(
     if (!mod || e.altKey) return;
     if (e.shiftKey && e.key === "Enter") return run(ACTIONS["run-all"]);
     if (key === "p" || key === "k") return run(search);
+    // By character, not physical key: on a Danish keyboard "+" has its own
+    // key (whose code is "Minus"), on a US one it is "=".
+    const zoomStep = e.key === "+" || e.key === "=" ? 1 : e.key === "-" ? -1 : e.key === "0" ? 0 : null;
+    if (zoomStep !== null) {
+      return run(() =>
+        void zoom(zoomStep).then((level) => {
+          showMessage(`Zoom ${Math.round(level * 100)}%`);
+          requestAnimationFrame(() => notebook.relayout());
+        }),
+      );
+    }
     if (key === "b") return run(ACTIONS.templates);
     if (key === "m") return run(matrix);
     if (key === "n" && !e.shiftKey) return run(newNotebook);
