@@ -8,6 +8,35 @@ The app lives in `app/`: Tauri 2 (Rust shell) + TypeScript + MathLive (2D
 input) + Giac (CAS, WebAssembly in a worker). The old Python/SymPy version
 is on the `legacy_python` branch; don't delete that branch.
 
+## Working with the owner: propose before you build
+
+The owner decides what gets built. When you pick up a roadmap item, a
+feature request, or any change to how the app looks or behaves, **don't
+implement it straight away.** First reply with a proposal, then wait for a
+go-ahead:
+
+1. **What it means.** Restate the item in a sentence or two. Name what is
+   unclear, and what you checked in the code to understand it.
+2. **Options.** Two or three genuinely different ways to do it. For each:
+   what the user would see and do (keys included), the main trade-off, and
+   a rough size (small / medium / large). Show visual options side by side,
+   e.g. ASCII mock-ups in an `AskUserQuestion` preview.
+3. **Recommendation.** The one you would pick, and why, in a few lines.
+4. **Decisions needed.** Only the questions whose answer changes what gets
+   built.
+
+Build only after the owner has chosen (an option, a mix, or "go with your
+recommendation"). Then follow "Working on it" below: tests and e2e checks,
+docs updated, a short report of what changed.
+
+- **Bugs:** first reproduce and explain the cause. If there is one obvious,
+  local fix that changes no intended behaviour, say what you will change
+  and fix it. If the fix has alternatives or changes behaviour, propose
+  options first, as above.
+- **Small, explicit instructions** ("rename this", "commit this") need no
+  proposal: just do them.
+- **Never commit or push unless asked.** `legacy_python` stays on the remote.
+
 ## Product rules (decided by the owner — don't change without asking)
 
 - **Keyboard first.** Everything must work without the mouse. New UI needs
@@ -46,6 +75,10 @@ npm run tauri build  # installers in src-tauri/target/release/bundle/
 - **Linux (WebKitGTK) can only be verified in CI**
   (`.github/workflows/app.yml`, Windows + Ubuntu). Check the run after
   pushing UI changes.
+- Desktop-only behaviour (closing, file association, recent files) is tested
+  against the built exe over CDP with an isolated WebView2 profile; see
+  "Testing the desktop app" in `docs/gotchas.md`. Never run tests against
+  the owner's own profile.
 - If the owner's `tauri dev` is running, it occupies port 1420. Run e2e
   against it rather than starting a second server, and never kill it.
 
