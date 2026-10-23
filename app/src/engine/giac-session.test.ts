@@ -307,6 +307,35 @@ describe("more notation", () => {
   });
 });
 
+describe("units", () => {
+  const result = (latex: string) => run(latex);
+  it("compute and show upright, with cancelling and named units", () => {
+    expect(result("5\\mathrm{m}+20\\mathrm{cm}")).toMatchObject({ ok: true, latex: "5.2\\,\\mathrm{m}" });
+    expect(result("\\frac{5\\mathrm{m}}{2\\mathrm{s}}")).toMatchObject({ ok: true, latex: "\\frac{5}{2}\\,\\mathrm{m}/\\mathrm{s}", approxLatex: "2.5\\,\\mathrm{m}/\\mathrm{s}" });
+    expect(result("5\\mathrm{m}\\cdot4\\mathrm{m}")).toMatchObject({ ok: true, latex: "20\\,\\mathrm{m}^{2}" });
+    expect(result("3\\mathrm{kg}\\cdot9.81\\mathrm{m}/\\mathrm{s}^2")).toMatchObject({ ok: true, latex: "29.43\\,\\mathrm{N}" });
+    expect(result("2\\mathrm{kg}\\cdot3\\mathrm{m}/\\mathrm{s}^2")).toMatchObject({ ok: true, latex: "6\\,\\mathrm{N}" });
+    expect(result("\\frac{5\\mathrm{m}}{1\\mathrm{m}}")).toMatchObject({ ok: true, latex: "5" });
+    expect(result("2\\mathrm{A}\\cdot3\\,\\mathrm{\\Omega}")).toMatchObject({ ok: true, latex: "6\\,\\mathrm{V}" });
+  });
+
+  it("convert with →", () => {
+    expect(result("72\\mathrm{km/h}\\to\\mathrm{m/s}")).toMatchObject({ ok: true, latex: "20\\,\\mathrm{m}/\\mathrm{s}" });
+    expect(result("1\\mathrm{kWh}\\to\\mathrm{J}")).toMatchObject({ ok: true, latex: "3600000\\,\\mathrm{J}" });
+    expect(result("1\\mathrm{in}\\to\\mathrm{cm}")).toMatchObject({ ok: true, latex: "2.54\\,\\mathrm{cm}" });
+  });
+
+  it("units are not variables, and mistakes are explained", () => {
+    run("m\\coloneq2");
+    expect(result("5\\mathrm{m}")).toMatchObject({ ok: true, latex: "5\\,\\mathrm{m}" });
+    expect(result("5m")).toMatchObject({ ok: true, latex: "10" });
+    expect(result("5\\mathrm{m}+3\\mathrm{s}")).toMatchObject({ ok: false, error: expect.stringMatching(/units/i) });
+    expect(result("5\\mathrm{xyz}")).toMatchObject({ ok: false, error: "Unknown unit: xyz" });
+    expect(result("5\\mathrm{m}\\to\\mathrm{s}")).toMatchObject({ ok: false, error: expect.stringMatching(/units/i) });
+    run("\\operatorname{purge}\\left(m\\right)");
+  });
+});
+
 describe("cleanLatex", () => {
   it.each([
     ["\\frac{-1}{2}", "-\\frac{1}{2}"],

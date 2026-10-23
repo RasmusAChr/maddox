@@ -35,7 +35,7 @@ const KEPT_SHORTCUTS = [
   "alpha", "delta", "Delta", "pi", "Pi", "theta", "Theta", "infty", "oo",
   "sqrt", "int", "sum", "prod", "lim", "dx", "dy", "dt",
   "sin", "cos", "tan", "arcsin", "arccos", "arctan", "sinh", "cosh", "tanh", "cot", "sec", "csc",
-  "ln", "<=", ">=", "!=", ":=",
+  "ln", "<=", ">=", "!=", ":=", "->",
   "deg", // after a number: 30deg becomes 30°
 ];
 const EXTRA_SHORTCUTS: Record<string, string> = {
@@ -53,7 +53,8 @@ const MATRIX_KEYS: Record<string, MatrixAction> = {
   ArrowRight: "addColumnRight",
 };
 
-export type Context = { matrix: MatrixInfo | null };
+/** unit: typing a unit (Ctrl+U), so letters are upright units, not variables. */
+export type Context = { matrix: MatrixInfo | null; unit: boolean };
 
 /** Minimum space, in px, between the results of one multi-line cell. */
 const RESULT_GAP = 8;
@@ -66,6 +67,8 @@ export class Notebook {
   private entries: Entry[] = [];
   private active: Entry | null = null;
   private shortcuts: Record<string, any> | null = null;
+  /** Ctrl+U: letters typed now are a unit (upright), until Space, Ctrl+U or an operator. */
+  private unitMode = false;
   /** The global answer mode (settings); Alt+Enter switches a cell to the other form. */
   answerMode: AnswerMode = "auto";
   private resizeObserver = new ResizeObserver((records) => {
@@ -211,6 +214,11 @@ export class Notebook {
 
     mf.addEventListener("keydown", (e) => this.onKeyDown(entry, e), { capture: true });
     mf.addEventListener("move-out", (e) => this.onMoveOut(entry, e as CustomEvent));
+    mf.addEventListener("blur", () => {
+      if (!this.unitMode) return;
+      this.unitMode = false;
+      mf.inlineShortcuts = this.shortcuts!;
+    });
     mf.addEventListener("focus", () => {
       this.active = entry;
       this.emitContext(entry);
@@ -288,6 +296,16 @@ export class Notebook {
       e.stopPropagation();
     };
     const mod = e.ctrlKey || e.metaKey;
+
+    if (e.key.toLowerCase() === "u" && mod && !e.altKey && !e.shiftKey) {
+      claim();
+      this.setUnitMode(entry, !this.unitMode);
+      return;
+    }
+    if (this.unitMode && this.unitKey(entry, e)) {
+      claim();
+      return;
+    }
 
     if (e.key === "Enter" && e.altKey && !mod && !e.shiftKey) {
       claim();
@@ -382,7 +400,49 @@ export class Notebook {
 
   private emitContext(entry: Entry) {
     if (entry !== this.active) return;
-    this.onContext({ matrix: matrixAtCaret(entry.mf) });
+    this.onContext({ matrix: matrixAtCaret(entry.mf), unit: this.unitMode });
+  }
+
+  /** Ctrl+P "Type a unit": unit mode in the entry being edited. */
+  startUnit() {
+    const entry = this.active ?? this.entries[this.entries.length - 1];
+    focusImmediately(entry.mf);
+    this.setUnitMode(entry, true);
+  }
+
+  // Unit mode is MathLive's upright style for what is typed next, which
+  // serialises as \mathrm{km}; the converter reads upright letters as units.
+  private setUnitMode(entry: Entry, on: boolean) {
+    if (on === this.unitMode) return;
+    this.unitMode = on;
+    entry.mf.applyStyle({ variantStyle: on ? "up" : "" });
+    // Typing shortcuts would turn units into symbols (deg is °, min a command).
+    entry.mf.inlineShortcuts = on ? {} : this.shortcuts!;
+    this.emitContext(entry);
+  }
+
+  /**
+   * A key in unit mode. Letters, digits and ^ (m²) are part of the unit; /
+   * stays inline (km/h, not a fraction); * is a · between units (MathLive
+   * would serialise a \cdot inside the upright group as plain letters).
+   * Space or Esc leaves unit mode; any other key leaves it and does its
+   * usual thing. Returns true when the key was handled here.
+   */
+  private unitKey(entry: Entry, e: KeyboardEvent): boolean {
+    if (e.ctrlKey || e.metaKey || e.altKey || ["Shift", "Backspace", "Delete", "CapsLock"].includes(e.key)) return false;
+    if (/^[A-Za-z0-9^]$/.test(e.key)) return false;
+    if (e.key === "/") {
+      entry.mf.insert("/");
+      return true;
+    }
+    if (e.key === "*") {
+      this.setUnitMode(entry, false);
+      entry.mf.insert("\\cdot");
+      this.setUnitMode(entry, true);
+      return true;
+    }
+    this.setUnitMode(entry, false);
+    return e.key === " " || e.key === "Escape";
   }
 
   // ---- evaluation ---------------------------------------------------------

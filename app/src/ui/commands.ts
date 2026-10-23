@@ -30,7 +30,13 @@ export const CATEGORIES: Category[] = [
   { id: "matrices", name: "Matrices", icon: "[ ]" },
   { id: "numbers", name: "Numbers & rounding", icon: "≈" },
   { id: "functions", name: "Functions", icon: "f(x)" },
+  { id: "units", name: "Units", icon: "m/s" },
 ];
+
+/** A unit template: upright letters, the way Ctrl+U types them. */
+const unit = (label: string, latex: string, description: string, keywords: string, advanced = false): CatalogItem => ({
+  label, syntax: label, category: "units", description, latex: `\\mathrm{${latex}}`, keywords: `unit ${keywords}`, advanced,
+});
 
 const fn = (name: string, args = 1) =>
   `\\operatorname{${name}}\\left(#0${",\\placeholder{}".repeat(args - 1)}\\right)`;
@@ -119,6 +125,35 @@ export const CATALOG: CatalogItem[] = [
   { label: "arcsin", syntax: "arcsin(…)", category: "functions", description: "Inverse sine", latex: "\\arcsin\\left(#0\\right)", keywords: "asin trig inverse", advanced: true },
   { label: "arccos", syntax: "arccos(…)", category: "functions", description: "Inverse cosine", latex: "\\arccos\\left(#0\\right)", keywords: "acos trig inverse", advanced: true },
   { label: "arctan", syntax: "arctan(…)", category: "functions", description: "Inverse tangent", latex: "\\arctan\\left(#0\\right)", keywords: "atan trig inverse", advanced: true },
+
+  // Units: Ctrl+U types any unit; these are the common ones. → converts.
+  { label: "Convert to…", syntax: "… → m/s", category: "units", description: "Type -> then Ctrl+U and the unit to convert to", latex: "#@\\to", keywords: "unit convert conversion arrow" },
+  unit("m", "m", "Metre", "metre meter length distance"),
+  unit("km", "km", "Kilometre", "kilometre kilometer length"),
+  unit("cm", "cm", "Centimetre", "centimetre centimeter length"),
+  unit("s", "s", "Second", "second time"),
+  unit("h", "h", "Hour", "hour time"),
+  unit("kg", "kg", "Kilogram", "kilogram mass weight"),
+  unit("m/s", "m/s", "Metres per second", "speed velocity"),
+  unit("km/h", "km/h", "Kilometres per hour", "speed velocity"),
+  unit("m/s²", "m/s^2", "Metres per second squared", "acceleration gravity"),
+  unit("N", "N", "Newton", "newton force"),
+  unit("J", "J", "Joule", "joule energy work"),
+  unit("W", "W", "Watt", "watt power"),
+  unit("Pa", "Pa", "Pascal", "pascal pressure"),
+  unit("min", "min", "Minute", "minute time", true),
+  unit("g", "g", "Gram", "gram mass", true),
+  unit("L", "L", "Litre", "litre liter volume", true),
+  unit("kWh", "kWh", "Kilowatt-hour", "kilowatt hour energy electricity", true),
+  unit("V", "V", "Volt", "volt voltage electricity", true),
+  unit("A", "A", "Ampere", "ampere amp current electricity", true),
+  unit("Ω", "\\Omega", "Ohm", "ohm resistance electricity", true),
+  unit("bar", "bar", "Bar", "bar pressure", true),
+  unit("in", "in", "Inch", "inch length imperial", true),
+  unit("ft", "ft", "Foot", "foot feet length imperial", true),
+  unit("mi", "mi", "Mile", "mile length imperial", true),
+  unit("mph", "mph", "Miles per hour", "speed imperial", true),
+  unit("lb", "lb", "Pound", "pound mass imperial", true),
 ];
 
 /** Command names that turn upright while typing, e.g. "solve" becomes solve. */

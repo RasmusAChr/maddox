@@ -73,6 +73,8 @@ type Piece = {
   bracket?: string;
   /** An index, v[…], so a following […] indexes further: M[1][2]. */
   index?: boolean;
+  /** A unit, (_km/_h): always multiplies, never a call's brackets. */
+  unit?: boolean;
 };
 
 const GREEK = new Set([
@@ -159,10 +161,10 @@ class Emitter {
       if ((named || prev.index) && p.bracket !== undefined) {
         // indexing: v[1]
         p = { ...p, text: `[${fromOne(p.bracket)}]`, index: true };
-      } else if (prev.kind === "fname" && p.text.startsWith("(")) {
+      } else if (prev.kind === "fname" && p.text.startsWith("(") && !p.unit) {
         // a command: solve(...)
         asPoint = false;
-      } else if (prev.kind === "name" && p.text.startsWith("(")) {
+      } else if (prev.kind === "name" && p.text.startsWith("(") && !p.unit) {
         // GiacSession decides; it makes b(1,3) a product with a point.
         this.pieces.push({ text: CALL_OR_PRODUCT, kind: "op" });
         asPoint = false;
@@ -402,6 +404,28 @@ class Converter {
       return;
     }
     if (name in FUNCTIONS) return this.func(name, out);
+    // Upright letters are a unit (5 m/s), unless they name a function: \mathrm{d} is the
+    // d of dx, and \mathrm{transpose}(X) is a call.
+    if (name === "mathrm" && this.isChar("{")) {
+      const start = this.i;
+      const text = unwrapTextLike(this.rawGroup()).trim();
+      const call = this.isChar("(") || (this.isCmd("left") && this.peek(1)?.value === "(");
+      if (text === "d") {
+        out.push({ text: DIFFERENTIAL, kind: "name" });
+        return;
+      }
+      if (!call) {
+        // MathLive writes m/s² typed in unit mode as \mathrm{m/s}^2: the power is the last unit's.
+        let unit = text;
+        if (this.isChar("^")) {
+          this.i++;
+          unit += `^${this.arg()}`;
+        }
+        out.push({ text: unitToGiac(unit), kind: "value", unit: true });
+        return;
+      }
+      this.i = start;
+    }
     if (TEXT_LIKE.has(name)) {
       const text = unwrapTextLike(this.rawGroup()).trim();
       if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(text)) throw new UnsupportedLatex(`Unsupported name: ${text}`);
@@ -748,9 +772,53 @@ function leibnizDerivative(num: string, den: string): { variable: string; order:
   return { variable: d[1], order };
 }
 
+// Unit names as typed, where Giac spells them differently ("in" is a Giac keyword).
+const UNIT_ALIASES: Record<string, string> = { in: "inch", day: "d", ohm: "Ohm", Ω: "Ohm" };
+
+/**
+ * The inside of an upright group as a Giac unit: km/h is (_km/_h), m^2 is
+ * (_m^(2)). Names are checked against Giac's units later (GiacSession).
+ */
+function unitToGiac(text: string): string {
+  const source = text
+    .replace(/\\Omega\s*/g, "Ω")
+    .replace(/\\mu\s*|µ/g, "u")
+    .replace(/\\cdot|·|\\,|\\ |~/g, "*")
+    .replace(/[{}]/g, "")
+    .trim();
+  let giac = "";
+  for (const m of source.matchAll(/([A-Za-zΩ]+)|(\^\s*-?\d+(?:\.\d+)?)|([*/()])|(\s+)|(.)/gy)) {
+    if (m[1]) giac += `_${UNIT_ALIASES[m[1]] ?? m[1]}`;
+    else if (m[2]) giac += `^(${m[2].slice(1).trim()})`;
+    else if (m[3]) giac += m[3];
+    else if (m[4]) giac += "*";
+    else throw new UnsupportedLatex(`Unsupported unit: ${text}`);
+  }
+  if (!giac) throw new UnsupportedLatex("The unit is empty");
+  return `(${giac.replace(/\*+/g, "*").replace(/^\*|\*$/g, "")})`;
+}
+
+/** expr -> unit, at the top level, converts: 72 km/h → m/s. */
+function conversion(giac: string): string {
+  let depth = 0;
+  for (let i = giac.length - 1; i > 0; i--) {
+    const c = giac[i];
+    if (")]".includes(c)) depth++;
+    else if ("([".includes(c)) depth--;
+    else if (depth === 0 && c === ">" && giac[i - 1] === "-") {
+      // Only units (and powers) after the arrow; (x,y)->x+y stays a function.
+      const target = giac.slice(i + 1);
+      const rest = target.replace(/_[A-Za-z]+/g, "");
+      if (rest === target || !/^[\d*/^().\-]*$/.test(rest)) return giac;
+      return `convert(${giac.slice(0, i - 1)},${target})`;
+    }
+  }
+  return giac;
+}
+
 export function latexToGiac(latex: string): string {
   const converter = new Converter(tokenize(latex));
   const result = converter.convertUntil();
   if (result.includes(DIFFERENTIAL)) throw new UnsupportedLatex("A d on its own only works in d/dx or at the end of an integral");
-  return result;
+  return conversion(result);
 }

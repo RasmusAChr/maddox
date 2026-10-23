@@ -60,6 +60,10 @@ docs updated, a short report of what changed.
   from Ctrl+M. A point with a column matrix gives a column. Positions count
   from 1 (`P[1]` is x). Decided 2026-10-23, see
   `docs/decisions/0005-points-and-vectors.md`.
+- **Units are upright, typed with Ctrl+U** (`5 m/s`; italic m is a
+  variable), and `→` converts (`72 km/h → m/s`). Results use a named SI
+  unit when exact (N, J, V). No °C/°F yet. Decided 2026-10-23, see
+  `docs/decisions/0006-units.md`.
 - **% is always hundredths**: `20%` is 0.2, so `150+20%` is 150.2 (as on
   the Nspire and in Excel, not a shop calculator). Decided 2026-10-23.
 - **Decimal point only.** `2.5`, never `2,5`, even on Danish setups. The

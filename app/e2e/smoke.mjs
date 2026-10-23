@@ -355,7 +355,7 @@ await page.keyboard.press("Control+b"); // open
 await page.keyboard.press("ArrowUp");
 check("↑ from the field selects the last item", (await page.$eval("#templates .selected", (el) => el.classList.contains("tcat-more"))) === true);
 await page.keyboard.press("Enter");
-check("Enter on More expands it", await page.$eval('#templates .tcat[data-id="functions"]', (el) => el.classList.contains("show-more")));
+check("Enter on More expands it", await page.$eval('#templates .tcat[data-id="units"]', (el) => el.classList.contains("show-more")));
 await page.keyboard.press("Control+b");
 check("Ctrl+B in the field closes and returns to the entry", (await active()).startsWith("MATH-FIELD") && (await page.$eval("#templates", (el) => el.classList.contains("collapsed"))), await active());
 
@@ -814,6 +814,55 @@ await typeAndRun("gp(-3");
 check("and evaluates by case", (await resultFor("gp\\left(-3")) === "3", await resultFor("gp\\left(-3"));
 await setAndRun(String.raw`\operatorname{solve}\left(x^2<4,x\right)`);
 check("an inequality answer reads -2 < x < 2", (await resultFor("x^2<4")) === "-2<x<2", await resultFor("x^2<4"));
+
+// 31. Units: Ctrl+U types an upright unit (Space ends it), → converts, and
+// italic letters stay variables.
+const resultOfCurrent = () => page.evaluate(() => {
+  const el = document.activeElement.closest(".entry").previousElementSibling;
+  return el?.querySelector(".exact")?.dataset.latex ?? el?.querySelector(".error")?.textContent ?? null;
+});
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("72");
+await page.keyboard.press("Control+u");
+check("Ctrl+U starts a unit", /Unit/.test(await hints()), await hints());
+await page.keyboard.type("km/h");
+await page.keyboard.press(" ");
+check("Space ends the unit", !/Unit/.test(await hints()), await hints());
+check("a unit is upright, / stays inline", (await current()).includes("72\\mathrm{km/h}"), await current());
+await page.keyboard.type("->");
+await page.keyboard.press("Control+u");
+await page.keyboard.type("m/s");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(100);
+check("72 km/h → m/s is 20 m/s", (await resultOfCurrent()) === "20\\,\\mathrm{m}/\\mathrm{s}", await resultOfCurrent());
+await page.keyboard.type("3");
+await page.keyboard.press("Control+u");
+await page.keyboard.type("kg");
+await page.keyboard.press(" ");
+await page.keyboard.type("*9.81");
+await page.keyboard.press("Control+u");
+await page.keyboard.type("m/s^2");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(100);
+check("3 kg · 9.81 m/s² is 29.43 N", (await resultOfCurrent()) === "29.43\\,\\mathrm{N}", await resultOfCurrent());
+await page.keyboard.type("2");
+await page.keyboard.press("Control+u");
+await page.keyboard.type("kg*m");
+await page.keyboard.press(" ");
+await page.keyboard.type("x");
+check("* is a · between units; letters after Space are variables", /^2\\mathrm\{kg\}\\cdot\\mathrm\{m\}x$/.test(await current()), await current());
+await page.keyboard.press("Control+Backspace");
+await page.keyboard.press("Control+a");
+await page.keyboard.press("Backspace");
+await page.keyboard.type("5");
+await page.keyboard.press("Control+u");
+await page.keyboard.type("xyz");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(100);
+check("an unknown unit is explained", (await resultOfCurrent()) === "Unknown unit: xyz", await resultOfCurrent());
 
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));

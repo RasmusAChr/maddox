@@ -117,6 +117,24 @@ const cases: [string, string][] = [
   ["\\begin{cases}-x & \\text{if } x<0\\\\ x^2 & \\text{otherwise}\\end{cases}", "piecewise(x<0,-x,x^(2))"],
   ["\\begin{cases}1 & x\\le1\\\\ 2 & otherwise\\\\ \\end{cases}", "piecewise(x<=1,1,2)"],
   ["g\\left(x\\right)\\coloneq\\begin{cases}0 & x<0\\\\ x & x\\ge0\\end{cases}", `g${CALL_OR_PRODUCT}(x):=piecewise(x<0,0,x>=0,x)`],
+  // units are upright (\mathrm, as unit mode types them); m in italics stays a variable
+  ["5\\mathrm{m}", "5*(_m)"],
+  ["5m", "5*m"],
+  ["72\\,\\mathrm{km/h}", "72*(_km/_h)"],
+  ["3\\mathrm{kg}\\cdot9.81\\mathrm{m}/\\mathrm{s}^2", "3*(_kg)*9.81*(_m)/(_s^(2))"],
+  // unit mode writes m/s² as \mathrm{m/s}^2; the power belongs to s
+  ["9.81\\mathrm{m/s}^2", "9.81*(_m/_s^(2))"],
+  ["\\mathrm{m^2}", "(_m^(2))"],
+  ["2\\mathrm{in}", "2*(_inch)"],
+  ["2\\,\\mathrm{\\Omega}", "2*(_Ohm)"],
+  ["\\mathrm{\\mu m}", "(_um)"],
+  // → followed only by units converts; (x,y)→x+y stays a function
+  ["72\\mathrm{km/h}\\to\\mathrm{m/s}", "convert(72*(_km/_h),(_m/_s))"],
+  ["1\\mathrm{kWh}\\to\\mathrm{J}", "convert(1*(_kWh),(_J))"],
+  ["\\left(x,y\\right)\\to x\\mathrm{m}", "(x,y)->x*(_m)"],
+  // upright names that are not units: the d of dx, and a call
+  ["\\frac{\\mathrm{d}}{\\mathrm{d}x}x^2", "diff(x^(2),x)"],
+  ["\\mathrm{transpose}\\left(A\\right)", "transpose(A)"],
 ];
 
 describe("latexToGiac", () => {

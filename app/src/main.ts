@@ -356,7 +356,10 @@ engine.onStatus = (status) => {
 const HINTS = "<kbd>Enter</kbd> evaluate · <kbd>Shift ↵</kbd> new line · <kbd>#</kbd> heading · <kbd>Ctrl P</kbd> search · <kbd>F1</kbd> all shortcuts";
 function showContext(ctx: Context) {
   const hints = $("#hints");
-  if (ctx.matrix?.cases) {
+  if (ctx.unit) {
+    hints.innerHTML = `<b>Unit</b> · type m, km/h, kg*m/s^2 · <kbd>Space</kbd> or <kbd>Ctrl U</kbd> done · <kbd>-></kbd> then <kbd>Ctrl U</kbd> converts`;
+    hints.classList.add("in-matrix");
+  } else if (ctx.matrix?.cases) {
     const n = ctx.matrix.rows;
     hints.innerHTML = `<b>Piecewise, ${n} case${n === 1 ? "" : "s"}</b> · <kbd>Tab</kbd> next box · <kbd>Alt ↓</kbd><kbd>Alt ↑</kbd> add case · <kbd>Alt ⇧ ↓</kbd> delete case · type <b>otherwise</b> for the rest`;
     hints.classList.add("in-matrix");
@@ -440,6 +443,7 @@ function searchItems(): SearchItem[] {
       undefined,
       "solve answers format style sets textbook equations",
     ),
+    action("Type a unit", "Letters typed next are a unit (5 m/s), upright; Space ends it", () => notebook.startUnit(), "Ctrl+U", "units metre meter second km/h kg newton convert physics"),
     action("Switch this cell: exact / decimal", "Show this cell's answers in the other form, or follow the setting again", () => notebook.toggleAnswers(), "Alt+Enter", "approximate approx decimal exact numeric evalf cell answers"),
     action("Settings", "Angles, answers, digits, theme, zoom, startup", settings, "Ctrl+,", "preferences options configure theme digits"),
     action("Show or hide templates", "The template sidebar", ACTIONS.templates, "Ctrl+B", "sidebar panel"),
@@ -565,7 +569,7 @@ const angleChip = $("#angle-chip");
 angleChip.addEventListener("mousedown", (e) => e.preventDefault()); // keep focus in the cell
 angleChip.addEventListener("click", toggleAngle);
 updateTitle();
-showContext({ matrix: null });
+showContext({ matrix: null, unit: false });
 notebook.focusLast();
 if (notebook.latexList.some((l) => l.trim())) void notebook.runAll();
 

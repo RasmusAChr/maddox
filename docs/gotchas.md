@@ -66,6 +66,16 @@ Re-check this list after upgrading.
 - **Forcing a re-render.** After editing the model directly, request a
   render with `mf.placeholderSymbol = mf.placeholderSymbol` (a public
   setter that calls `requestUpdate`).
+- **Upright typing (units).** Letters typed into a `\mathrm{\placeholder{}}`
+  box come out italic. What works is `applyStyle({ variantStyle: "up" })`
+  before typing (and `""` to stop): the letters serialise as
+  `\mathrm{km}`. Inside that style:
+  - a `\cdot` serialises as plain letters (`\mathrm{kgcdotm}`), so unit
+    mode leaves the style around a ·;
+  - `/` typed with `insert("/")` stays in the group (`\mathrm{km/h}`), but a
+    power on the last unit comes out after the group (`\mathrm{m/s}^2`),
+    and the converter gives it to that last unit;
+  - inline shortcuts still fire (deg → °), so unit mode turns them off.
 - **Matrix results need `pmatrix`.** Giac's `\left(\begin{array}…\right)`
   renders with misaligned brackets and pastes back as uneditable.
   `cleanLatex()` rewrites it to `pmatrix`.
@@ -137,6 +147,19 @@ Re-check this list after upgrading.
   `piecewiseLatex` (in `cleanLatex`) builds a `cases` brace, and
   `variableFirst` / `chain` put the variable first and turn
   `x>-2 and x<2` into `-2<x<2` (also for solve answers).
+- **Units.** Giac writes them `5_m`, `72_(km/h)` and `_km` alone is 1 km
+  (decision 0006).
+  - Any `_name` is accepted silently (`1_xyz`). `GiacSession.unknownUnit`
+    checks that `mksa(1_name)` reduces to SI base units.
+  - `in` is a keyword: inch is `_inch` (the converter maps it).
+  - `latex()` of a unit is unreadable and results come as
+    `20.0_(m*s^-1.0)`. A unit result has `sommet` `'_'`; `op(v)[0]` is the
+    number and `op(v)[1]` the unit, which `unitLatexOf` draws (and cancels:
+    `m*m^-1` is 1).
+  - `convert(a, _m/_s)` works; the `=>` operator fails with `_m/_s`.
+  - `usimplify` names units (kg·m/s² is N) but makes the number a decimal;
+    `tidyUnits` keeps the exact number when the factor is 1.
+  - °C/°F don't convert (affine scales); not supported yet.
 - **Display simplification.** Autosimplify settings do not affect
   `caseval`. Results are wrapped in `regroup()` for display.
 - **Loading under Node.** The script declares `var Module` at the top

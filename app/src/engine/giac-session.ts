@@ -96,6 +96,8 @@ export class GiacSession {
     giac = this.resolveCalls(giac);
     const notSquare = this.squareCheck(giac);
     if (notSquare) return { ok: false, error: notSquare };
+    const unknown = this.unknownUnit(giac);
+    if (unknown) return { ok: false, error: unknown };
     this.takePrinted();
     // A point or list with a column matrix: Giac pairs them element by
     // element into nonsense (poly1[…]) or a point, so make both columns.
@@ -110,6 +112,7 @@ export class GiacSession {
       this.caseval(`${RESULT}:=${POINT}[op(${RESULT})]`);
       this.takePrinted();
     }
+    this.tidyUnits();
 
     // approx(…, 20) asks for its own number of digits: don't round that.
     let latex = this.exactLatex(RESULT, !askedForDigits(giac));
@@ -173,7 +176,57 @@ export class GiacSession {
   }
 
   /** Exact form; a result that already holds decimals is shown rounded like any decimal. */
+  /**
+   * Giac takes any _name as a unit (1_xyz is fine to it), so check each one:
+   * a real unit reduces to the SI base units.
+   */
+  private unknownUnit(giac: string): string | null {
+    for (const [, name] of giac.matchAll(/(?<![\w])_([A-Za-z]+)/g)) {
+      const base = this.caseval(`string(mksa(1_${name}))`).replace(/"/g, "");
+      this.takePrinted();
+      const names = [...base.matchAll(/_([A-Za-z]+)/g)].map((m) => m[1]);
+      if (!/^-?[\d.]/.test(base) || names.some((n) => !SI_BASE.has(n))) return `Unknown unit: ${name}`;
+    }
+    return null;
+  }
+
+  /**
+   * A result with units: units that cancel go (5 m / 1 m is 5), and
+   * combined units that are exactly a named SI unit become it
+   * (kg·m/s² is N), keeping the number exact.
+   */
+  private tidyUnits() {
+    if (!this.hasUnit(RESULT)) return;
+    const powers = unitPowers(this.caseval(`string(op(${RESULT})[1])`).replace(/"/g, ""));
+    if (powers && powers.size === 0) {
+      this.caseval(`${RESULT}:=op(${RESULT})[0]`);
+    } else if (powers && powers.size > 1) {
+      const simple = this.caseval(`string(op(usimplify(${RESULT}))[1])`).replace(/"/g, "");
+      const same = this.caseval(`evalf(op(${RESULT})[0]-op(usimplify(${RESULT}))[0])`);
+      if (/^_[A-Za-z]+$/.test(simple) && Number(same) === 0) this.caseval(`${RESULT}:=op(${RESULT})[0]*1${simple}`);
+    }
+    this.takePrinted();
+  }
+
+  /** True when the value is a number with a unit (Giac's _ operator at the top). */
+  private hasUnit(expr: string): boolean {
+    const top = this.caseval(`sommet(${expr})`);
+    this.takePrinted();
+    return top === "'_'";
+  }
+
+  /** 20 m/s: the number as usual, the unit drawn upright by Maddox (Giac's latex() of units is unreadable). */
+  private unitLatex(expr: string, number: (item: string) => string): string | null {
+    if (!this.hasUnit(expr)) return null;
+    const unit = unitLatexOf(this.caseval(`string(op(${expr})[1])`).replace(/"/g, ""));
+    if (unit === null) return null;
+    const value = number(`op(${expr})[0]`);
+    return unit ? `${value}\\,${unit}` : value;
+  }
+
   private exactLatex(expr: string, roundDecimals = true): string {
+    const unit = this.unitLatex(expr, (item) => this.exactLatex(item, false));
+    if (unit !== null) return roundDecimals && /\d\.\d/.test(unit) ? this.decimalLatex(expr) : unit;
     const shaped = this.shapedLatex(expr, (item) => this.exactLatex(item, false));
     if (shaped !== null) return roundDecimals && /\d\.\d/.test(shaped) ? this.decimalLatex(expr) : shaped;
     // regroup collects like terms (x+x is 2x), as Xcas does by default.
@@ -182,6 +235,8 @@ export class GiacSession {
   }
 
   private decimalLatex(expr: string): string {
+    const unit = this.unitLatex(expr, (item) => this.decimalLatex(item));
+    if (unit !== null) return unit;
     const shaped = this.shapedLatex(expr, (item) => this.decimalLatex(item));
     if (shaped !== null) return shaped;
     const latex = cleanLatex(unquote(this.caseval(`latex(evalf(${expr},${this.options.digits}))`)));
@@ -447,6 +502,8 @@ function findError(raw: string, printed: string[], giac: string): string | null 
   const named = (text: string) => (fn ? `${fn} ${text}` : `This ${text}`);
   const friendly = (text: string): string | null => {
     if (/Not invertible/i.test(text)) return "This matrix can't be inverted: its determinant is 0.";
+    if (/could not be converted to MKSA/i.test(text)) return "These units can't be converted into each other.";
+    if (/Incompatible units/i.test(text)) return "These units don't fit together, e.g. metres and seconds can't be added.";
     if (/non-square/i.test(text)) return named("needs a square matrix.");
     if (/\^ is ambiguous on non square/i.test(text)) return "Powers and inverses need a square matrix.";
     if (/Invalid dimension/i.test(text)) {
@@ -474,6 +531,82 @@ function findError(raw: string, printed: string[], giac: string): string | null 
     if (err) return friendly(line) ?? err[1].trim();
   }
   return null;
+}
+
+// What every unit reduces to (Giac's mksa); anything else left over is not a unit.
+const SI_BASE = new Set(["m", "kg", "s", "A", "K", "mol", "cd", "E"]);
+
+// Giac's unit names that read differently in a textbook.
+const UNIT_DISPLAY: Record<string, string> = { mn: "min", Ohm: "\\Omega", ohm: "\\Omega", inch: "in", um: "\\mu m", ug: "\\mu g", uL: "\\mu L" };
+
+/**
+ * Giac's unit text (_kg*_m/_s^2, _m*_s^-1.0, _kg/(_m*_s^2)) as powers per
+ * name, with units that cancel removed. Null if it isn't shaped like that.
+ */
+function unitPowers(text: string): Map<string, number> | null {
+  const tokens = text.match(/_[A-Za-z]+|-?\d+(?:\.\d+)?|[*/^()]/g) ?? [];
+  if (tokens.join("") !== text.replace(/\s+/g, "")) return null;
+  let i = 0;
+  const powers = new Map<string, number>();
+  const add = (into: Map<string, number>, from: Map<string, number>, k: number) => {
+    for (const [name, p] of from) into.set(name, (into.get(name) ?? 0) + p * k);
+  };
+  const primary = (): Map<string, number> | null => {
+    const t = tokens[i++];
+    if (t?.startsWith("_")) return new Map([[t.slice(1), 1]]);
+    if (t !== "(") return null;
+    const inner = term();
+    if (tokens[i++] !== ")") return null;
+    return inner;
+  };
+  const factor = (): Map<string, number> | null => {
+    const base = primary();
+    if (!base || tokens[i] !== "^") return base;
+    i++;
+    let exponent = tokens[i++];
+    if (exponent === "(") {
+      exponent = tokens[i++];
+      if (tokens[i++] !== ")") return null;
+    }
+    const k = Number(exponent);
+    if (!Number.isFinite(k)) return null;
+    const out = new Map<string, number>();
+    add(out, base, k);
+    return out;
+  };
+  const term = (): Map<string, number> | null => {
+    const result = new Map<string, number>();
+    let sign = 1;
+    for (;;) {
+      const f = factor();
+      if (!f) return null;
+      add(result, f, sign);
+      if (tokens[i] !== "*" && tokens[i] !== "/") return result;
+      sign = tokens[i++] === "/" ? -1 : 1;
+    }
+  };
+  const all = term();
+  if (!all || i !== tokens.length) return null;
+  add(powers, all, 1);
+  for (const [name, p] of powers) if (Math.abs(p) < 1e-12) powers.delete(name);
+  return powers;
+}
+
+/** Upright unit LaTeX: m/s, kg·m², kg/(m·s²); "" when every unit cancels. */
+function unitLatexOf(text: string): string | null {
+  const powers = unitPowers(text);
+  if (!powers) return null;
+  const show = (name: string, p: number) => {
+    const shown = UNIT_DISPLAY[name] ?? name;
+    const upright = shown.startsWith("\\") && !shown.includes(" ") ? shown : `\\mathrm{${shown}}`;
+    return p === 1 ? upright : `${upright}^{${p}}`;
+  };
+  const above = [...powers].filter(([, p]) => p > 0).map(([n, p]) => show(n, p));
+  const below = [...powers].filter(([, p]) => p < 0).map(([n, p]) => show(n, -p));
+  if (!above.length) return below.length ? [...powers].map(([n, p]) => show(n, p)).join("\\cdot ") : "";
+  const top = above.join("\\cdot ");
+  if (!below.length) return top;
+  return below.length === 1 ? `${top}/${below[0]}` : `${top}/\\left(${below.join("\\cdot ")}\\right)`;
 }
 
 function unquote(s: string): string {
@@ -507,7 +640,8 @@ export function cleanLatex(latex: string): string {
 // exact form is not already a decimal, and the approximation is purely numeric.
 function showApprox(exactLatex: string, approxText: string): boolean {
   if (/\d\.\d|\d\.(?!\d)/.test(exactLatex)) return false;
-  const text = approxText.replace(/^list/, "").replaceAll(POINT, "");
+  // 2.5_(m*s^-1.0): only the number matters here.
+  const text = approxText.replace(/^list/, "").replaceAll(POINT, "").replace(/_\([^)]*\)|_[A-Za-z]+/g, "");
   // evalf(10) is "10.0": a whole number gains nothing from a decimal.
   if (!/\d\.\d/.test(text.replace(/(\d)\.0\b/g, "$1"))) return false;
   return /^[\s\d.,+\-*/e^i[\]()]*$/.test(text.replace(/\binf(inity)?\b/g, ""));
