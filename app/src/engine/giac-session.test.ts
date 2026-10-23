@@ -116,7 +116,7 @@ describe("readable answers", () => {
     expect(exact("\\operatorname{solve}\\left(2x=4,x\\right)")).toBe("x=2");
     expect(exact("\\operatorname{solve}\\left(x^2=-1,x\\right)")).toBe("\\text{No solution}");
     expect(exact("\\operatorname{solve}\\left(x^2>4,x\\right)")).toBe("x<-2\\text{ or }x>2");
-    expect(exact("\\operatorname{solve}\\left(x^2<4,x\\right)")).toBe("x>-2\\text{ and }x<2");
+    expect(exact("\\operatorname{solve}\\left(x^2<4,x\\right)")).toBe("-2<x<2");
     expect(exact("\\operatorname{solve}\\left(\\left[x^2+y^2=1,x=y\\right],\\left[x,y\\right]\\right)")).toBe(
       "\\left(x=\\frac{\\sqrt{2}}{2}\\text{ and }y=\\frac{\\sqrt{2}}{2}\\right)\\text{ or }\\left(x=-\\frac{\\sqrt{2}}{2}\\text{ and }y=-\\frac{\\sqrt{2}}{2}\\right)",
     );
@@ -270,6 +270,40 @@ describe("points and vectors", () => {
   it("points survive a reset (the helpers are defined again)", () => {
     session.reset();
     expect(run("\\left(1,3\\right)")).toMatchObject({ ok: true, latex: "\\left(1,\\,3\\right)" });
+  });
+});
+
+describe("more notation", () => {
+  it("f′(x) is the derivative of f, never f′ times x", () => {
+    run("f\\left(x\\right)\\coloneq x^3");
+    expect(run("f^{\\prime}\\left(x\\right)")).toMatchObject({ ok: true, latex: "3\\cdot x^{2}" });
+    expect(run("f^{\\prime}\\left(2\\right)")).toMatchObject({ ok: true, latex: "12" });
+    expect(run("f^{\\prime}^{\\prime}\\left(x\\right)")).toMatchObject({ ok: true, latex: "6\\cdot x" });
+  });
+
+  it("% divides by 100", () => {
+    expect(run("20\\%\\cdot150")).toMatchObject({ ok: true, latex: "30" });
+    expect(run("150\\left(1+20\\%\\right)")).toMatchObject({ ok: true, latex: "180" });
+    expect(run("20\\%")).toMatchObject({ ok: true, latex: "\\frac{1}{5}", approxLatex: "0.2" });
+  });
+
+  it("piecewise functions evaluate and show as a brace", () => {
+    expect(run("g\\left(x\\right)\\coloneq\\begin{cases}-x & x<0\\\\ x^2 & \\text{otherwise}\\end{cases}")).toMatchObject({
+      ok: true,
+      latex: "x \\rightarrow \\begin{cases}-x & \\text{if }x<0\\\\x^{2} & \\text{otherwise}\\end{cases}",
+    });
+    expect(run("g\\left(-3\\right)")).toMatchObject({ ok: true, latex: "3" });
+    expect(run("g\\left(2\\right)")).toMatchObject({ ok: true, latex: "4" });
+    // Giac turns x<0 into 0>x; the display puts x first again.
+    expect(run("g\\left(x\\right)")).toMatchObject({ ok: true, latex: "\\begin{cases}-x & \\text{if }x<0\\\\x^{2} & \\text{otherwise}\\end{cases}" });
+  });
+
+  it("inequalities read like a textbook", () => {
+    expect(run("\\operatorname{solve}\\left(x^2<4,x\\right)")).toMatchObject({ ok: true, latex: "-2<x<2" });
+    expect(run("\\operatorname{solve}\\left(\\left|x-1\\right|<3,x\\right)")).toMatchObject({ ok: true, latex: "-2<x<4" });
+    expect(run("\\operatorname{solve}\\left(x^2\\ge4,x\\right)")).toMatchObject({ ok: true, latex: "x\\leq -2\\text{ or }x\\geq 2" });
+    expect(run("\\operatorname{solve}\\left(2x+1>5,x\\right)")).toMatchObject({ ok: true, latex: "x>2" });
+    expect(run("3<5")).toMatchObject({ ok: true, latex: "\\text{true}" });
   });
 });
 

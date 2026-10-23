@@ -42,6 +42,8 @@ const EXTRA_SHORTCUTS: Record<string, string> = {
   log: "\\log", // MathLive's default asks for a base; log is base 10 here.
   beta: "\\beta", gamma: "\\gamma", lambda: "\\lambda", mu: "\\mu", sigma: "\\sigma",
   omega: "\\omega", phi: "\\phi", epsilon: "\\epsilon", rho: "\\rho", tau: "\\tau",
+  // The last case of a piecewise function reads as a word, not a variable.
+  otherwise: "\\text{otherwise}",
 };
 
 const MATRIX_KEYS: Record<string, MatrixAction> = {

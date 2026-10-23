@@ -45,11 +45,13 @@ export const CATALOG: CatalogItem[] = [
   { label: "nth root", syntax: "ⁿ√a", category: "basics", description: "Root of any degree", latex: "\\sqrt[\\placeholder{}]{#0}", keywords: "root radical surd cube", advanced: true },
   { label: "e", syntax: "e", category: "basics", description: "Euler's number, 2.71828…", latex: "\\exponentialE", keywords: "euler constant", advanced: true },
   { label: "i", syntax: "i", category: "basics", description: "Imaginary unit, i² = −1", latex: "\\imaginaryI", keywords: "complex imaginary", advanced: true },
+  { label: "Percent", syntax: "20%", category: "basics", description: "Hundredths: 20% is 0.2", latex: "#@\\%", keywords: "percent procent hundredths", advanced: true },
   { label: "∞", syntax: "oo", category: "basics", description: "Infinity", latex: "\\infty", keywords: "infinity", advanced: true },
 
   // Variables & functions
   { label: "Assign a variable", syntax: "a := 5", category: "variables", description: "Store a value under a name", latex: "\\placeholder{}\\coloneq #0", keywords: "define store set" },
   { label: "Define a function", syntax: "f(x) := …", category: "variables", description: "Then use it like f(3)", latex: "f\\left(x\\right)\\coloneq #0", keywords: "define" },
+  { label: "Piecewise function", syntax: "{ … if …", category: "variables", description: "One case per row: value, then condition; otherwise for the rest", latex: "\\begin{cases}#0 & \\placeholder{}\\\\ \\placeholder{} & \\placeholder{}\\end{cases}", keywords: "piecewise cases if otherwise condition branch" },
   { label: "Forget a variable", syntax: "purge(a)", category: "variables", description: "Remove one stored value", latex: fn("purge"), keywords: "clear delete delvar purge", advanced: true },
   { label: "Forget all variables", syntax: "restart", category: "variables", description: "Clear every variable and function", latex: "\\operatorname{restart}", keywords: "clear all reset restart", advanced: true },
 
@@ -73,6 +75,7 @@ export const CATALOG: CatalogItem[] = [
   { label: "Limit", syntax: "lim x→a", category: "calculus", description: "Value approached as x → a", latex: "\\lim_{x\\to\\placeholder{}}#0", keywords: "lim approach" },
   { label: "Sum", syntax: "Σ", category: "calculus", description: "Sum from k = 1 to n", latex: "\\sum_{k=1}^{\\placeholder{}}#0", keywords: "sigma series", advanced: true },
   { label: "Product", syntax: "Π", category: "calculus", description: "Product from k = 1 to n", latex: "\\prod_{k=1}^{\\placeholder{}}#0", keywords: "pi product", advanced: true },
+  { label: "Derivative of a function", syntax: "f′(x)", category: "calculus", description: "Type ' after a function's name; f″ for the second", latex: "f^{\\prime}\\left(#0\\right)", keywords: "prime derivative f' dash" },
   { label: "Derivative (as a function)", syntax: "diff(…, x)", category: "calculus", description: "Same as d/dx, written as a command", latex: "\\operatorname{diff}\\left(#0,x\\right)", keywords: "diff derivative", advanced: true },
   { label: "Taylor series", syntax: "taylor(…, x=0, 5)", category: "calculus", description: "Polynomial approximation around a point", latex: "\\operatorname{taylor}\\left(#0,x=0,5\\right)", keywords: "series taylor maclaurin", advanced: true },
   { label: "Differential equation", syntax: "desolve(…, x, y)", category: "calculus", description: "Solve an ODE for y(x)", latex: "\\operatorname{desolve}\\left(#0,x,y\\right)", keywords: "ode desolve", advanced: true },

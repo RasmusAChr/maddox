@@ -26,7 +26,7 @@ function getPlaceholderClass(): (new () => any) | null {
 }
 
 /**
- * Puts a placeholder box into every empty matrix cell, so each cell always
+ * Puts a placeholder box into every empty matrix (or piecewise) cell, so each cell always
  * shows where to type. MathLive leaves cells empty after adding a column, or
  * once their content (or the box itself) is deleted. Returns true if it
  * changed anything.
@@ -37,7 +37,7 @@ export function fillEmptyMatrixCells(mf: MathfieldElement): boolean {
     const model = internal(mf)?.model;
     if (!Placeholder || !model) return false;
     const matrices = [model.root, ...model.root.children].filter(
-      (a: any) => a.type === "array" && /matrix$/.test(a.environmentName ?? ""),
+      (a: any) => a.type === "array" && /matrix$|^cases$/.test(a.environmentName ?? ""),
     );
     const caret = model.at(model.position);
     let caretTarget: any = null;

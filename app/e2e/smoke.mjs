@@ -776,6 +776,45 @@ await waitIdle();
 await page.waitForTimeout(100);
 check("Alt+Enter again follows the setting", (await resultFor("frac{7}{8}")) !== "0.875" && (await chipOf("frac{7}{8}")) === null, await resultFor("frac{7}{8}"));
 
+// 30. More notation, typed: f′(x) is a derivative, % is hundredths, a
+// piecewise function comes from the template and is edited like a matrix.
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("fd(x");
+await page.keyboard.press("ArrowRight");
+await page.keyboard.type(":=x^3");
+await page.keyboard.press("Enter");
+await waitIdle();
+await typeAndRun("fd'(2");
+check("f′(2) is the derivative at 2", (await resultFor("fd^{\\prime}")) === "12", await resultFor("fd^{\\prime}"));
+await typeAndRun("20%*150");
+check("20% of 150 is 30", (await resultFor("20\\%")) === "30", await resultFor("20\\%"));
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("gp(x");
+await page.keyboard.press("ArrowRight");
+await page.keyboard.type(":=");
+await searchRun("piecewise");
+await page.keyboard.type("-x");
+await page.keyboard.press("Tab");
+await page.keyboard.type("x<0");
+await page.keyboard.press("Tab");
+await page.keyboard.type("x^2");
+await page.keyboard.press("Tab");
+await page.keyboard.type("otherwise");
+check("the hints explain a piecewise function", /Piecewise, 2 cases/.test(await hints()), await hints());
+await page.keyboard.press("Alt+ArrowDown");
+check("Alt+↓ adds a case", /Piecewise, 3 cases/.test(await hints()), await hints());
+await page.keyboard.press("Alt+Shift+ArrowDown");
+check("Alt+Shift+↓ deletes it again", /Piecewise, 2 cases/.test(await hints()), await hints());
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(100);
+const piecewise = await resultFor("gp\\left");
+check("a piecewise function shows as a brace", piecewise?.includes("\\begin{cases}") && piecewise.includes("\\text{otherwise}"), piecewise);
+await typeAndRun("gp(-3");
+check("and evaluates by case", (await resultFor("gp\\left(-3")) === "3", await resultFor("gp\\left(-3"));
+await setAndRun(String.raw`\operatorname{solve}\left(x^2<4,x\right)`);
+check("an inequality answer reads -2 < x < 2", (await resultFor("x^2<4")) === "-2<x<2", await resultFor("x^2<4"));
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

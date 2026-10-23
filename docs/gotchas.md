@@ -127,6 +127,16 @@ Re-check this list after upgrading.
     (`asColumns`).
   - Giac's loop syntax inside `caseval` definitions is fragile (`local` in a
     `for` fails to parse). The session helpers use `when(…)` and `apply`.
+- **f′(x) was silently f′ times x.** MathLive types ′ as `f^{\prime}` (f″ as
+  `f^{\prime}^{\prime}`). Giac's own `f'(x)` is right, but `'` used to end
+  an operand, so the converter wrote `f'*(x)`, which Giac answers with
+  "3x²·x". `Emitter.prime` makes the name a function name, so the brackets
+  are always a call.
+- **Piecewise output is unreadable.** `latex(piecewise(…))` gives
+  `\mathrm{piecewise}\left(0>x,…\right)`, and Giac rewrites `x<0` as `0>x`.
+  `piecewiseLatex` (in `cleanLatex`) builds a `cases` brace, and
+  `variableFirst` / `chain` put the variable first and turn
+  `x>-2 and x<2` into `-2<x<2` (also for solve answers).
 - **Display simplification.** Autosimplify settings do not affect
   `caseval`. Results are wrapped in `regroup()` for display.
 - **Loading under Node.** The script declares `var Module` at the top

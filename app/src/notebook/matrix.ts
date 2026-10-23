@@ -1,13 +1,15 @@
 import type { MathfieldElement } from "mathlive";
 import { fillEmptyMatrixCells, parentEnvironment } from "./mathlive-internals";
 
-export type MatrixInfo = { rows: number; cols: number };
+/** `cases`: a piecewise function's brace, edited like a matrix with two fixed columns. */
+export type MatrixInfo = { rows: number; cols: number; cases: boolean };
 
-/** The matrix around the caret, if any. */
+/** The matrix (or piecewise brace) around the caret, if any. */
 export function matrixAtCaret(mf: MathfieldElement): MatrixInfo | null {
   const env = parentEnvironment(mf);
-  if (!env || !/matrix$/.test(env.environmentName ?? "")) return null;
-  return { rows: env.rowCount, cols: env.colCount };
+  const name = env?.environmentName ?? "";
+  if (!env || !(/matrix$/.test(name) || name === "cases")) return null;
+  return { rows: env.rowCount, cols: env.colCount, cases: name === "cases" };
 }
 
 export type MatrixAction = "addRowAbove" | "addRowBelow" | "addColumnLeft" | "addColumnRight" | "removeRow" | "removeColumn";
@@ -25,6 +27,8 @@ const COMMANDS = {
 export function editMatrix(mf: MathfieldElement, action: MatrixAction): boolean {
   const info = matrixAtCaret(mf);
   if (!info) return false;
+  // A case is always a value and a condition.
+  if (info.cases && /Column/.test(action)) return true;
   if (action === "removeRow" && info.rows === 1) return true;
   if (action === "removeColumn" && info.cols === 1) return true;
   mf.executeCommand(COMMANDS[action]);

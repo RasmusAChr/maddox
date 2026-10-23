@@ -17,6 +17,10 @@
 // through arithmetic so results show as (…) again. Not after a function name
 // (a call), and not before -> ((x,y)->x+y is a function). Square brackets
 // after a name index from 1, as in maths notation: v[1] is the first element.
+//
+// f′(x) is Giac's f'(x), the derivative of f at x: the prime makes the name a
+// function name, so the brackets that follow are always a call. 20% is
+// (20/100). A cases environment (value & condition per row) is piecewise(…).
 
 export class UnsupportedLatex extends Error {}
 
@@ -170,6 +174,28 @@ class Emitter {
     this.pieces.push(p);
   }
 
+  /** f then ′ gives f': a derivative, which the following ( calls. */
+  prime(count: number) {
+    const prev = this.pieces[this.pieces.length - 1];
+    if (!prev || (prev.kind !== "name" && !(prev.kind === "fname" && prev.text.endsWith("'")))) {
+      throw new UnsupportedLatex("Write ′ after a function name, e.g. f′(x)");
+    }
+    prev.text += "'".repeat(count);
+    prev.kind = "fname";
+  }
+
+  /** 20% is (20/100): the operand just before, with its powers and calls. */
+  percent() {
+    let j = this.pieces.length - 1;
+    while (j >= 0 && (this.pieces[j].kind === "post" || this.pieces[j].index)) j--;
+    if (j < 0 || this.pieces[j].kind === "op") throw new UnsupportedLatex("Write % after a number, e.g. 20%");
+    const before = this.pieces[j - 1];
+    if (before?.text === CALL_OR_PRODUCT) j -= 2;
+    else if (before?.kind === "fname" && this.pieces[j].text.startsWith("(")) j -= 1;
+    const operand = this.pieces.splice(j).map((p) => p.text).join("");
+    this.pieces.push({ text: `((${operand})/100)`, kind: "value" });
+  }
+
   /** Glues a subscript onto the previous name: x then 1 gives x_1. */
   appendToName(suffix: string): boolean {
     const prev = this.pieces[this.pieces.length - 1];
@@ -248,6 +274,20 @@ class Converter {
     return out.toString();
   }
 
+  /** After ^: the number of primes in \prime, {\prime\prime} or \doubleprime (consumed), else 0. */
+  private primes(): number {
+    const count = (t: Token | undefined) =>
+      t?.kind === "cmd" ? (t.value === "prime" ? 1 : t.value === "doubleprime" ? 2 : 0) : 0;
+    if (count(this.peek())) return count(this.tokens[this.i++]);
+    if (!this.isChar("{")) return 0;
+    let n = 0;
+    let k = 1;
+    while (count(this.peek(k))) n += count(this.peek(k++));
+    if (!n || !this.isChar("}", k)) return 0;
+    this.i += k + 1;
+    return n;
+  }
+
   /** The raw text inside a brace group, e.g. the name in \operatorname{solve}. */
   private rawGroup(): string {
     this.expectChar("{");
@@ -307,7 +347,13 @@ class Converter {
         out.push({ text: `abs(${inner})`, kind: "value" });
         return;
       }
-      case "^":
+      case "^": {
+        // f^{\prime}: MathLive's f′. f″ comes as f^{\prime}^{\prime} or f^{\prime\prime}.
+        const primes = this.primes();
+        if (primes) {
+          out.prime(primes);
+          return;
+        }
         // 30^{\circ} (or 30^\circ) is how a degree sign is often written.
         if (this.isCmd("circ") || (this.isChar("{") && this.isCmd("circ", 1) && this.isChar("}", 2))) {
           this.i += this.isCmd("circ") ? 1 : 3;
@@ -316,6 +362,7 @@ class Converter {
         }
         out.push({ text: `^(${this.arg()})`, kind: "post" });
         return;
+      }
       case "_": {
         const sub = this.arg().replace(/[()]/g, "");
         if (!/^[A-Za-z0-9]+$/.test(sub)) throw new UnsupportedLatex(`Unsupported subscript: ${sub}`);
@@ -326,7 +373,8 @@ class Converter {
         out.push({ text: "!", kind: "post" });
         return;
       case "'":
-        out.push({ text: "'", kind: "post" });
+        // Pasted f'(x); typed primes come as ^{\prime}.
+        out.prime(1);
         return;
       case "&":
         throw new UnsupportedLatex("Unexpected '&' outside a matrix");
@@ -394,6 +442,9 @@ class Converter {
         return this.limit(out, stop);
       case "degree":
         out.push({ text: `*${DEGREE_VARIABLE}`, kind: "post" });
+        return;
+      case "%":
+        out.percent();
         return;
       case "differentialD":
         // Only meaningful inside d/dx; latexToGiac rejects any that survive.
@@ -568,7 +619,62 @@ class Converter {
     out.push({ text: `limit(${body},${m[1]},${m[2]})`, kind: "value" });
   }
 
+  /**
+   * A piecewise function: one case per row, value & condition. A condition
+   * may start with the word "if"; "otherwise" (last row only) is every other x.
+   */
+  private cases(out: Emitter) {
+    const rowEnd: Stop = (t) => t.kind === "cmd" && (t.value === "\\" || t.value === "cr" || t.value === "end");
+    const parts: string[] = [];
+    let otherwise: string | null = null;
+    for (;;) {
+      const value = this.convertUntil((t, next) => atChar("&")(t, next) || rowEnd(t, next));
+      const hasCondition = this.isChar("&");
+      let condition = "";
+      let isOtherwise = false;
+      if (hasCondition) {
+        this.i++;
+        this.skipWord(["if", "for", "when"]);
+        isOtherwise = this.skipWord(["otherwise", "else"]) !== null;
+        condition = this.convertUntil(rowEnd);
+        if (/^(otherwise|else)$/.test(condition)) [isOtherwise, condition] = [true, ""];
+      }
+      const t = this.peek();
+      if (!t) throw new UnsupportedLatex("Unterminated piecewise function");
+      this.i++;
+      const last = t.value === "end";
+      if (last && this.rawGroup() !== "cases") throw new UnsupportedLatex("Mismatched \end");
+      // MathLive leaves a trailing empty row after a final "\\".
+      if (last && value === "" && !hasCondition) break;
+      if (value === "") throw new UnsupportedLatex("Fill in the value of every case");
+      if (otherwise !== null) throw new UnsupportedLatex("\"otherwise\" must be the last case");
+      if (isOtherwise && condition) throw new UnsupportedLatex("Nothing goes after \"otherwise\"");
+      if (isOtherwise) otherwise = value;
+      else if (condition) parts.push(condition, value);
+      else throw new UnsupportedLatex("Each case needs a condition, e.g. x<0, or the word otherwise");
+      if (last) break;
+    }
+    if (!parts.length) throw new UnsupportedLatex("A piecewise function needs at least one condition");
+    if (otherwise !== null) parts.push(otherwise);
+    out.push({ text: `piecewise(${parts.join(",")})`, kind: "value" });
+  }
+
+  /** Skips a leading word such as \text{if } (or a comma); returns it if found. */
+  private skipWord(words: string[]): string | null {
+    while (this.peek()?.kind === "cmd" && SPACING.has(this.peek()!.value)) this.i++;
+    if (this.isChar(",")) this.i++;
+    const t = this.peek();
+    if (t?.kind !== "cmd" || !TEXT_LIKE.has(t.value) || !this.isChar("{", 1)) return null;
+    const start = this.i;
+    this.i++;
+    const word = unwrapTextLike(this.rawGroup()).trim();
+    if (words.includes(word)) return word;
+    this.i = start;
+    return null;
+  }
+
   private environment(env: string, out: Emitter) {
+    if (env === "cases") return this.cases(out);
     if (!MATRIX_ENVS.has(env)) throw new UnsupportedLatex(`Unsupported notation: ${env}`);
     // pmatrix may carry a column spec, e.g. \begin{pmatrix}[cc]... (not emitted by MathLive today)
     const rows: string[][] = [[]];

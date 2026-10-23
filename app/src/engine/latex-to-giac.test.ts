@@ -96,6 +96,27 @@ const cases: [string, string][] = [
   ["30^\\circ", "30*maddox_deg"],
   ["30\\degree", "30*maddox_deg"],
   ["\\sin\\left(30^{\\circ}\\right)", "sin(30*maddox_deg)"],
+  // f′(x): the derivative of f, always a call
+  ["f^{\\prime}\\left(x\\right)", "f'(x)"],
+  ["f^{\\prime}\\left(2\\right)", "f'(2)"],
+  ["f^{\\prime}^{\\prime}\\left(x\\right)", "f''(x)"],
+  ["f^{\\prime\\prime}\\left(x\\right)", "f''(x)"],
+  ["f^{\\doubleprime}\\left(x\\right)", "f''(x)"],
+  ["f'\\left(x\\right)", "f'(x)"],
+  ["3f^{\\prime}\\left(x\\right)", "3*f'(x)"],
+  ["f^{\\prime}", "f'"],
+  // 20% is (20/100), whatever comes before or after it
+  ["20\\%", "((20)/100)"],
+  ["20\\%\\cdot150", "((20)/100)*150"],
+  ["150+20\\%", "150+((20)/100)"],
+  ["\\frac{a}{5\\%}", "((a)/(((5)/100)))"],
+  ["x^2\\%", "((x^(2))/100)"],
+  ["\\left(1+5\\%\\right)^{10}", "(1+((5)/100))^(10)"],
+  // piecewise: value & condition per row, optional "if", "otherwise" last
+  ["\\begin{cases}-x & x<0\\\\ x^2 & x\\ge0\\end{cases}", "piecewise(x<0,-x,x>=0,x^(2))"],
+  ["\\begin{cases}-x & \\text{if } x<0\\\\ x^2 & \\text{otherwise}\\end{cases}", "piecewise(x<0,-x,x^(2))"],
+  ["\\begin{cases}1 & x\\le1\\\\ 2 & otherwise\\\\ \\end{cases}", "piecewise(x<=1,1,2)"],
+  ["g\\left(x\\right)\\coloneq\\begin{cases}0 & x<0\\\\ x & x\\ge0\\end{cases}", `g${CALL_OR_PRODUCT}(x):=piecewise(x<0,0,x>=0,x)`],
 ];
 
 describe("latexToGiac", () => {
@@ -112,6 +133,11 @@ describe("latexToGiac", () => {
     ["\\mathbb{R}", /Unsupported/],
     ["1&2", /outside a matrix/],
     ["v\\left[0\\right]", /start at 1/],
+    ["2^{\\prime}", /after a function name/],
+    ["\\%", /after a number/],
+    ["\\begin{cases}1 & otherwise\\\\ 2 & x<0\\end{cases}", /must be the last/],
+    ["\\begin{cases}1 & x<0\\\\ 2\\end{cases}", /needs a condition/],
+    ["\\begin{cases}1 & otherwise\\end{cases}", /at least one condition/],
   ];
   it.each(errors)("rejects %s", (latex, message) => {
     expect(() => latexToGiac(latex)).toThrow(UnsupportedLatex);

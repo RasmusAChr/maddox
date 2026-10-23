@@ -356,7 +356,11 @@ engine.onStatus = (status) => {
 const HINTS = "<kbd>Enter</kbd> evaluate · <kbd>Shift ↵</kbd> new line · <kbd>#</kbd> heading · <kbd>Ctrl P</kbd> search · <kbd>F1</kbd> all shortcuts";
 function showContext(ctx: Context) {
   const hints = $("#hints");
-  if (ctx.matrix) {
+  if (ctx.matrix?.cases) {
+    const n = ctx.matrix.rows;
+    hints.innerHTML = `<b>Piecewise, ${n} case${n === 1 ? "" : "s"}</b> · <kbd>Tab</kbd> next box · <kbd>Alt ↓</kbd><kbd>Alt ↑</kbd> add case · <kbd>Alt ⇧ ↓</kbd> delete case · type <b>otherwise</b> for the rest`;
+    hints.classList.add("in-matrix");
+  } else if (ctx.matrix) {
     const { rows, cols } = ctx.matrix;
     hints.innerHTML = `<b>Matrix ${rows}×${cols}</b> · <kbd>Alt ↓</kbd><kbd>Alt ↑</kbd> add row · <kbd>Alt →</kbd><kbd>Alt ←</kbd> add column · <kbd>Alt ⇧ ↓</kbd> delete row · <kbd>Alt ⇧ →</kbd> delete column`;
     hints.classList.add("in-matrix");

@@ -365,7 +365,70 @@ function askedForDigits(giac: string): boolean {
 
 /** Giac writes x^2<4 as (x>-2)\mbox{ and }(x<2). */
 function conditionLatex(latex: string): string {
-  return latex.replace(/\\mbox\{ and \}/g, AND).replace(/\\mbox\{ or \}/g, OR).replace(/\(([^()]*(?:<|>|\\leq|\\geq)[^()]*)\)/g, "$1");
+  return latex
+    .replace(/\\mbox\{ and \}/g, AND)
+    .replace(/\\mbox\{ or \}/g, OR)
+    .replace(/\(([^()]*(?:<|>|\\leq|\\geq)[^()]*)\)/g, "$1")
+    .split(OR)
+    .map((part) => chain(part.split(AND).map(variableFirst)))
+    .join(OR);
+}
+
+const COMPARISON = /^(.+?)\s*(<|>|\\leq|\\geq)\s*(.+)$/;
+const FLIPPED: Record<string, string> = { "<": ">", ">": "<", "\\leq": "\\geq", "\\geq": "\\leq" };
+const spaced = (op: string) => (op.startsWith("\\") ? `${op} ` : op);
+const NUMBER_FIRST = /^-?(\d|\\frac\{\d)/;
+
+/** Giac writes x < 0 as 0 > x; put the variable first again. */
+function variableFirst(comparison: string): string {
+  const m = comparison.trim().match(COMPARISON);
+  if (!m || !NUMBER_FIRST.test(m[1]) || NUMBER_FIRST.test(m[3])) return comparison.trim();
+  return `${m[3]}${spaced(FLIPPED[m[2]])}${m[1]}`;
+}
+
+/** x > -2 and x < 2 reads better as -2 < x < 2. */
+function chain(parts: string[]): string {
+  const [a, b] = parts.map((p) => p.match(COMPARISON));
+  if (parts.length === 2 && a && b && a[1] === b[1]) {
+    const isLower = (m: RegExpMatchArray) => m[2] === ">" || m[2] === "\\geq";
+    const lower = isLower(a) ? a : b;
+    const upper = lower === a ? b : a;
+    if (isLower(lower) && !isLower(upper)) {
+      return `${lower[3]}${spaced(FLIPPED[lower[2]])}${lower[1]}${spaced(upper[2])}${upper[3]}`;
+    }
+  }
+  return parts.join(AND);
+}
+
+/** Giac's \mathrm{piecewise}\left(c₁, v₁, …, otherwise\right) as a brace of cases. */
+function piecewiseLatex(latex: string): string {
+  const head = "\\mathrm{piecewise}\\left(";
+  for (let start = latex.indexOf(head); start >= 0; start = latex.indexOf(head)) {
+    // Find the matching \right) and split the inside on its top-level commas.
+    const parts: string[] = [];
+    let depth = 0;
+    let i = start + head.length;
+    let from = i;
+    for (; i < latex.length; i++) {
+      if (latex.startsWith("\\left", i)) depth++;
+      else if (latex.startsWith("\\right", i)) {
+        if (depth === 0) break;
+        depth--;
+      } else if (latex[i] === "{") depth++;
+      else if (latex[i] === "}") depth--;
+      else if (latex[i] === "," && depth === 0) {
+        parts.push(latex.slice(from, i));
+        from = i + 1;
+      }
+    }
+    if (i >= latex.length) return latex;
+    parts.push(latex.slice(from, i));
+    const rows: string[] = [];
+    for (let k = 0; k + 1 < parts.length; k += 2) rows.push(`${parts[k + 1]} & \\text{if }${conditionLatex(parts[k])}`);
+    if (parts.length % 2) rows.push(`${parts[parts.length - 1]} & \\text{otherwise}`);
+    latex = `${latex.slice(0, start)}\\begin{cases}${rows.join("\\\\")}\\end{cases}${latex.slice(i + "\\right)".length)}`;
+  }
+  return latex;
 }
 
 // Functions whose "bad argument" errors mean the same thing every time.
@@ -419,8 +482,9 @@ function unquote(s: string): string {
 
 /** Makes Giac's LaTeX read like hand-written maths. */
 export function cleanLatex(latex: string): string {
-  return latex
+  return piecewiseLatex(latex)
     .trim()
+    .replace(/\\mbox\{(true|false)\}/g, "\\text{$1}")
     // x_1 comes back as \mathrm{x\_1}
     .replace(/\\mathrm\{([A-Za-z]+)\\_([A-Za-z0-9]+)\}/g, "$1_{$2}")
     .replace(/\\mathrm\{a(sin|cos|tan)h\}/g, "\\operatorname{ar$1h}")
