@@ -8,13 +8,37 @@ import { queryWords, score, type Searchable } from "./search";
  */
 function openDialog(dialog: HTMLDialogElement, onCancel: () => void) {
   let finished = false;
-  dialog.addEventListener("close", () => finished || onCancel(), { once: true });
+  dialog.addEventListener(
+    "close",
+    () => {
+      if (finished) return;
+      dropRestoredFocus();
+      onCancel();
+    },
+    { once: true },
+  );
   dialog.showModal();
   return (action: () => void) => {
     finished = true;
     dialog.close();
+    dropRestoredFocus();
     action();
+    // An action that focuses nothing (Run all, Save as…): back to the notebook.
+    if (!document.activeElement || document.activeElement === document.body) onCancel();
   };
+}
+
+/**
+ * A closing <dialog> hands focus back to whatever had it before it opened.
+ * In WebView2 (the desktop app), focus restored that way to a math-field can
+ * leave Windows' text input detached: the caret blinks but typed characters
+ * go nowhere, until the cell is left and re-entered. Undo the restoration so
+ * the caller focuses the cell for real (the same path as moving between
+ * cells, which works).
+ */
+function dropRestoredFocus() {
+  const el = document.activeElement;
+  if (el instanceof HTMLElement && el.tagName === "MATH-FIELD") el.blur();
 }
 
 // ---- search (Ctrl+P) ----------------------------------------------------------
@@ -137,6 +161,35 @@ export function openMatrixDialog(dialog: HTMLDialogElement, onInsert: (rows: num
   finish = openDialog(dialog, onCancel);
   rowsInput.focus();
   rowsInput.select();
+}
+
+// ---- unsaved changes --------------------------------------------------------
+
+export type UnsavedChoice = "save" | "discard" | "cancel";
+
+/**
+ * "Save changes to <name>?" Enter saves (the Save button has focus), D
+ * discards, Esc cancels; the buttons work too.
+ */
+export function askUnsaved(dialog: HTMLDialogElement, name: string): Promise<UnsavedChoice> {
+  return new Promise((resolve) => {
+    dialog.querySelector<HTMLElement>(".unsaved-name")!.textContent = name;
+    const finish = openDialog(dialog, () => resolve("cancel"));
+    const choose = (choice: UnsavedChoice) => {
+      dialog.onkeydown = null;
+      finish(() => resolve(choice));
+    };
+    for (const button of dialog.querySelectorAll<HTMLButtonElement>("button[data-choice]")) {
+      button.onclick = () => choose(button.dataset.choice as UnsavedChoice);
+    }
+    dialog.onkeydown = (e) => {
+      if (e.key.toLowerCase() === "d" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        choose("discard");
+      }
+    };
+    dialog.querySelector<HTMLButtonElement>('button[data-choice="save"]')!.focus();
+  });
 }
 
 // ---- help -------------------------------------------------------------------

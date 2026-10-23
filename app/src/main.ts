@@ -3,10 +3,11 @@ import "mathlive/static.css";
 import "./style.css";
 import { MathfieldElement } from "mathlive";
 import { Engine, type EngineStatus } from "./engine/engine";
-import { fileName, openNotebook, saveNotebook, setWindowTitle, toCells } from "./files";
+import { fileName, isTauri, launchFile, openNotebook, readNotebookAt, saveNotebook, setWindowTitle, toCells } from "./files";
+import { forgetFile, recentFiles, rememberFile } from "./recent";
 import { Notebook, type Context } from "./notebook/notebook";
 import { CATALOG, CATEGORIES, type CatalogItem } from "./ui/commands";
-import { openHelp, openMatrixDialog, openSearch, type SearchItem } from "./ui/dialogs";
+import { askUnsaved, openHelp, openMatrixDialog, openSearch, type SearchItem } from "./ui/dialogs";
 import { renderTemplates, toggleTemplates } from "./ui/templates";
 import { applyZoom, zoom } from "./zoom";
 
@@ -27,6 +28,12 @@ void applyZoom();
 const SESSION_KEY = "maddox.session";
 let path: string | null = null;
 let dirty = false;
+// The content as last saved or opened. MathLive reports an edit a moment
+// after the keystroke, so `dirty` alone can lag: a Ctrl+N right after typing
+// would discard the edit unasked. Comparing the content cannot lag.
+let savedContent: string | null = null;
+const currentContent = () => JSON.stringify(notebook.latexList);
+const hasUnsavedChanges = () => dirty || currentContent() !== savedContent;
 
 function updateTitle() {
   const name = fileName(path);
@@ -57,23 +64,29 @@ function restoreSession(): boolean {
     notebook.load(toCells(entries));
     path = saved.path ?? null;
     dirty = Boolean(saved.dirty);
+    savedContent = dirty ? null : currentContent();
     return true;
   } catch {
     return false;
   }
 }
 
-async function save(saveAs = false) {
+/** Saves the notebook (asking for a name when it has none); true once it is on disk. */
+async function save(saveAs = false): Promise<boolean> {
   try {
     const written = await saveNotebook(notebook.latexList, saveAs ? null : path);
-    if (!written) return;
+    if (!written) return false;
     path = written;
     dirty = false;
+    savedContent = currentContent();
     updateTitle();
     markDirtyFree();
+    if (isTauri) rememberFile(written);
     showMessage(`Saved ${fileName(path)}`);
+    return true;
   } catch (err) {
     showMessage(`Could not save: ${err}`);
+    return false;
   }
 }
 
@@ -85,30 +98,78 @@ function markDirtyFree() {
   }
 }
 
+/**
+ * Before the notebook is replaced or the window closes: with unsaved
+ * changes, ask "Save changes?". True when it is fine to go on (saved, or
+ * the user chose not to save); false when they cancelled or the save did not
+ * happen.
+ */
+async function confirmDiscard(): Promise<boolean> {
+  if (!hasUnsavedChanges()) return true;
+  const dialog = $<HTMLDialogElement>("#unsaved-dialog");
+  if (dialog.open) return false; // already asking (e.g. a second close request)
+  const choice = await askUnsaved(dialog, fileName(path));
+  if (choice === "cancel") return false;
+  if (choice === "discard") {
+    forgetUnsavedEdits();
+    return true;
+  }
+  return save();
+}
+
+/**
+ * "Don't save" means the edits are gone: point the autosaved session back at
+ * the last saved content, so they don't reappear at the next start.
+ */
+function forgetUnsavedEdits() {
+  clearTimeout(autosaveTimer);
+  try {
+    if (savedContent === null) localStorage.removeItem(SESSION_KEY);
+    else localStorage.setItem(SESSION_KEY, JSON.stringify({ entries: JSON.parse(savedContent), path, dirty: false }));
+  } catch {
+    // see markDirty
+  }
+}
+
+function loadDocument(cells: string[], newPath: string | null) {
+  notebook.load(cells);
+  path = newPath;
+  dirty = false;
+  savedContent = currentContent();
+  updateTitle();
+  markDirtyFree();
+  if (isTauri && newPath) rememberFile(newPath);
+  notebook.focusLast();
+  void notebook.runAll();
+}
+
 async function open() {
+  if (!(await confirmDiscard())) return refocus();
   try {
     const doc = await openNotebook();
     if (!doc) return refocus();
-    notebook.load(doc.cells);
-    path = doc.path;
-    dirty = false;
-    updateTitle();
-    markDirtyFree();
-    notebook.focusLast();
-    await notebook.runAll();
+    loadDocument(doc.cells, doc.path);
   } catch (err) {
     showMessage(`Could not open: ${err instanceof Error ? err.message : err}`);
   }
 }
 
-function newNotebook() {
-  notebook.load([]);
-  path = null;
-  dirty = false;
-  updateTitle();
-  markDirtyFree();
+/** Opens a notebook by path: a recent file, or the one the app was launched with. */
+async function openPath(filePath: string) {
+  if (!(await confirmDiscard())) return refocus();
+  try {
+    loadDocument(await readNotebookAt(filePath), filePath);
+  } catch (err) {
+    forgetFile(filePath);
+    showMessage(`Could not open ${fileName(filePath)} (${err instanceof Error ? err.message : err}); removed it from recent files`);
+    refocus();
+  }
+}
+
+async function newNotebook() {
+  if (!(await confirmDiscard())) return refocus();
+  loadDocument([], null);
   void engine.reset();
-  notebook.focusLast();
 }
 
 // ---- status bar -----------------------------------------------------------------
@@ -163,6 +224,25 @@ function search() {
   openSearch($("#search-dialog"), searchItems(), refocus);
 }
 
+/** Ctrl+Shift+O: the search, listing only recent files. */
+function openRecent() {
+  if (!recentFiles().length) {
+    showMessage(isTauri ? "No recent files yet: open or save a notebook first" : "Recent files are kept in the desktop app");
+    return;
+  }
+  openSearch($("#search-dialog"), recentItems(), refocus);
+}
+
+function recentItems(): SearchItem[] {
+  return recentFiles().map((filePath) => ({
+    label: fileName(filePath),
+    description: filePath,
+    keywords: "recent open file",
+    group: "Recent files",
+    run: () => void openPath(filePath),
+  }));
+}
+
 function searchItems(): SearchItem[] {
   const groupName = new Map(CATEGORIES.map((c) => [c.id, c.name]));
   const templates: SearchItem[] = CATALOG.map((item) => ({
@@ -178,14 +258,15 @@ function searchItems(): SearchItem[] {
   });
   const actions = [
     action("Run all", "Re-run every entry from the top", ACTIONS["run-all"], "Ctrl+Shift+Enter", "evaluate recalculate"),
-    action("New notebook", "Start an empty notebook", newNotebook, "Ctrl+N"),
+    action("New notebook", "Start an empty notebook", ACTIONS.new, "Ctrl+N"),
     action("Open notebook…", "Open a .maddox file", ACTIONS.open, "Ctrl+O", "load file"),
+    action("Open recent…", "A notebook you opened or saved lately", openRecent, "Ctrl+Shift+O", "recent file history"),
     action("Save", "Save the notebook", ACTIONS.save, "Ctrl+S", "file"),
     action("Save as…", "Save under a new name", () => void save(true), "Ctrl+Shift+S", "file"),
     action("Show or hide templates", "The template sidebar", ACTIONS.templates, "Ctrl+B", "sidebar panel"),
     action("Keyboard shortcuts", "List every shortcut", help, "F1", "help keys"),
   ];
-  return [...templates, ...actions];
+  return [...recentItems(), ...templates, ...actions];
 }
 
 function matrix() {
@@ -210,7 +291,7 @@ const ACTIONS: Record<string, () => void> = {
   matrix,
   help,
   "run-all": () => void notebook.runAll(),
-  new: newNotebook,
+  new: () => void newNotebook(),
   open: () => void open(),
   save: () => void save(),
 };
@@ -265,17 +346,47 @@ window.addEventListener(
     }
     if (key === "b") return run(ACTIONS.templates);
     if (key === "m") return run(matrix);
-    if (key === "n" && !e.shiftKey) return run(newNotebook);
-    if (key === "o") return run(ACTIONS.open);
+    if (key === "n" && !e.shiftKey) return run(ACTIONS.new);
+    if (key === "o") return run(e.shiftKey ? openRecent : ACTIONS.open);
     if (key === "s") return run(() => void save(e.shiftKey));
   },
   { capture: true },
 );
 
+// ---- closing ----------------------------------------------------------------------
+
+// Never lose work silently: closing with unsaved changes asks first.
+if (isTauri) {
+  void import("@tauri-apps/api/window").then(({ getCurrentWindow }) =>
+    getCurrentWindow().onCloseRequested(async (event) => {
+      if (!(await confirmDiscard())) {
+        event.preventDefault();
+        refocus();
+      }
+    }),
+  );
+} else {
+  // In a browser (development) the browser's own prompt is all a page gets.
+  window.addEventListener("beforeunload", (e) => {
+    if (hasUnsavedChanges()) e.preventDefault();
+  });
+}
+
 // ---- start ----------------------------------------------------------------------
 
-if (!restoreSession()) notebook.load([]);
+if (!restoreSession()) {
+  notebook.load([]);
+  savedContent = currentContent();
+}
 updateTitle();
 showContext({ matrix: null });
 notebook.focusLast();
 if (notebook.latexList.some((l) => l.trim())) void notebook.runAll();
+
+// Started by double-clicking a .maddox file: open it (asking first if the
+// restored session has unsaved changes).
+void launchFile()
+  .then((launched) => {
+    if (launched) return openPath(launched);
+  })
+  .catch(() => {});

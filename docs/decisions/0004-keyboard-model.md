@@ -43,6 +43,8 @@
 | Ctrl+B | anywhere | Toggle the template sidebar. Opening focuses its search field; closing returns to the cell |
 | ↑ / ↓, Enter, Esc | sidebar search field | Move the selection; insert, or toggle "More"; back to the cell |
 | Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S | anywhere | New / Open / Save / Save as |
+| Ctrl+Shift+O | anywhere | Open a recent notebook (the search, narrowed to recent files) |
+| Enter / D / Esc | "Save changes?" dialog | Save / don't save / cancel. Shown before New, Open, opening a recent or launch file, and closing the window, whenever there are unsaved changes |
 | Ctrl++ (or Ctrl+=) / Ctrl+− / Ctrl+0 | anywhere | Zoom in / out / reset (remembered; matched by character, so `+` works on Danish and US layouts alike) |
 | F1 (or Ctrl+/) | anywhere | Shortcut list |
 

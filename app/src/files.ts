@@ -64,6 +64,19 @@ export async function saveNotebook(cells: string[], path: string | null): Promis
   return name;
 }
 
+/** Reads a notebook by path (desktop app only): a recent file, or one the app was launched with. */
+export async function readNotebookAt(path: string): Promise<string[]> {
+  const { readTextFile } = await import("@tauri-apps/plugin-fs");
+  return parse(await readTextFile(path));
+}
+
+/** The .maddox file the desktop app was started with (double-click in the file manager), if any. */
+export async function launchFile(): Promise<string | null> {
+  if (!isTauri) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return (await invoke<string | null>("launch_file")) ?? null;
+}
+
 export async function openNotebook(): Promise<{ cells: string[]; path: string } | null> {
   if (isTauri) {
     const { open } = await import("@tauri-apps/plugin-dialog");

@@ -850,6 +850,51 @@ dialog h2 {
   border: 1px solid var(--accent);
 }
 
+.unsaved-dialog {
+  width: min(420px, calc(100vw - 32px));
+}
+
+.unsaved-dialog p {
+  margin: 0 16px;
+  color: var(--muted);
+}
+
+.dialog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 18px 16px 16px;
+}
+
+.dialog-buttons button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.dialog-buttons button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.dialog-buttons button.primary kbd {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.2);
+  color: inherit;
+}
+
+.dialog-buttons button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .help-dialog {
   width: min(880px, calc(100vw - 32px));
   padding: 20px 22px;

@@ -58,6 +58,11 @@ Re-check this list after upgrading.
   `transpose(A)`) they do nothing. Its Alt+arrows (word moves) step through
   the letters inside a function name. Fix: `moveByWord()`, which crosses
   one atom or one letter run per press and leaves a group at its edge.
+- **`input` events lag behind keystrokes.** MathLive dispatches `input`
+  from a `setTimeout(0)`, so an "unsaved" flag set there is briefly stale:
+  a Ctrl+N right after typing would discard the edit unasked. `main.ts`
+  decides "unsaved changes?" by comparing the content with the last saved
+  content (`hasUnsavedChanges`), not by the flag alone.
 - **Forcing a re-render.** After editing the model directly, request a
   render with `mf.placeholderSymbol = mf.placeholderSymbol` (a public
   setter that calls `requestUpdate`).
@@ -103,6 +108,14 @@ Re-check this list after upgrading.
 - **`<dialog>` closes late.** Its `close` event fires a task after focus
   has already returned, so a fast keystroke lands before the inserted text.
   Dialog actions run synchronously through `finish()` in `dialogs.ts`.
+- **WebView2: typing dead after a dialog closes.** A closing `<dialog>`
+  hands focus back to the cell by itself. In the desktop app, focus restored
+  that way could leave Windows' text input (TSF) detached: the caret blinks,
+  but typed characters go nowhere until the cell is left and re-entered.
+  Automated tests (CDP) inject keys past TSF and cannot reproduce it.
+  `dropRestoredFocus()` in `dialogs.ts` blurs the restored cell, so the
+  caller's focus is a real one. Never rely on dialog focus restoration for
+  a math-field.
 - **WebKitGTK (Linux) navigation:**
   - MathLive's `move-out` event is unreliable at the top and bottom rows,
     so ↑/↓ also move between cells when the caret provably did not move.
@@ -128,6 +141,15 @@ Re-check this list after upgrading.
 - **`tar` and Windows paths.** GNU tar (from Git Bash) reads `C:\…` as a
   remote host. `fetch-giac.mjs` runs tar with relative paths in a working
   directory.
+- **Testing the desktop app without touching the owner's data.** The
+  built exe shares its WebView2 profile (localStorage: autosaved session,
+  recent files, zoom) with the owner's own runs. Start it with
+  `WEBVIEW2_USER_DATA_FOLDER=<a scratch folder>` (plus
+  `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333` to
+  drive it over CDP). To test the close prompt, use
+  `Process.CloseMainWindow()` (the same message as clicking X). The page
+  itself may not invoke `plugin:window|close`; the capability doesn't
+  allow it.
 - **Port 1420.** The owner's `tauri dev` uses it. A Vite server started by
   an agent survives the agent's task being stopped on Windows, so find it
   by command line and kill only your own.

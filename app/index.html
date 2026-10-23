@@ -53,6 +53,16 @@
       <div class="dialog-foot"><kbd>Tab</kbd> switch · <kbd>↑</kbd><kbd>↓</kbd> change · <kbd>Enter</kbd> insert</div>
     </dialog>
 
+    <dialog id="unsaved-dialog" class="small-dialog unsaved-dialog" aria-label="Unsaved changes">
+      <h2>Save changes to <span class="unsaved-name">Untitled</span>?</h2>
+      <p>Your changes are lost if you don't save them.</p>
+      <div class="dialog-buttons">
+        <button type="button" data-choice="save" class="primary">Save <kbd>Enter</kbd></button>
+        <button type="button" data-choice="discard">Don't save <kbd>D</kbd></button>
+        <button type="button" data-choice="cancel">Cancel <kbd>Esc</kbd></button>
+      </div>
+    </dialog>
+
     <dialog id="help-dialog" class="help-dialog" aria-label="Keyboard shortcuts">
       <h2>Keyboard shortcuts</h2>
       <div class="help-columns">
@@ -96,6 +106,7 @@
             <dt><kbd>Ctrl</kbd> <kbd>B</kbd></dt><dd>Show or hide the template sidebar</dd>
             <dt><kbd>Ctrl</kbd> <kbd>N</kbd></dt><dd>New notebook</dd>
             <dt><kbd>Ctrl</kbd> <kbd>O</kbd></dt><dd>Open</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>O</kbd></dt><dd>Open a recent notebook</dd>
             <dt><kbd>Ctrl</kbd> <kbd>S</kbd></dt><dd>Save</dd>
             <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>S</kbd></dt><dd>Save as</dd>
             <dt><kbd>Ctrl</kbd> <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd></dt><dd>Zoom in / out / reset</dd>
