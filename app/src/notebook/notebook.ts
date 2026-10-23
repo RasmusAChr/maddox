@@ -45,7 +45,9 @@ export type Context = { matrix: MatrixInfo | null };
 
 // Injected into each math-field's shadow root: text lines (# …) read as
 // headings. MathLive renders every text-mode character as span.ML__text.
-const FIELD_CSS = `.ML__text { font-weight: 600; letter-spacing: 0.005em; }`;
+/** Minimum space, in px, between the results of one multi-line cell. */
+const RESULT_GAP = 8;
+const FIELD_CSS =`.ML__text { font-weight: 600; letter-spacing: 0.005em; }`;
 
 export class Notebook {
   private entries: Entry[] = [];
@@ -431,7 +433,8 @@ export class Notebook {
       rows.forEach((row, i) => {
         const height = row.offsetHeight;
         const center = (boxes[i].top + boxes[i].bottom) / 2;
-        const rowTop = Math.max(y, center - height / 2);
+        // A little air between results, so stacked matrices don't touch.
+        const rowTop = Math.max(i ? y + RESULT_GAP : y, center - height / 2);
         row.style.marginTop = `${rowTop - y}px`;
         y = rowTop + height;
       });

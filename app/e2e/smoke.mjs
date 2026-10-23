@@ -743,6 +743,16 @@ await typeAndRun("(8,15");
 const pointApprox = await page.$$eval(".entry", (els) => els.find((e) => e.querySelector("math-field")?.value === "\\left(8,15\\right)")?.querySelector(".approx")?.textContent ?? null);
 check("a whole-number point has no stray decimal (not 8,15,6)", pointApprox === null, pointApprox);
 
+// 28. Results of one multi-line cell keep a little air between them, even
+// when they are taller than their lines (stacked matrices).
+await setAndRun("\\displaylines{Ma\\coloneq\\begin{pmatrix}1&1\\\\1&3\\end{pmatrix}\\\\ Mb\\coloneq\\begin{pmatrix}3\\\\8\\end{pmatrix}\\\\ \\operatorname{transpose}(Ma)}");
+const gaps = await page.$$eval(".entry", (els) => {
+  const el = els.find((e) => e.querySelector("math-field")?.value.includes("Ma\\coloneq"));
+  const boxes = [...el.querySelectorAll(".result-line .exact")].map((x) => x.getBoundingClientRect());
+  return boxes.slice(1).map((b, i) => Math.round(b.top - boxes[i].bottom));
+});
+check("stacked results don't touch", gaps.length === 2 && gaps.every((g) => g >= 6), JSON.stringify(gaps));
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 
