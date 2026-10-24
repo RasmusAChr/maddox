@@ -11,7 +11,8 @@ const EXTENSION = "maddox";
 export const isTauri = "__TAURI_INTERNALS__" in window;
 
 /** What a .maddox file holds: the cells, and settings that change results. */
-export type NotebookDoc = { cells: Cell[]; angle: AngleMode };
+/** What a .maddox file holds: the cells, settings that change results, and the graph panel. */
+export type NotebookDoc = { cells: Cell[]; angle: AngleMode; graphs?: unknown };
 
 // Each entry is {"latex": ...}: one cell, possibly several lines, plus
 // "answers": "exact" | "approx" when the cell was switched with Alt+Enter, and
@@ -20,7 +21,7 @@ export type NotebookDoc = { cells: Cell[]; angle: AngleMode };
 // them as optional.
 export function serialize(doc: NotebookDoc): string {
   return JSON.stringify(
-    { format: FORMAT, version: VERSION, settings: { angle: doc.angle }, entries: doc.cells },
+    { format: FORMAT, version: VERSION, settings: { angle: doc.angle }, entries: doc.cells, ...(doc.graphs ? { graphs: doc.graphs } : {}) },
     null,
     2,
   );
@@ -69,7 +70,7 @@ export function parse(text: string): NotebookDoc {
   }
   if (data?.format !== FORMAT || !Array.isArray(data.entries)) throw new Error("This is not a Maddox notebook");
   if (data.version > VERSION) throw new Error("This notebook was made by a newer version of Maddox");
-  return { cells: toCells(data.entries), angle: readAngle(data.settings) };
+  return { cells: toCells(data.entries), angle: readAngle(data.settings), graphs: data.graphs };
 }
 
 export function fileName(path: string | null): string {

@@ -89,6 +89,11 @@ export class Engine {
     return this.request<PlotResult>({ type: "plot", giac });
   }
 
+  /** A definition (or purge) for the graph panel's own names: no answer, no ans. */
+  run(giac: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    return this.request<{ ok: true } | { ok: false; error: string }>({ type: "run", giac }, true);
+  }
+
   /** A function's values at n+1 evenly spaced x; empty if the engine restarted meanwhile. */
   async sample(fn: string, a: number, b: number, n: number): Promise<number[]> {
     const values = await this.request<number[] | EvalResult>({ type: "sample", fn, a, b, n }, true);

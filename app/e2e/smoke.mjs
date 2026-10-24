@@ -967,6 +967,92 @@ check("0 resets to the automatic view", !/"views"/.test(resetView ?? ""), resetV
 await page.keyboard.press("Escape");
 check("Esc goes back to the cell", (await active()).startsWith("MATH-FIELD") && (await current()).includes("plot"), await active());
 
+// 33. The graph panel (Ctrl+G): a list per tab above a graph, tabs by
+// keyboard, F6 between notebook and panel, Ctrl+Shift+G from a cell line.
+const panelState = () => page.evaluate(() => ({
+  open: !document.querySelector("#graph-panel").hidden,
+  focus: document.activeElement?.className ?? "",
+  inPanel: document.querySelector("#graph-panel").contains(document.activeElement),
+  rows: [...document.querySelectorAll(".panel-input")].map((m) => m.value),
+  tabs: [...document.querySelectorAll(".panel-tab")].map((t) => (t.getAttribute("aria-selected") === "true" ? "*" : "") + t.firstChild.textContent),
+  curves: [...document.querySelectorAll(".graph-panel .graph-curve")].filter((p) => (p.getAttribute("d") ?? "").length > 20).length,
+}));
+await page.keyboard.press("Control+g");
+await page.waitForTimeout(200);
+let ps = await panelState();
+check("Ctrl+G opens the panel with the keyboard in its list", ps.open && ps.focus.includes("panel-input"), JSON.stringify(ps));
+await page.keyboard.type("fp");
+await page.keyboard.press("Enter");
+await page.keyboard.type("x");
+await page.waitForTimeout(1200);
+ps = await panelState();
+check("each row of the list is drawn", ps.curves === 2 && ps.rows.join("|") === "fp|x", JSON.stringify(ps));
+await page.keyboard.press("Enter");
+await page.keyboard.type("fp(5");
+await page.waitForTimeout(1200);
+const rowValue = await page.$$eval(".panel-row.has-value .panel-value", (els) => els.map((e) => e.textContent));
+const panelDots = () => page.$$eval(".graph-panel .graph-point", (els) => els.map((e) => [e.getAttribute("cx"), e.getAttribute("cy")]));
+check("f(5) in a row shows = 23 and marks its point", rowValue.length === 1 && /=\s*23/.test(rowValue[0]) && (await panelState()).curves === 2 && (await panelDots()).length === 1, JSON.stringify([rowValue, await panelDots()]));
+await page.keyboard.press("Control+a");
+await page.keyboard.press("Backspace");
+await page.keyboard.press("Backspace"); // the now empty row goes
+await page.waitForTimeout(300);
+await page.keyboard.press("ArrowDown");
+check("↓ from the last row goes into the graph", (await page.evaluate(() => document.activeElement?.classList.contains("graph"))) === true, (await panelState()).focus);
+await page.keyboard.press("Escape");
+check("Esc in the graph goes back to the list", (await panelState()).focus.includes("panel-input"), (await panelState()).focus);
+await page.keyboard.press("Control+Enter");
+await page.waitForTimeout(200);
+ps = await panelState();
+check("Ctrl+Enter makes a new tab", ps.tabs.join("|") === "Graph 1|*Graph 2" && ps.rows.join("|") === "", JSON.stringify(ps));
+await page.keyboard.press("Control+PageUp");
+await page.waitForTimeout(200);
+ps = await panelState();
+check("Ctrl+PageUp goes back to the first tab and its list", ps.tabs[0] === "*Graph 1" && ps.rows.join("|") === "fp|x", JSON.stringify(ps));
+await page.keyboard.press("F2");
+await page.keyboard.type("Parabola");
+await page.keyboard.press("Enter");
+ps = await panelState();
+check("F2 renames the tab", ps.tabs[0] === "*Parabola" && ps.focus.includes("panel-input"), JSON.stringify(ps));
+await page.keyboard.press("F6");
+check("F6 goes to the notebook", !(await panelState()).inPanel && (await active()).startsWith("MATH-FIELD"), await active());
+await page.keyboard.press("Control+Shift+g");
+await page.waitForTimeout(800);
+ps = await panelState();
+check("Ctrl+Shift+G adds the line's items to the open tab", ps.rows.join("|") === "fp|x|fp|x" && !ps.inPanel, JSON.stringify(ps));
+await page.keyboard.press("F6");
+check("F6 goes back to the panel", (await panelState()).inPanel, (await panelState()).focus);
+await page.waitForTimeout(600);
+const savedPanel = await page.evaluate(() => JSON.parse(localStorage.getItem("maddox.session") ?? "{}").graphs);
+check("the panel is saved: open, tabs, lists", savedPanel?.open === true && savedPanel.tabs?.[0]?.name === "Parabola" && savedPanel.tabs[1]?.name === "Graph 2", JSON.stringify(savedPanel));
+// g(x) = … defines g for this tab only; := is for cells.
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("gl(x");
+await page.keyboard.press("ArrowRight");
+await page.keyboard.type("=2x+3");
+await page.keyboard.press("Enter");
+await page.keyboard.type("gl(0");
+await page.keyboard.press("Enter");
+await page.keyboard.type("hl(x");
+await page.keyboard.press("ArrowRight");
+await page.keyboard.type(":=x");
+await page.waitForTimeout(1500);
+const localRows = await page.$$eval(".panel-row", (rows) => rows.map((r) => ({ value: r.querySelector(".panel-value")?.textContent ?? "", error: r.querySelector(".panel-error")?.textContent ?? "" })));
+ps = await panelState();
+check("g(x) = … in a graph row is drawn and usable by other rows", ps.curves === 1 && /=\s*3/.test(localRows[1]?.value ?? ""), JSON.stringify([ps, localRows]));
+check(":= in a graph row says to use = (or a cell)", /Use = to define hl in this graph/.test(localRows[2]?.error ?? ""), JSON.stringify(localRows[2]));
+await page.keyboard.press("F6");
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("gl(1");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(150);
+check("the graph's own g is not defined in the notebook", (await resultFor("gl\\left(1")) !== "5", await resultFor("gl\\left(1"));
+await page.keyboard.press("F6");
+await page.keyboard.press("Control+g");
+ps = await panelState();
+check("Ctrl+G closes it and returns to the notebook", !ps.open && (await active()).startsWith("MATH-FIELD"), JSON.stringify(ps));
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

@@ -353,6 +353,19 @@ describe("units", () => {
   });
 });
 
+describe("wrong number of inputs", () => {
+  // Giac throws here instead of answering; the raw exception text must never show.
+  it("is explained in plain words, and the engine keeps working", () => {
+    run("f\\left(x\\right)\\coloneq x^2");
+    run("g\\left(x,y\\right)\\coloneq x+y");
+    expect(run("f\\left(\\right)")).toEqual({ ok: false, error: "f() is empty: write a value inside the brackets, e.g. f(5)" });
+    expect(run("\\sin\\left(\\right)")).toMatchObject({ ok: false, error: expect.stringContaining("sin() is empty") });
+    expect(run("g\\left(1\\right)")).toEqual({ ok: false, error: "A function got the wrong number of inputs, e.g. f(x) needs one: f(5)" });
+    expect(session.plot(latexToGiac("\\operatorname{plot}\\left(f\\left(\\right)\\right)"))).toMatchObject({ ok: false, error: expect.stringContaining("f() is empty") });
+    expect(run("f\\left(5\\right)")).toMatchObject({ ok: true, latex: "25" });
+  });
+});
+
 describe("plot", () => {
   const plot = (latex: string) => session.plot(latexToGiac(latex));
   it("reads functions, expressions in x, points and lists of points", () => {
@@ -376,6 +389,21 @@ describe("plot", () => {
     const result = plot("\\operatorname{plot}\\left(\\frac{1}{x}\\right)");
     if (!result.ok || result.items[0].kind !== "function") throw new Error("expected a function");
     expect(session.sample(result.items[0].fn, -2, 2, 4)).toEqual([-0.5, -1, NaN, 1, 0.5]);
+  });
+
+  it("a value (no x in it) is an answer, not a flat line", () => {
+    expect(plot("\\operatorname{plot}\\left(f\\left(5\\right)\\right)")).toMatchObject({
+      ok: true,
+      items: [{ kind: "value", latex: "23", approxLatex: null, point: [5, 23] }],
+    });
+    // f at a number also marks its point; other values don't.
+    const sum = plot("\\operatorname{plot}\\left(2+3\\right)");
+    expect(sum.ok && sum.items[0]).toMatchObject({ kind: "value", latex: "5" });
+    expect(sum.ok && sum.items[0].kind === "value" && sum.items[0].point).toBeUndefined();
+    expect(plot("\\operatorname{plot}\\left(f\\left(\\frac{1}{3}\\right)\\right)")).toMatchObject({
+      ok: true,
+      items: [{ kind: "value", latex: "-\\frac{17}{9}", approxLatex: "-1.88889" }],
+    });
   });
 
   it("trig in degrees gets a window in degrees", () => {

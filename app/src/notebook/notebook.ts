@@ -7,7 +7,7 @@ import { OPERATOR_NAMES } from "../ui/commands";
 import { Graph, type View } from "./graph";
 import { isTextLine, splitLines } from "./lines";
 import { editMatrix, matrixAtCaret, matrixLatex, type MatrixAction, type MatrixInfo } from "./matrix";
-import { atLineStart, breakLine, deleteAtBrackets, fillEmptyMatrixCells, focusImmediately, lineBoxes, moveByWord, type LineBox } from "./mathlive-internals";
+import { atLineStart, breakLine, caretLine, deleteAtBrackets, fillEmptyMatrixCells, focusImmediately, lineBoxes, moveByWord, type LineBox } from "./mathlive-internals";
 
 /** plot(…): the line's result is a graph, drawn below the cell. */
 type PlotLine = { ok: true; plot: Extract<PlotResult, { ok: true }> };
@@ -64,7 +64,7 @@ const MATRIX_KEYS: Record<string, MatrixAction> = {
 };
 
 /** unit: typing a unit (Ctrl+U), so letters are upright units, not variables. graph: a graph has the keyboard. */
-export type Context = { matrix: MatrixInfo | null; unit: boolean; graph?: boolean };
+export type Context = { matrix: MatrixInfo | null; unit: boolean; graph?: boolean; list?: boolean };
 
 /** Minimum space, in px, between the results of one multi-line cell. */
 const RESULT_GAP = 8;
@@ -94,6 +94,8 @@ export class Notebook {
   onContext: (ctx: Context) => void = () => {};
   /** A message for the status bar. */
   onMessage: (text: string) => void = () => {};
+  /** A cell was evaluated: what graphs show may have changed. */
+  onEvaluated: () => void = () => {};
 
   constructor(private container: HTMLElement, private engine: Engine) {
     // Positions measured before the maths fonts arrive are wrong; redo them.
@@ -169,6 +171,13 @@ export class Notebook {
     const el = target.closest(".entry");
     const entry = this.entries.find((e) => e.el === el) ?? this.entries[this.entries.length - 1];
     this.focus(entry, "end");
+  }
+
+  /** The line the caret is on in the entry being edited (LaTeX), or null. */
+  currentLine(): string | null {
+    const entry = this.active;
+    if (!entry) return null;
+    return splitLines(entry.mf.value)[caretLine(entry.mf)] ?? null;
   }
 
   /** Returns focus to the entry being edited, caret unchanged. */
@@ -254,7 +263,8 @@ export class Notebook {
     return entry;
   }
 
-  private configure(mf: MathfieldElement) {
+  /** Shortcuts and keybindings for a math field (the cells, and the graph panel's rows). */
+  configure(mf: MathfieldElement) {
     if (!this.shortcuts) {
       const defaults = mf.inlineShortcuts as Record<string, any>;
       const kept = Object.fromEntries(KEPT_SHORTCUTS.filter((k) => k in defaults).map((k) => [k, defaults[k]]));
@@ -579,6 +589,7 @@ export class Notebook {
       this.renderResults(entry);
     }
     entry.el.classList.toggle("stale", entry.mf.value !== latex);
+    this.onEvaluated();
   }
 
   private renderResults(entry: Entry) {
@@ -642,7 +653,10 @@ export class Notebook {
     for (const [i, result] of wanted) {
       if (entry.graphs.has(i)) continue;
       const graph = new Graph({
-        items: result.plot.items,
+        // A value draws nothing, except f(a), which marks its point.
+        items: result.plot.items.flatMap((item) =>
+          item.kind !== "value" ? [item] : item.point ? [{ kind: "points" as const, label: item.label, points: [item.point] }] : [],
+        ),
         xRange: result.plot.xRange,
         view: entry.views[i] ?? null,
         sample: (fn, a, b, n) => this.engine.sample(fn, a, b, n),

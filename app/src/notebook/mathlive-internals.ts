@@ -207,6 +207,20 @@ export function moveByWord(mf: MathfieldElement, direction: "left" | "right", ex
   }
 }
 
+/** The index of the cell line the caret is on (0 for a one-line cell). */
+export function caretLine(mf: MathfieldElement): number {
+  try {
+    const model = internal(mf).model;
+    const root = model.root;
+    if (root.type !== "array") return 0;
+    let atom = model.at(model.position);
+    while (atom?.parent && atom.parent !== root) atom = atom.parent;
+    return Array.isArray(atom?.parentBranch) ? atom.parentBranch[0] : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export type LineBox = { top: number; bottom: number; left: number; right: number };
 
 /** The on-screen extent of each line of the cell, in document order. */

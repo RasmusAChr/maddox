@@ -2,7 +2,7 @@
 // SVG, re-samples functions from the engine whenever the view changes, and is
 // driven by the keyboard (trace, zoom, pan) as well as the mouse.
 import { convertLatexToMarkup } from "mathlive";
-import type { PlotItem } from "../engine/giac-session";
+import type { DrawnItem } from "../engine/giac-session";
 import { autoY, formatNumber, niceStep, pointsX, segments, ticks, type View } from "./graph-math";
 
 export type { View };
@@ -12,7 +12,7 @@ const SVG = "http://www.w3.org/2000/svg";
 const COLOURS = 6; // --plot-1 … --plot-6 in style.css
 
 export type GraphOptions = {
-  items: PlotItem[];
+  items: DrawnItem[];
   /** The default window's x range. */
   xRange: [number, number];
   /** A view saved with the cell (zoomed or panned); null for the automatic one. */
@@ -22,6 +22,12 @@ export type GraphOptions = {
   onView: (view: View | null) => void;
   /** Esc: back to the cell. */
   onExit: () => void;
+  /** Fill the height of the container (the panel); otherwise a fixed 320 px. */
+  fill?: boolean;
+  /** Show the legend of chips (the panel's list shows the colours instead). */
+  legend?: boolean;
+  /** Colour slot per item, when it isn't the item's position (panel rows that failed). */
+  colours?: number[];
 };
 
 type Trace = { item: number; x: number; index: number };
@@ -45,6 +51,7 @@ export class Graph {
   private generation = 0;
   private resampleTimer: number | undefined;
   private width = 0;
+  private height = HEIGHT;
   private resizeObserver: ResizeObserver;
 
   constructor(private options: GraphOptions) {
@@ -54,12 +61,17 @@ export class Graph {
     this.el.setAttribute("role", "img");
     this.el.setAttribute("aria-label", "Graph. Arrow keys trace, + and − zoom, Esc returns to the cell.");
     this.plot = svg("svg", { class: "graph-plot", height: HEIGHT });
+    if (options.legend === false) this.el.classList.add("no-legend");
+    if (options.fill) {
+      this.el.classList.add("fill");
+      this.plot.removeAttribute("height");
+    }
     const legend = document.createElement("div");
     legend.className = "graph-legend";
     options.items.forEach((item, i) => {
       const chip = document.createElement("span");
       chip.className = "graph-chip";
-      chip.style.setProperty("--colour", `var(--plot-${(i % COLOURS) + 1})`);
+      chip.style.setProperty("--colour", this.colour(i));
       chip.innerHTML = convertLatexToMarkup(item.label);
       legend.append(chip);
     });
@@ -73,8 +85,10 @@ export class Graph {
     this.addMouse();
     this.resizeObserver = new ResizeObserver(() => {
       const width = this.plot.clientWidth;
-      if (width && width !== this.width) {
+      const height = this.options.fill ? Math.max(120, this.plot.clientHeight) : HEIGHT;
+      if (width && (width !== this.width || height !== this.height)) {
         this.width = width;
+        this.height = height;
         if (this.view) this.render();
         this.scheduleResample(0);
       }
@@ -100,7 +114,7 @@ export class Graph {
 
   // ---- data ---------------------------------------------------------------
 
-  private get functions(): [number, Extract<PlotItem, { kind: "function" }>][] {
+  private get functions(): [number, Extract<DrawnItem, { kind: "function" }>][] {
     return this.options.items.flatMap((item, i) => (item.kind === "function" ? [[i, item] as [number, typeof item]] : []));
   }
 
@@ -162,7 +176,7 @@ export class Graph {
     const view = this.view;
     if (!view || !this.width) return;
     const w = this.width;
-    const h = HEIGHT;
+    const h = this.height;
     const sx = (x: number) => ((x - view.xmin) / (view.xmax - view.xmin)) * w;
     const sy = (y: number) => h - ((y - view.ymin) / (view.ymax - view.ymin)) * h;
     this.plot.replaceChildren();
@@ -189,7 +203,7 @@ export class Graph {
     this.plot.append(grid, axes, labels);
 
     this.options.items.forEach((item, i) => {
-      const colour = `var(--plot-${(i % COLOURS) + 1})`;
+      const colour = this.colour(i);
       if (item.kind === "function") {
         const s = this.samples.get(i);
         if (!s) return;
@@ -203,9 +217,14 @@ export class Graph {
     });
 
     if (this.trace && this.traceY !== null && Number.isFinite(this.traceY)) {
-      const colour = `var(--plot-${(this.trace.item % COLOURS) + 1})`;
+      const colour = this.colour(this.trace.item);
       this.plot.append(svg("circle", { cx: sx(this.trace.x), cy: sy(this.traceY), r: 5.5, class: "graph-trace", stroke: colour }));
     }
+  }
+
+  private colour(item: number): string {
+    const slot = this.options.colours?.[item] ?? item;
+    return `var(--plot-${(slot % COLOURS) + 1})`;
   }
 
   private label(text: string, x: number, y: number, anchor: string) {

@@ -169,6 +169,11 @@ Re-check this list after upgrading.
   600 points of x³e⁻ˣsin 5x, against 14 ms with `evalf(seq(…))`. `apply` on
   a list does not map. `maddox_real` turns complex or undefined values into
   `undef` (a gap).
+- **A wrong number of inputs throws.** `f()` (f defined), `sin()` or
+  `g(1)` for g(x, y) make Giac throw a C++ exception that this WebAssembly
+  build can't catch inside Giac, so `caseval` itself throws ("Exception
+  catching is disabled…"). The engine survives. `GiacSession.evaluate`,
+  `plot` and `sample` catch it and answer in words (`thrownError`).
 - **Display simplification.** Autosimplify settings do not affect
   `caseval`. Results are wrapped in `regroup()` for display.
 - **Loading under Node.** The script declares `var Module` at the top

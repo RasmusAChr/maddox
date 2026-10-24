@@ -9,6 +9,8 @@ import { clearRecentFiles, forgetFile, recentFiles, rememberFile } from "./recen
 import { applyTheme, DIGIT_CHOICES, prefs, setPref, type Theme } from "./settings";
 import { openSettings, type Setting } from "./ui/settings-dialog";
 import { Notebook, type Context } from "./notebook/notebook";
+import { plotItemsFromLine } from "./notebook/plot-items";
+import { GraphPanel } from "./ui/graph-panel";
 import { CATALOG, CATEGORIES, type CatalogItem } from "./ui/commands";
 import { askUnsaved, openHelp, openMatrixDialog, openSearch, type SearchItem } from "./ui/dialogs";
 import { renderTemplates, toggleTemplates } from "./ui/templates";
@@ -24,6 +26,7 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)
 
 const engine = new Engine(new URL("giac/giacwasm.js", document.baseURI).href);
 const notebook = new Notebook($("#sheet"), engine);
+const panel = new GraphPanel($("#graph-panel"), engine, (mf) => notebook.configure(mf));
 void applyZoom();
 
 // Room to scroll the last cell up off the bottom edge, but only once the
@@ -50,7 +53,9 @@ let dirty = false;
 // after the keystroke, so `dirty` alone can lag: a Ctrl+N right after typing
 // would discard the edit unasked. Comparing the content cannot lag.
 let savedContent: string | null = null;
-const currentContent = () => JSON.stringify(notebook.cells);
+/** Everything saved in the file except the angle: the cells and the graph panel. */
+const content = () => ({ cells: notebook.cells, graphs: panel.saved });
+const currentContent = () => JSON.stringify(content());
 
 // Degrees or radians, saved in each notebook. A new notebook starts in the
 // mode last used (degrees the very first time).
@@ -69,8 +74,8 @@ function lastAngle(): AngleMode {
 const hasUnsavedChanges = () => dirty || currentContent() !== savedContent || angle !== savedAngle;
 
 /** What the autosave keeps between runs. */
-const sessionRecord = (entries: unknown[], isDirty: boolean, mode: AngleMode) =>
-  JSON.stringify({ entries, path, dirty: isDirty, angle: mode });
+const sessionRecord = (saved: ReturnType<typeof content>, isDirty: boolean, mode: AngleMode) =>
+  JSON.stringify({ entries: saved.cells, graphs: saved.graphs, path, dirty: isDirty, angle: mode });
 
 function updateTitle() {
   const name = fileName(path);
@@ -86,7 +91,7 @@ function markDirty() {
   clearTimeout(autosaveTimer);
   autosaveTimer = window.setTimeout(() => {
     try {
-      localStorage.setItem(SESSION_KEY, sessionRecord(notebook.cells, dirty, angle));
+      localStorage.setItem(SESSION_KEY, sessionRecord(content(), dirty, angle));
     } catch {
       // Storage can be unavailable; autosave is only a convenience.
     }
@@ -101,6 +106,7 @@ function restoreSession(onlyIfUnsaved = false): boolean {
     if (!Array.isArray(entries)) return false;
     if (onlyIfUnsaved && !saved.dirty) return false;
     notebook.load(toCells(entries));
+    panel.load(saved.graphs);
     path = saved.path ?? null;
     dirty = Boolean(saved.dirty);
     savedContent = dirty ? null : currentContent();
@@ -116,7 +122,7 @@ function restoreSession(onlyIfUnsaved = false): boolean {
 /** Saves the notebook (asking for a name when it has none); true once it is on disk. */
 async function save(saveAs = false): Promise<boolean> {
   try {
-    const written = await saveNotebook({ cells: notebook.cells, angle }, saveAs ? null : path);
+    const written = await saveNotebook({ cells: notebook.cells, angle, graphs: panel.saved }, saveAs ? null : path);
     if (!written) return false;
     path = written;
     dirty = false;
@@ -135,7 +141,7 @@ async function save(saveAs = false): Promise<boolean> {
 
 function markDirtyFree() {
   try {
-    localStorage.setItem(SESSION_KEY, sessionRecord(notebook.cells, false, angle));
+    localStorage.setItem(SESSION_KEY, sessionRecord(content(), false, angle));
   } catch {
     // see markDirty
   }
@@ -176,6 +182,7 @@ function forgetUnsavedEdits() {
 
 function loadDocument(doc: NotebookDoc, newPath: string | null) {
   notebook.load(doc.cells);
+  panel.load(doc.graphs);
   path = newPath;
   dirty = false;
   savedContent = currentContent();
@@ -354,9 +361,20 @@ engine.onStatus = (status) => {
 };
 
 const HINTS = "<kbd>Enter</kbd> evaluate · <kbd>Shift ↵</kbd> new line · <kbd>#</kbd> heading · <kbd>Ctrl P</kbd> search · <kbd>F1</kbd> all shortcuts";
+/** Ctrl+Shift+G: what the caret's line defines or plots goes to the open graph tab. */
+function addLineToGraph() {
+  const items = plotItemsFromLine(notebook.currentLine() ?? "");
+  if (!items.length) return showMessage("Nothing to plot on this line");
+  panel.addItems(items);
+  showMessage(`Added to the graph: ${items.length} item${items.length === 1 ? "" : "s"}`);
+}
+
 function showContext(ctx: Context) {
   const hints = $("#hints");
-  if (ctx.graph) {
+  if (ctx.list) {
+    hints.innerHTML = `<b>Graph list</b> · type f, D or x² · <kbd>Enter</kbd> new row · <kbd>↓</kbd> into the graph · <kbd>Ctrl ↵</kbd> new tab · <kbd>Ctrl PgUp</kbd><kbd>PgDn</kbd> switch · <kbd>F2</kbd> rename · <kbd>F6</kbd> notebook`;
+    hints.classList.add("in-matrix");
+  } else if (ctx.graph) {
     hints.innerHTML = `<b>Graph</b> · <kbd>←</kbd><kbd>→</kbd> trace · <kbd>↑</kbd><kbd>↓</kbd> curve · <kbd>+</kbd><kbd>−</kbd> zoom · <kbd>Ctrl</kbd>+arrows pan · <kbd>0</kbd> reset · <kbd>Esc</kbd> back`;
     hints.classList.add("in-matrix");
   } else if (ctx.unit) {
@@ -385,6 +403,10 @@ function showMessage(text: string) {
 }
 
 notebook.onChange = markDirty;
+notebook.onEvaluated = () => panel.refresh();
+panel.onChange = markDirty;
+panel.onExit = () => notebook.refocus();
+panel.onContext = (graph) => showContext({ matrix: null, unit: false, graph, list: !graph });
 notebook.onContext = showContext;
 notebook.onMessage = showMessage;
 
@@ -517,6 +539,9 @@ window.addEventListener(
     };
     if (e.key === "Escape" && engine.isBusy) return run(() => engine.cancel());
     if (e.key === "F1" || (mod && key === "/")) return run(help);
+    // F6: the keyboard moves between the notebook and the graph panel.
+    if (e.key === "F6" && panel.isOpen) return run(() => (panel.hasFocus ? notebook.refocus() : panel.focus()));
+    if (mod && !e.altKey && key === "g") return run(() => (e.shiftKey ? addLineToGraph() : panel.toggle()));
     if (!mod || e.altKey) return;
     if (e.shiftKey && e.key === "Enter") return run(ACTIONS["run-all"]);
     if (e.shiftKey && key === "a") return run(toggleAngle);
@@ -565,6 +590,7 @@ if (isTauri) {
 
 if (!restoreSession(!prefs.reopenLast)) {
   notebook.load([]);
+  panel.load(null);
   savedContent = currentContent();
   setAngle(angle);
 }

@@ -26,6 +26,12 @@
 | Shift+Enter | cell | New line in the same cell |
 | `#` at the start of a line | cell | The line is text |
 | Ctrl+Enter | cell | New cell below |
+| Alt+↓ | cell with a graph | Into its graph: ←/→ trace, ↑/↓ curve, +/− zoom, Ctrl+arrows pan, 0 reset, Esc back |
+| Ctrl+G | anywhere | Graph panel open / close |
+| F6 | panel open | Keyboard between notebook and panel |
+| Ctrl+Shift+G | cell | Add the caret's line to the open graph tab |
+| Ctrl+Enter / Ctrl+Shift+Backspace | graph panel | New tab / close tab |
+| Ctrl+PageUp / PageDown, F2 | graph panel | Switch tab, rename it |
 | Ctrl+U | cell | Type a unit (upright): / stays inline, * is ·, Space / Esc / Ctrl+U ends it |
 | Alt+Enter | cell | Show this cell's answers as decimals (exact ones when the setting is "Decimals only"), or follow the setting again. Saved with the cell, marked ≈ (or =) |
 | Ctrl+Shift+Enter | anywhere | Run all (resets the engine first) |

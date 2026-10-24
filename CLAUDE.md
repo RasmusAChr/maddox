@@ -66,8 +66,11 @@ docs updated, a short report of what changed.
   arithmetic. Decided 2026-10-23, see
   `docs/decisions/0006-units.md`.
 - **Graphs:** `plot(f, g, D)` draws below its cell (Alt+↓ into it: ←/→
-  trace, +/− zoom, Esc back), and a Ctrl+G panel with tabs is coming.
-  Built in four releases, see `docs/decisions/0008-graphs.md`.
+  trace, +/− zoom, Esc back). Ctrl+G opens a graph panel (right half) with
+  tabs, each with its own list; F6 switches pane, Ctrl+Shift+G adds a cell
+  line. In a tab, `g(x) = …` defines g for that tab only; `:=` (global) is
+  for cells. Exact intersections and sliders come next; see
+  `docs/decisions/0008-graphs.md`.
 - **% is always hundredths**: `20%` is 0.2, so `150+20%` is 150.2 (as on
   the Nspire and in Excel, not a shop calculator). Decided 2026-10-23.
 - **Decimal point only.** `2.5`, never `2,5`, even on Danish setups. The
@@ -147,6 +150,7 @@ npm run tauri build  # installers in src-tauri/target/release/bundle/
 | `app/src/ui/commands.ts` | every template and its category (sidebar + search) |
 | `app/src/ui/templates.ts`, `dialogs.ts`, `search.ts` | sidebar, Ctrl+P / matrix / help dialogs, matching |
 | `app/src/notebook/graph.ts`, `graph-math.ts` | a graph (SVG, trace/zoom keys); its window and tick arithmetic |
+| `app/src/ui/graph-panel.ts`, `notebook/plot-items.ts` | the Ctrl+G panel (tabs, lists); what Ctrl+Shift+G adds from a line |
 | `app/src/settings.ts`, `ui/settings-dialog.ts` | preferences of this computer; the Ctrl+, dialog |
 | `app/src/main.ts` | app shell: files, status bar, global keys, click handling, the settings list |
 

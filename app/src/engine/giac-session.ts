@@ -8,9 +8,15 @@ export type EvalResult =
 export type Caseval = (input: string) => string;
 
 /** One thing a graph draws: a function of x (sampled per view) or fixed points. */
-export type PlotItem =
+export type DrawnItem =
   | { kind: "function"; label: string; fn: string }
   | { kind: "points"; label: string; points: [number, number][] };
+
+/**
+ * A plot argument: something drawn, or a value with no x in it, shown as its
+ * answer. A function at a number (f(0)) also marks that point on the graph.
+ */
+export type PlotItem = DrawnItem | { kind: "value"; label: string; latex: string; approxLatex: string | null; point?: [number, number] };
 
 /** xRange: the default window's x (−360…360 for trig in degrees). */
 export type PlotResult = { ok: true; items: PlotItem[]; xRange: [number, number] } | { ok: false; error: string };
@@ -105,6 +111,15 @@ export class GiacSession {
    * of points). Functions are sampled later with sample(), per view.
    */
   plot(giac: string): PlotResult {
+    try {
+      return this.plotUnguarded(giac);
+    } catch {
+      this.takePrinted();
+      return { ok: false, error: thrownError(giac) };
+    }
+  }
+
+  private plotUnguarded(giac: string): PlotResult {
     const input = this.resolveCalls(giac).trim();
     const m = input.match(/^plot\((.*)\)$/s);
     if (!m || !m[1].trim()) return { ok: false, error: "Write what to plot inside the brackets, e.g. plot(f, x^2)" };
@@ -125,6 +140,13 @@ export class GiacSession {
         items.push({ kind: "points", label: this.exactLatex(RESULT), points });
         continue;
       }
+      if (!isFunction && this.caseval(`lname(${RESULT})`) === "[]") {
+        // No x and no unknowns: a value, shown as an answer (like a cell) rather than a flat line.
+        const latex = this.exactLatex(RESULT);
+        const forms = answerForms(latex, this.decimalLatex(RESULT), this.caseval(`evalf(${RESULT})`), this.options.answerMode);
+        items.push({ kind: "value", label: this.exactLatex(RESULT), ...forms, ...this.pointOfCall(arg) });
+        continue;
+      }
       if (!isFunction) {
         const others = this.caseval(`lname(${RESULT})`).replace(/^\[|\]$/g, "").split(",").map((s) => s.trim()).filter((s) => s && s !== "x");
         if (others.length) return { ok: false, error: `plot draws functions of x, but ${others.join(", ")} ${others.length > 1 ? "have" : "has"} no value` };
@@ -142,9 +164,40 @@ export class GiacSession {
     return { ok: true, items, xRange: deg ? [-360, 360] : [-10, 10] };
   }
 
+  /**
+   * Runs a definition or purge for the graph panel's own names (no answer,
+   * no ans, no display). Errors come back in words.
+   */
+  run(giac: string): { ok: true } | { ok: false; error: string } {
+    try {
+      this.takePrinted();
+      const raw = this.caseval(this.resolveCalls(giac));
+      const error = findError(raw, this.takePrinted(), giac);
+      return error ? { ok: false, error } : { ok: true };
+    } catch {
+      this.takePrinted();
+      return { ok: false, error: thrownError(giac) };
+    }
+  }
+
+  /** f(a) for a function f and a number a: the point (a, f(a)), from RESULT; else nothing. */
+  private pointOfCall(arg: string): { point?: [number, number] } {
+    const call = arg.match(/^([A-Za-z_][A-Za-z0-9_]*)\((.+)\)$/s);
+    if (!call || splitTopLevel(call[2]).length !== 1 || this.caseval(`type(${call[1]})`) !== "func") return {};
+    const x = Number(this.caseval(`evalf(${call[2]})`));
+    const y = Number(this.caseval(`evalf(${RESULT})`));
+    this.takePrinted();
+    return Number.isFinite(x) && Number.isFinite(y) ? { point: [x, y] } : {};
+  }
+
   /** fn's values at n+1 evenly spaced x from a to b; NaN where it has no real value. */
   sample(fn: string, a: number, b: number, n: number): number[] {
-    const raw = this.caseval(`maddox_sample(${fn},${a},${b},${n})`);
+    let raw: string;
+    try {
+      raw = this.caseval(`maddox_sample(${fn},${a},${b},${n})`);
+    } catch {
+      raw = ""; // a function that can't take one input: draw nothing
+    }
     this.takePrinted();
     return raw.replace(/^\[|\]$/g, "").split(",").map((v) => (/^-?[\d.]+(e[+-]?\d+)?$/.test(v.trim()) ? Number(v) : NaN));
   }
@@ -160,6 +213,15 @@ export class GiacSession {
 
   /** `mode` overrides the answer mode for this one input (a cell switched with Alt+Enter). */
   evaluate(giac: string, mode: AnswerMode = this.options.answerMode): EvalResult {
+    try {
+      return this.evaluateUnguarded(giac, mode);
+    } catch {
+      this.takePrinted();
+      return { ok: false, error: thrownError(giac) };
+    }
+  }
+
+  private evaluateUnguarded(giac: string, mode: AnswerMode): EvalResult {
     // restart returns the names it cleared, RESULT among them, so storing
     // that list in RESULT is a "recursive definition" error.
     if (giac.trim() === "restart") {
@@ -203,12 +265,7 @@ export class GiacSession {
     }
     this.caseval(`${ANS_VARIABLE}:=${RESULT}`);
     this.takePrinted();
-    if (mode === "exact") return { ok: true, latex, approxLatex: null };
-    if (mode === "approx") {
-      // The decimal form takes the exact form's place, when there is one.
-      return { ok: true, latex: showApprox(latex, approxText) ? approxLatex : latex, approxLatex: null };
-    }
-    return { ok: true, latex, approxLatex: showApprox(latex, approxText) ? approxLatex : null };
+    return { ok: true, ...answerForms(latex, approxLatex, approxText, mode) };
   }
 
   /**
@@ -578,6 +635,18 @@ function piecewiseLatex(latex: string): string {
   return latex;
 }
 
+/**
+ * Giac throws (instead of answering with an error) when a function gets the
+ * wrong number of inputs: f() or g(1) for g(x, y). This WebAssembly build
+ * can't catch that inside Giac, so it arrives as a JavaScript exception
+ * whose text means nothing to a student.
+ */
+function thrownError(giac: string): string {
+  const empty = giac.match(/([A-Za-z_][A-Za-z0-9_]*)\W?\(\s*\)/);
+  if (empty) return `${empty[1]}() is empty: write a value inside the brackets, e.g. ${empty[1]}(5)`;
+  return "A function got the wrong number of inputs, e.g. f(x) needs one: f(5)";
+}
+
 // Functions whose "bad argument" errors mean the same thing every time.
 const NEEDS_WHOLE_NUMBERS = new Set(["ifactor", "isprime", "nextprime", "prevprime", "gcd", "lcm", "irem", "iquo", "comb", "perm", "factorial"]);
 const NEEDS_MATRIX = new Set(["det", "inv", "rref", "rank", "transpose", "eigenvals", "eigenvects", "ker", "trace"]);
@@ -699,6 +768,14 @@ function unitLatexOf(text: string): string | null {
   const top = above.join("\\cdot ");
   if (!below.length) return top;
   return below.length === 1 ? `${top}/${below[0]}` : `${top}/\\left(${below.join("\\cdot ")}\\right)`;
+}
+
+/** Which forms an answer shows, by answer mode (exact, decimal, or both when the decimal adds something). */
+function answerForms(latex: string, approxLatex: string, approxText: string, mode: AnswerMode): { latex: string; approxLatex: string | null } {
+  if (mode === "exact") return { latex, approxLatex: null };
+  // In decimal mode the decimal form takes the exact form's place, when there is one.
+  if (mode === "approx") return { latex: showApprox(latex, approxText) ? approxLatex : latex, approxLatex: null };
+  return { latex, approxLatex: showApprox(latex, approxText) ? approxLatex : null };
 }
 
 /** "[[1.0,3.0],[3.0,8.0]]" as rows of `width` numbers; null if any is not a number. */

@@ -1,7 +1,7 @@
 # 0008 — Graphs: plot() in a cell, and a graph panel with tabs
 
-**Status:** accepted, 2026-10-24. Release 1 (inline `plot()`) is built;
-releases 2–4 follow, each proposed in detail before it is built.
+**Status:** accepted, 2026-10-24. Releases 1 (inline `plot()`) and 2 (the
+panel) are built; 3–4 follow, each proposed in detail before it is built.
 
 ## Problem
 
@@ -45,10 +45,47 @@ Both, built on one graph component (same drawing, keys and maths):
 - Sampling: `GiacSession.sample` (one Giac call per curve per view, float x),
   in the background: it shows no "busy" and Esc never cancels it.
 
+## Release 2 (built)
+
+- Ctrl+G opens or closes the panel: the window splits 50/50 and the
+  keyboard goes to the open tab's list. F6 moves between notebook and panel.
+- Tabs: "Graph 1" to start; **+** or Ctrl+Enter (in the panel) adds one,
+  × or Ctrl+Shift+Backspace closes one (a second press confirms when it has
+  items; browsers keep Ctrl+T/W). Ctrl+PageUp/PageDown switch, F2 or a
+  double-click renames.
+- The list sits above the graph, one maths field per row. Enter adds a row,
+  Backspace in an empty one removes it, ↑/↓ move, ↓ from the last row goes
+  into the graph, Esc back to the notebook (Esc in the graph: back to the
+  list). A row that can't be drawn shows why; the others still draw. A row
+  with no x in it (`f(5)`, `2+3`) is a value: it shows `= 23` after a
+  dotted leader, as a cell would (answer mode applies), and isn't drawn.
+  A function at a number (`f(0)`) also marks the point (0, f(0)) with a
+  dot in the row's colour (its chip is a dot). In an inline `plot(…)` the
+  same holds: f(a) is a dot, other values are left out of the drawing.
+- **Definitions in a tab are local** (the owner's choice): `g(x) = 2x + 3`
+  defines g for that tab only. It is drawn, and other rows of the tab can
+  use it (`g(0) = 3`, with its dot). `a = 5` defines a value; `y = …` just
+  draws. A tab's name hides a notebook name of the same spelling there.
+  `:=` in a row is an error ("Use = to define g in this graph. := defines it
+  for the whole notebook, so do that in a cell."), and the notebook never
+  sees a tab's names: in Giac they are `maddox_local_g`, defined before the
+  tab is drawn and purged before the next draw (`readPanelRow`, `localise`).
+  Before this, a row like `g(x):=…` defined g globally as a hidden side
+  effect.
+- Ctrl+Shift+G in a cell adds the caret's line: `f(x):=…` adds f, `D:=…`
+  adds D, `plot(…)` its items, anything else the expression
+  (`plotItemsFromLine`).
+- The panel re-plots after every cell evaluation (so redefining f, and the
+  recalculation after it, shows at once).
+- Saved in the file as `"graphs": {open, active, tabs: [{name, items, view}]}`;
+  files without it open with the panel closed.
+
 ## Consequences
 
 - Engine: `GiacSession.plot` / `sample`, worker messages `plot` and
   `sample`, `Engine.request(…, background)`.
-- UI: `notebook/graph.ts` (drawing, keys, mouse) and `graph-math.ts`
-  (window, ticks, breaks; unit-tested). `Notebook.renderGraphs` keeps one
-  graph per plot line.
+- UI: `notebook/graph.ts` (drawing, keys, mouse; `fill`, `legend`,
+  `colours` options for the panel) and `graph-math.ts` (window, ticks,
+  breaks; unit-tested). `Notebook.renderGraphs` keeps one graph per plot
+  line. `ui/graph-panel.ts` is the panel; `notebook/plot-items.ts` what
+  Ctrl+Shift+G adds.
