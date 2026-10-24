@@ -28,6 +28,7 @@
 | Ctrl+Enter | cell | New cell below |
 | Alt+↓ | cell with a graph | Into its graph: ←/→ trace, ↑/↓ curve, Tab/Shift+Tab next/previous zero, max/min or intersection, +/− zoom, Ctrl+arrows pan, 0 reset, S sliders (←/→ change, ↑/↓ move, Esc back), Esc back |
 | Alt+← / Alt+→ | graph-panel row `a = 3` | Nudge its slider (Shift ×10) |
+| Alt+↓ | graph-panel row with sliders | To its sliders: ←/→ change, ↑/↓ move, Esc back to the row |
 | Ctrl+G | anywhere | Graph panel open / close |
 | F6 | panel open | Keyboard between notebook and panel |
 | Ctrl+Shift+G | cell | Add the caret's line to the open graph tab |

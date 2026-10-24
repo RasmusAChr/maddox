@@ -1545,3 +1545,15 @@ body.with-graph-panel .notebook {
 .panel-row.has-slider .panel-value {
   display: none;
 }
+
+/* Sliders inside a panel row, for names it uses without a value (jj(x) = ax + b). */
+.panel-sliders {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 4px 24px;
+}
+
+.panel-sliders:empty {
+  display: none;
+}

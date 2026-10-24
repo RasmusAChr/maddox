@@ -372,7 +372,7 @@ function addLineToGraph() {
 function showContext(ctx: Context) {
   const hints = $("#hints");
   if (ctx.list) {
-    hints.innerHTML = `<b>Graph list</b> · type f, D or x² · <kbd>Enter</kbd> new row · <kbd>Alt ←</kbd><kbd>Alt →</kbd> slider · <kbd>↓</kbd> into the graph · <kbd>Ctrl ↵</kbd> new tab · <kbd>Ctrl PgUp</kbd><kbd>PgDn</kbd> switch · <kbd>F2</kbd> rename · <kbd>F6</kbd> notebook`;
+    hints.innerHTML = `<b>Graph list</b> · type f, D or x² · <kbd>Enter</kbd> new row · <kbd>Alt ↓</kbd> sliders · <kbd>↓</kbd> into the graph · <kbd>Ctrl ↵</kbd> new tab · <kbd>Ctrl PgUp</kbd><kbd>PgDn</kbd> switch · <kbd>F2</kbd> rename · <kbd>F6</kbd> notebook`;
     hints.classList.add("in-matrix");
   } else if (ctx.graph) {
     hints.innerHTML = `<b>Graph</b> · <kbd>←</kbd><kbd>→</kbd> trace · <kbd>↑</kbd><kbd>↓</kbd> curve · <kbd>Tab</kbd> zeros, max/min · <kbd>S</kbd> sliders · <kbd>+</kbd><kbd>−</kbd> zoom · <kbd>Ctrl</kbd>+arrows pan · <kbd>0</kbd> reset · <kbd>Esc</kbd> back`;

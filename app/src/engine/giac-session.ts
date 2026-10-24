@@ -185,7 +185,7 @@ export class GiacSession {
       if (free.length) {
         if (!isFunction && !this.caseval(`lname(${RESULT})`).match(/\bx\b/)) {
           const typed = arg.replace(/\^\((-?\d+)\)/g, "^$1").replace(/\*/g, "·");
-          return { ok: false, error: `plot draws functions of x. Use x, or define a function, e.g. f(t) := at+b` };
+          return { ok: false, error: `plot draws functions of x. Use x, or define a function, e.g. f(t) := ${typed}` };
         }
         missing.push(...free.filter((n) => !missing.includes(n)));
         continue;

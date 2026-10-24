@@ -103,10 +103,15 @@ Both, built on one graph component (same drawing, keys and maths):
   priority (then there is no slider). Keys: S in the graph goes to the
   first slider; ←/→ change it (Shift ×10), ↑/↓ move between sliders (↑ from
   the first back to the graph), Esc back to the graph.
-- Panel: a row `a = 3` (a plain number) gets a slider under it; Alt+←/→ in
-  the row nudge it and the row's text follows (so it saves as text). A row
-  that uses names without a value says so ("Enter adds sliders"); Enter, or
-  leaving the row, adds `a = 1` rows (the owner's choice: add, don't ask).
+- Panel: names a row uses without a value get sliders **inside that row**,
+  under its maths, as under a cell's graph (the owner: "it should be in the
+  same cell"). One slider per name per tab, under the first row that uses
+  it; values saved with the tab (`"sliders": {a: 1}`). Alt+↓ in the row goes
+  to its sliders (←/→ change, ↑/↓ move, ↑ from the first and Esc back to the
+  row). They are not editable text and need no Enter. A row you type
+  yourself, `a = 3`, is a definition with its own slider (Alt+←/→ nudge it,
+  the text follows). An earlier version added separate `a = 1` rows; that
+  was replaced.
 - Range −10…10 in steps of 0.1, widened by powers of ten for bigger values
   (`sliderRange`, `nudge`).
 - **The axis is never guessed** (the owner: "fair not to accommodate every
