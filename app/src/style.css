@@ -20,6 +20,13 @@
   --active: #f6f7fc;
   --rule: #ecece8;
   --leader: #cfcfc8;
+  /* Graph curves, one colour per plotted item (graph.ts). */
+  --plot-1: #2f6fdb;
+  --plot-2: #d9480f;
+  --plot-3: #2b8a3e;
+  --plot-4: #9c36b5;
+  --plot-5: #c2255c;
+  --plot-6: #0b7285;
   /* Maths grows a little with the window; Ctrl+/- zoom scales everything. */
   --math-size: clamp(1.3rem, 0.95rem + 0.42vw, 1.65rem);
   --sheet-width: clamp(640px, 46vw + 160px, 1160px);
@@ -47,6 +54,12 @@
     --active: #22242d;
     --rule: #2a2b31;
     --leader: #3c3e47;
+    --plot-1: #74a9ff;
+    --plot-2: #ff8a4c;
+    --plot-3: #69db7c;
+    --plot-4: #da77f2;
+    --plot-5: #f783ac;
+    --plot-6: #3bc9db;
     color-scheme: dark;
   }
 }
@@ -70,6 +83,12 @@
   --active: #22242d;
   --rule: #2a2b31;
   --leader: #3c3e47;
+  --plot-1: #74a9ff;
+  --plot-2: #ff8a4c;
+  --plot-3: #69db7c;
+  --plot-4: #da77f2;
+  --plot-5: #f783ac;
+  --plot-6: #3bc9db;
   color-scheme: dark;
 }
 
@@ -1135,4 +1154,108 @@ dialog h2 {
 .action-button:disabled {
   color: var(--muted);
   cursor: default;
+}
+
+/* Graphs of plot(…) lines: below the cell, full width (graph.ts). */
+.entry-graphs {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entry-graphs:empty {
+  display: none;
+}
+
+.graph {
+  margin: 4px 0 6px;
+  padding: 8px 10px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  outline: none;
+}
+
+.graph:focus-visible,
+.graph:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.graph-plot {
+  display: block;
+  width: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.graph-grid line {
+  stroke: var(--rule);
+  stroke-width: 1;
+}
+
+.graph-axes line {
+  stroke: var(--muted);
+  stroke-width: 1.2;
+}
+
+.graph-labels text {
+  fill: var(--muted);
+  font: 11px ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+}
+
+.graph-curve {
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.graph-point {
+  stroke: var(--surface, #fff);
+  stroke-width: 1.5;
+}
+
+.graph-trace {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-bottom: 4px;
+  font-size: 0.9em;
+}
+
+.graph-chip::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-radius: 2px;
+  background: var(--colour);
+}
+
+.graph-readout {
+  min-height: 1.6em;
+  margin-top: 4px;
+  color: var(--muted);
+  font: 12px/1.6 ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.graph-readout-name {
+  color: var(--text);
+  font-family: var(--font, inherit);
+}
+
+.result-line .graph-note {
+  color: var(--muted);
+  font-size: 0.8rem;
 }

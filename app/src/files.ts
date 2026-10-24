@@ -14,7 +14,8 @@ export const isTauri = "__TAURI_INTERNALS__" in window;
 export type NotebookDoc = { cells: Cell[]; angle: AngleMode };
 
 // Each entry is {"latex": ...}: one cell, possibly several lines, plus
-// "answers": "exact" | "approx" when the cell was switched with Alt+Enter.
+// "answers": "exact" | "approx" when the cell was switched with Alt+Enter, and
+// "views": {line: {xmin, xmax, ymin, ymax}} for graphs zoomed or panned.
 // "settings" and "answers" were added after version 1 shipped; readers treat
 // them as optional.
 export function serialize(doc: NotebookDoc): string {
@@ -40,9 +41,23 @@ export function toCells(entries: unknown[]): Cell[] {
   return entries.map((e: any): Cell => {
     if (typeof e === "string") return { latex: e };
     if (typeof e?.text === "string") return { latex: textToLatex(e.text) };
-    const latex = typeof e?.latex === "string" ? e.latex : "";
-    return e?.answers === "exact" || e?.answers === "approx" ? { latex, answers: e.answers } : { latex };
+    const cell: Cell = { latex: typeof e?.latex === "string" ? e.latex : "" };
+    if (e?.answers === "exact" || e?.answers === "approx") cell.answers = e.answers;
+    const views = readViews(e?.views);
+    if (views) cell.views = views;
+    return cell;
   });
+}
+
+/** Saved graph views ({line: {xmin, xmax, ymin, ymax}}); anything malformed is dropped. */
+function readViews(views: unknown): Cell["views"] | null {
+  if (!views || typeof views !== "object") return null;
+  const out: NonNullable<Cell["views"]> = {};
+  for (const [line, v] of Object.entries(views as Record<string, any>)) {
+    const ok = ["xmin", "xmax", "ymin", "ymax"].every((k) => Number.isFinite(v?.[k])) && v.xmin < v.xmax && v.ymin < v.ymax;
+    if (ok && /^\d+$/.test(line)) out[Number(line)] = { xmin: v.xmin, xmax: v.xmax, ymin: v.ymin, ymax: v.ymax };
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 export function parse(text: string): NotebookDoc {

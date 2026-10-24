@@ -164,6 +164,11 @@ Re-check this list after upgrading.
     its `sommet` is `of`, `evalf` does not look inside it, and `string()`
     is how it is recognised. MathLive writes a typed ° in unit mode as
     `\mathrm{\degree C}`.
+- **Graph sampling must use float x.** `map(seq(a+k*h…), t->evalf(f(t)))`
+  with exact x lets Giac simplify every value symbolically first: 5.6 s for
+  600 points of x³e⁻ˣsin 5x, against 14 ms with `evalf(seq(…))`. `apply` on
+  a list does not map. `maddox_real` turns complex or undefined values into
+  `undef` (a gap).
 - **Display simplification.** Autosimplify settings do not affect
   `caseval`. Results are wrapped in `regroup()` for display.
 - **Loading under Node.** The script declares `var Module` at the top
@@ -223,6 +228,9 @@ Re-check this list after upgrading.
   The next key press still goes to the previous cell. Move with ↑/↓ (as a
   user would) and set `document.activeElement.value`. `setAndRun` leaves an
   empty cell between the cells it makes, so ↑ until the wanted input.
+- **Esc cancels whatever the engine is doing.** Graph sampling runs in the
+  background (`Engine.request(…, true)`): it doesn't count as busy, so Esc
+  in a graph returns to the cell instead of restarting the engine.
 - **Port 1420.** The owner's `tauri dev` uses it. A Vite server started by
   an agent survives the agent's task being stopped on Windows, so find it
   by command line and kill only your own.

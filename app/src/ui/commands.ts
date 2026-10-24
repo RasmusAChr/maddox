@@ -30,6 +30,7 @@ export const CATEGORIES: Category[] = [
   { id: "matrices", name: "Matrices", icon: "[ ]" },
   { id: "numbers", name: "Numbers & rounding", icon: "≈" },
   { id: "functions", name: "Functions", icon: "f(x)" },
+  { id: "graphs", name: "Graphs", icon: "∿" },
   { id: "units", name: "Units", icon: "m/s" },
 ];
 
@@ -125,6 +126,9 @@ export const CATALOG: CatalogItem[] = [
   { label: "arcsin", syntax: "arcsin(…)", category: "functions", description: "Inverse sine", latex: "\\arcsin\\left(#0\\right)", keywords: "asin trig inverse", advanced: true },
   { label: "arccos", syntax: "arccos(…)", category: "functions", description: "Inverse cosine", latex: "\\arccos\\left(#0\\right)", keywords: "acos trig inverse", advanced: true },
   { label: "arctan", syntax: "arctan(…)", category: "functions", description: "Inverse tangent", latex: "\\arctan\\left(#0\\right)", keywords: "atan trig inverse", advanced: true },
+
+  // Graphs
+  { label: "Plot a graph", syntax: "plot(f, g, …)", category: "graphs", description: "Functions, expressions in x, points; Alt+↓ to trace and zoom", latex: "\\operatorname{plot}\\left(#0\\right)", keywords: "plot graph draw curve chart scatter" },
 
   // Units: Ctrl+U types any unit; these are the common ones. → converts.
   { label: "Convert to…", syntax: "… → m/s", category: "units", description: "Type -> then Ctrl+U and the unit to convert to", latex: "#@\\to", keywords: "unit convert conversion arrow" },

@@ -46,6 +46,10 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   try {
     if (msg.type === "eval") {
       post({ type: "result", id: msg.id, result: session.evaluate(msg.giac, msg.mode) });
+    } else if (msg.type === "plot") {
+      post({ type: "result", id: msg.id, result: session.plot(msg.giac) });
+    } else if (msg.type === "sample") {
+      post({ type: "result", id: msg.id, result: session.sample(msg.fn, msg.a, msg.b, msg.n) });
     } else if (msg.type === "options") {
       session.configure(msg.options);
       post({ type: "result", id: msg.id, result: { ok: true, latex: "", approxLatex: null } });

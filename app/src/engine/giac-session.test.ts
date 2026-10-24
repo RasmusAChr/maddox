@@ -353,6 +353,43 @@ describe("units", () => {
   });
 });
 
+describe("plot", () => {
+  const plot = (latex: string) => session.plot(latexToGiac(latex));
+  it("reads functions, expressions in x, points and lists of points", () => {
+    run("f\\left(x\\right)\\coloneq x^2-2");
+    run("D\\coloneq\\left[\\left(1,3\\right),\\left(3,8\\right)\\right]");
+    const result = plot("\\operatorname{plot}\\left(f,\\sin\\left(x\\right),D,\\left(0,1\\right)\\right)");
+    expect(result).toMatchObject({
+      ok: true,
+      xRange: [-10, 10],
+      items: [
+        { kind: "function", label: "f", fn: "f" },
+        { kind: "function", label: "\\sin\\left(x\\right)" },
+        { kind: "points", points: [[1, 3], [3, 8]] },
+        { kind: "points", points: [[0, 1]] },
+      ],
+    });
+  });
+
+  it("samples a function, with gaps where it has no real value", () => {
+    expect(session.sample("f", -2, 2, 4)).toEqual([2, -1, -2, -1, 2]);
+    const result = plot("\\operatorname{plot}\\left(\\frac{1}{x}\\right)");
+    if (!result.ok || result.items[0].kind !== "function") throw new Error("expected a function");
+    expect(session.sample(result.items[0].fn, -2, 2, 4)).toEqual([-0.5, -1, NaN, 1, 0.5]);
+  });
+
+  it("trig in degrees gets a window in degrees", () => {
+    session.setAngle("deg");
+    expect(plot("\\operatorname{plot}\\left(\\sin\\left(x\\right)\\right)")).toMatchObject({ ok: true, xRange: [-360, 360] });
+    session.setAngle("rad");
+  });
+
+  it("explains what it can't draw", () => {
+    expect(plot("\\operatorname{plot}\\left(a\\cdot x^2\\right)")).toMatchObject({ ok: false, error: "plot draws functions of x, but a has no value" });
+    expect(plot("\\operatorname{plot}\\left(\\right)")).toMatchObject({ ok: false });
+  });
+});
+
 describe("cleanLatex", () => {
   it.each([
     ["\\frac{-1}{2}", "-\\frac{1}{2}"],

@@ -1,9 +1,12 @@
-import type { AngleMode, AnswerMode, EvalResult, SessionOptions } from "./giac-session";
+import type { AngleMode, AnswerMode, EvalResult, PlotResult, SessionOptions } from "./giac-session";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
+
+type Request = WorkerRequest extends infer R ? (R extends { id: number } ? Omit<R, "id"> : never) : never;
 
 export type EngineStatus = "loading" | "ready" | "busy" | "failed";
 
-type Pending = { resolve: (r: EvalResult) => void };
+// Each request resolves with its own kind of result (EvalResult, PlotResult, samples).
+type Pending = { resolve: (r: any) => void; background: boolean };
 
 /**
  * Client for the Giac worker. Requests run one at a time in order. cancel()
@@ -42,7 +45,7 @@ export class Engine {
         } else {
           const p = this.pending.get(msg.id);
           this.pending.delete(msg.id);
-          if (this.pending.size === 0) this.setStatus("ready");
+          if (!this.isBusy && this.status === "busy") this.setStatus("ready");
           p?.resolve(msg.result);
         }
       };
@@ -62,22 +65,34 @@ export class Engine {
     this.onStatus(status);
   }
 
-  private request(msg: { type: "eval"; giac: string; mode?: AnswerMode } | { type: "reset" } | { type: "options"; options: Partial<SessionOptions> }): Promise<EvalResult> {
+  /** background: graph sampling, which shows no "busy" and which Esc does not cancel. */
+  private request<T = EvalResult>(msg: Request, background = false): Promise<T> {
     return this.ready.then(
       () =>
-        new Promise<EvalResult>((resolve) => {
+        new Promise<T>((resolve) => {
           const id = this.nextId++;
-          this.pending.set(id, { resolve });
-          this.setStatus("busy");
-          this.send({ ...msg, id });
+          this.pending.set(id, { resolve, background });
+          if (!background) this.setStatus("busy");
+          this.send({ ...msg, id } as WorkerRequest);
         }),
-      () => ({ ok: false, error: this.error ?? "The math engine failed to load" }),
+      () => ({ ok: false, error: this.error ?? "The math engine failed to load" }) as T,
     );
   }
 
   /** `mode` overrides the answer mode for this one input. */
   evaluate(giac: string, mode?: AnswerMode): Promise<EvalResult> {
     return this.request({ type: "eval", giac, mode });
+  }
+
+  /** What plot(…) draws; functions are then sampled per view with sample(). */
+  plot(giac: string): Promise<PlotResult> {
+    return this.request<PlotResult>({ type: "plot", giac });
+  }
+
+  /** A function's values at n+1 evenly spaced x; empty if the engine restarted meanwhile. */
+  async sample(fn: string, a: number, b: number, n: number): Promise<number[]> {
+    const values = await this.request<number[] | EvalResult>({ type: "sample", fn, a, b, n }, true);
+    return Array.isArray(values) ? values : [];
   }
 
   async reset(): Promise<void> {
@@ -94,8 +109,9 @@ export class Engine {
     return this.configure({ angle: mode });
   }
 
+  /** Working on something the user asked for (not graph sampling). */
   get isBusy() {
-    return this.pending.size > 0;
+    return [...this.pending.values()].some((p) => !p.background);
   }
 
   cancel() {

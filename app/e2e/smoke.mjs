@@ -922,6 +922,51 @@ await waitIdle();
 await page.waitForTimeout(100);
 check("deleting rq := 4 clears rq for the cells using it", /rq/.test((await resultFor("Aq\\coloneq")) ?? ""), await resultFor("Aq\\coloneq"));
 
+// 32. Graphs: plot(…) draws below the cell; Alt+↓ goes in, ←/→ trace, + zooms
+// (saved with the cell), 0 resets, Esc goes back.
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("fp(x");
+await page.keyboard.press("ArrowRight");
+await page.keyboard.type(":=x^2-2");
+await page.keyboard.press("Shift+Enter");
+await page.keyboard.type("plot(fp,x");
+await page.waitForTimeout(100);
+const plotCell = () => page.$$eval(".entry", (els) => {
+  const el = els.find((e) => /plot\}+\\left\(/.test(e.querySelector("math-field")?.value ?? ""));
+  return el ? { curves: [...el.querySelectorAll(".graph-curve")].filter((p) => (p.getAttribute("d") ?? "").length > 20).length, note: el.querySelector(".graph-note")?.textContent ?? null } : null;
+});
+check("typing plot( gives the plot command", /operatorname\{(\\mathrm\{)?plot\}/.test(await current()), await current());
+await page.keyboard.press("ArrowUp"); // back to the first line, so Enter evaluates the whole cell
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(600);
+check("plot draws both curves below the cell", (await plotCell())?.curves === 2, JSON.stringify(await plotCell()));
+await page.keyboard.press("ArrowUp");
+await page.keyboard.press("Alt+ArrowDown");
+const inGraph = () => page.evaluate(() => document.activeElement?.classList.contains("graph") ?? false);
+const readout = () => page.$eval(".graph:focus .graph-readout", (el) => el.textContent);
+check("Alt+↓ moves into the graph", await inGraph(), await active());
+check("the hints explain the graph keys", /Graph/.test(await hints()), await hints());
+await page.keyboard.press("ArrowRight");
+await page.waitForTimeout(200);
+check("→ starts tracing at x = 0", /x = 0,\s+y = −2/.test(await readout()), await readout());
+await page.keyboard.press("ArrowRight");
+await page.waitForTimeout(200);
+check("→ steps along the curve", /x = 0\.2,\s+y = −1\.96/.test(await readout()), await readout());
+await page.keyboard.press("ArrowDown");
+await page.waitForTimeout(200);
+check("↓ switches to the next curve", /x = 0\.2,\s+y = 0\.2/.test(await readout()), await readout());
+await page.keyboard.press("+");
+await page.waitForTimeout(700);
+const savedView = await page.evaluate(() => localStorage.getItem("maddox.session"));
+check("a zoomed view is saved with the cell", /"views":\{"1":\{"xmin"/.test(savedView ?? ""), savedView?.slice(-300));
+await page.keyboard.press("0");
+await page.waitForTimeout(700);
+const resetView = await page.evaluate(() => localStorage.getItem("maddox.session"));
+check("0 resets to the automatic view", !/"views"/.test(resetView ?? ""), resetView?.slice(-300));
+await page.keyboard.press("Escape");
+check("Esc goes back to the cell", (await active()).startsWith("MATH-FIELD") && (await current()).includes("plot"), await active());
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

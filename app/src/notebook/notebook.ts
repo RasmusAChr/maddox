@@ -1,15 +1,19 @@
 import { MathfieldElement, convertLatexToMarkup } from "mathlive";
 import type { Engine } from "../engine/engine";
-import type { AnswerMode, EvalResult } from "../engine/giac-session";
+import type { AnswerMode, EvalResult, PlotResult } from "../engine/giac-session";
 import { lineNames } from "../engine/dependencies";
 import { ANS_VARIABLE, latexToGiac, UnsupportedLatex } from "../engine/latex-to-giac";
 import { OPERATOR_NAMES } from "../ui/commands";
+import { Graph, type View } from "./graph";
 import { isTextLine, splitLines } from "./lines";
 import { editMatrix, matrixAtCaret, matrixLatex, type MatrixAction, type MatrixInfo } from "./matrix";
 import { atLineStart, breakLine, deleteAtBrackets, fillEmptyMatrixCells, focusImmediately, lineBoxes, moveByWord, type LineBox } from "./mathlive-internals";
 
+/** plot(…): the line's result is a graph, drawn below the cell. */
+type PlotLine = { ok: true; plot: Extract<PlotResult, { ok: true }> };
+
 /** What one line of a cell shows on the right: nothing (text or empty line), a result, or "computing". */
-type LineResult = EvalResult | "pending" | null;
+type LineResult = EvalResult | PlotLine | "pending" | null;
 
 type Entry = {
   el: HTMLElement;
@@ -22,13 +26,18 @@ type Entry = {
   answers: Answers | null;
   /** The ≈ marker shown while `answers` is set. */
   chip: HTMLElement;
+  /** The graphs of plot(…) lines, below the cell, by line index. */
+  graphsEl: HTMLElement;
+  graphs: Map<number, { result: PlotLine; graph: Graph }>;
+  /** Views zoomed or panned to, by line index; saved with the cell. */
+  views: Record<number, View>;
 };
 
 /** A cell's own answer form, overriding the global setting. */
 export type Answers = "exact" | "approx";
 
-/** One cell as saved: its input, and its own answer form if it has one. */
-export type Cell = { latex: string; answers?: Answers };
+/** One cell as saved: its input, its own answer form, and its graphs' views (by line). */
+export type Cell = { latex: string; answers?: Answers; views?: Record<number, View> };
 
 // Shortcuts MathLive applies while typing. Its defaults include surprises for
 // a calculator (e.g. "in" becomes ∈), so start from a short allowlist.
@@ -54,8 +63,8 @@ const MATRIX_KEYS: Record<string, MatrixAction> = {
   ArrowRight: "addColumnRight",
 };
 
-/** unit: typing a unit (Ctrl+U), so letters are upright units, not variables. */
-export type Context = { matrix: MatrixInfo | null; unit: boolean };
+/** unit: typing a unit (Ctrl+U), so letters are upright units, not variables. graph: a graph has the keyboard. */
+export type Context = { matrix: MatrixInfo | null; unit: boolean; graph?: boolean };
 
 /** Minimum space, in px, between the results of one multi-line cell. */
 const RESULT_GAP = 8;
@@ -107,7 +116,12 @@ export class Notebook {
   }
 
   get cells(): Cell[] {
-    return this.entries.map((e) => (e.answers ? { latex: e.mf.value, answers: e.answers } : { latex: e.mf.value }));
+    return this.entries.map((e) => {
+      const cell: Cell = { latex: e.mf.value };
+      if (e.answers) cell.answers = e.answers;
+      if (Object.keys(e.views).length) cell.views = e.views;
+      return cell;
+    });
   }
 
   /** Replaces every entry. Always leaves at least one. */
@@ -117,7 +131,7 @@ export class Notebook {
     this.entries = [];
     this.active = null;
     const list = cells.length ? cells : [{ latex: "" }];
-    list.forEach((cell, i) => this.createEntry(cell.latex, i, cell.answers ?? null));
+    list.forEach((cell, i) => this.createEntry(cell.latex, i, cell.answers ?? null, cell.views));
   }
 
   /**
@@ -186,7 +200,7 @@ export class Notebook {
 
   // ---- entries ------------------------------------------------------------
 
-  private createEntry(latex: string, index: number, answers: Answers | null = null): Entry {
+  private createEntry(latex: string, index: number, answers: Answers | null = null, views: Record<number, View> = {}): Entry {
     const el = document.createElement("div");
     el.className = "entry";
     const mf = new MathfieldElement();
@@ -198,9 +212,11 @@ export class Notebook {
     chip.type = "button";
     chip.className = "answers-chip";
     chip.addEventListener("mousedown", (e) => e.preventDefault()); // keep focus in the cell
-    el.append(mf, resultEl, chip);
+    const graphsEl = document.createElement("div");
+    graphsEl.className = "entry-graphs";
+    el.append(mf, resultEl, graphsEl, chip);
 
-    const entry: Entry = { el, mf, resultEl, evaluatedLatex: null, results: [], answers, chip };
+    const entry: Entry = { el, mf, resultEl, evaluatedLatex: null, results: [], answers, chip, graphsEl, graphs: new Map(), views: { ...views } };
     chip.addEventListener("click", () => this.toggleAnswers(entry));
     this.showAnswersChip(entry);
     const next = this.entries[index];
@@ -342,6 +358,11 @@ export class Notebook {
       claim();
       moveByWord(entry.mf, e.key === "ArrowLeft" ? "left" : "right", e.shiftKey);
       this.emitContext(entry);
+      return;
+    }
+
+    if (e.altKey && !mod && !e.shiftKey && e.key === "ArrowDown" && !matrixAtCaret(entry.mf) && this.focusGraph(entry)) {
+      claim();
       return;
     }
 
@@ -540,9 +561,15 @@ export class Notebook {
 
     for (let i = 0; i < lines.length; i++) {
       if (entry.results[i] !== "pending") continue;
-      let result: EvalResult;
+      let result: EvalResult | PlotLine;
       try {
-        result = await this.engine.evaluate(latexToGiac(lines[i]), entry.answers ?? undefined);
+        const giac = latexToGiac(lines[i]);
+        if (/^plot\W?\(/.test(giac)) {
+          const plot = await this.engine.plot(giac);
+          result = plot.ok ? { ok: true, plot } : plot;
+        } else {
+          result = await this.engine.evaluate(giac, entry.answers ?? undefined);
+        }
       } catch (err) {
         if (!(err instanceof UnsupportedLatex)) throw err;
         result = { ok: false, error: err.message };
@@ -575,6 +602,13 @@ export class Notebook {
         row.append(msg);
         return;
       }
+      if ("plot" in result) {
+        const note = document.createElement("span");
+        note.className = "graph-note";
+        note.textContent = "graph below · Alt+↓";
+        row.append(note);
+        return;
+      }
       const exact = document.createElement("span");
       exact.className = "exact";
       exact.innerHTML = convertLatexToMarkup(result.latex);
@@ -589,7 +623,52 @@ export class Notebook {
         row.append(approx);
       }
     });
+    this.renderGraphs(entry);
     this.layoutResults(entry);
+  }
+
+  /** Keeps one graph per plot(…) line, below the cell; a graph is rebuilt only when its result is new. */
+  private renderGraphs(entry: Entry) {
+    const wanted = new Map<number, PlotLine>();
+    entry.results.forEach((r, i) => {
+      if (r && r !== "pending" && r.ok && "plot" in r) wanted.set(i, r);
+    });
+    for (const [i, { result, graph }] of entry.graphs) {
+      if (wanted.get(i) !== result) {
+        graph.destroy();
+        entry.graphs.delete(i);
+      }
+    }
+    for (const [i, result] of wanted) {
+      if (entry.graphs.has(i)) continue;
+      const graph = new Graph({
+        items: result.plot.items,
+        xRange: result.plot.xRange,
+        view: entry.views[i] ?? null,
+        sample: (fn, a, b, n) => this.engine.sample(fn, a, b, n),
+        onView: (view) => {
+          if (view) entry.views[i] = view;
+          else delete entry.views[i];
+          this.onChange();
+        },
+        onExit: () => focusImmediately(entry.mf),
+      });
+      graph.el.addEventListener("focus", () => {
+        this.active = entry;
+        this.onContext({ matrix: null, unit: false, graph: true });
+      });
+      entry.graphs.set(i, { result, graph });
+    }
+    const els = [...entry.graphs.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => g.graph.el);
+    if (els.length !== entry.graphsEl.children.length || els.some((el, k) => entry.graphsEl.children[k] !== el)) entry.graphsEl.replaceChildren(...els);
+  }
+
+  /** Alt+↓ on a cell with a graph: the keyboard goes into the (first) graph. */
+  private focusGraph(entry: Entry): boolean {
+    const first = [...entry.graphs.entries()].sort((a, b) => a[0] - b[0])[0];
+    if (!first) return false;
+    first[1].graph.focus();
+    return true;
   }
 
   /**

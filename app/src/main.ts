@@ -356,7 +356,10 @@ engine.onStatus = (status) => {
 const HINTS = "<kbd>Enter</kbd> evaluate · <kbd>Shift ↵</kbd> new line · <kbd>#</kbd> heading · <kbd>Ctrl P</kbd> search · <kbd>F1</kbd> all shortcuts";
 function showContext(ctx: Context) {
   const hints = $("#hints");
-  if (ctx.unit) {
+  if (ctx.graph) {
+    hints.innerHTML = `<b>Graph</b> · <kbd>←</kbd><kbd>→</kbd> trace · <kbd>↑</kbd><kbd>↓</kbd> curve · <kbd>+</kbd><kbd>−</kbd> zoom · <kbd>Ctrl</kbd>+arrows pan · <kbd>0</kbd> reset · <kbd>Esc</kbd> back`;
+    hints.classList.add("in-matrix");
+  } else if (ctx.unit) {
     hints.innerHTML = `<b>Unit</b> · type m, km/h, kg*m/s^2 · <kbd>Space</kbd> or <kbd>Ctrl U</kbd> done · <kbd>-></kbd> then <kbd>Ctrl U</kbd> converts`;
     hints.classList.add("in-matrix");
   } else if (ctx.matrix?.cases) {
@@ -490,7 +493,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-action]
 // with nowhere to go. Only real controls take focus from a click; in the
 // notebook, a click on empty space puts the caret in the entry it hit (or
 // the last one), like a text editor. Clicking a result still pastes it.
-const FOCUSABLE = "input, textarea, select, button, a[href], summary, math-field, [contenteditable='true']";
+const FOCUSABLE = "input, textarea, select, button, a[href], summary, math-field, [contenteditable='true'], .graph";
 window.addEventListener("mousedown", (e) => {
   const target = e.target as Element;
   if (e.button !== 0 || target.closest(FOCUSABLE)) return;

@@ -7,6 +7,14 @@ export type EvalResult =
 
 export type Caseval = (input: string) => string;
 
+/** One thing a graph draws: a function of x (sampled per view) or fixed points. */
+export type PlotItem =
+  | { kind: "function"; label: string; fn: string }
+  | { kind: "points"; label: string; points: [number, number][] };
+
+/** xRange: the default window's x (−360…360 for trig in degrees). */
+export type PlotResult = { ok: true; items: PlotItem[]; xRange: [number, number] } | { ok: false; error: string };
+
 /** How trigonometric functions read and return angles. */
 export type AngleMode = "deg" | "rad";
 
@@ -83,7 +91,62 @@ export class GiacSession {
         "k:=when(a==\"C\",x+5463/20,when(a==\"F\",(x+45967/100)*5/9,x));" +
         "return when(b==\"K\",k*(1_K),when(b==\"C\",maddox_degC(k-5463/20),maddox_degF(k*9/5-45967/100))) end",
     );
+    // Graphs: a function's values at n+1 evenly spaced x, as decimals (undef
+    // where it has no real value). Float x keeps this fast: exact x makes
+    // Giac simplify every value symbolically first (seconds, not ms).
+    this.caseval("maddox_real(v):=when(type(v)==DOM_FLOAT || type(v)==DOM_INT || type(v)==DOM_RAT,v,undef)");
+    this.caseval("maddox_sample(f,a,b,n):=map(evalf(seq(a+k*(b-a)/n,k,0,n)),t->maddox_real(evalf(f(t))))");
     this.takePrinted();
+  }
+
+  /**
+   * What plot(f, x²−2, D) draws: each argument becomes a function of x (a
+   * defined function, or an expression in x) or points (a point or a list
+   * of points). Functions are sampled later with sample(), per view.
+   */
+  plot(giac: string): PlotResult {
+    const input = this.resolveCalls(giac).trim();
+    const m = input.match(/^plot\((.*)\)$/s);
+    if (!m || !m[1].trim()) return { ok: false, error: "Write what to plot inside the brackets, e.g. plot(f, x^2)" };
+    const unknown = this.unknownUnit(input);
+    if (unknown) return { ok: false, error: unknown };
+    const items: PlotItem[] = [];
+    let trig = false;
+    for (const arg of splitTopLevel(m[1]).map((a) => a.trim())) {
+      this.takePrinted();
+      const isFunction = this.caseval(`type(${arg})`) === "func";
+      const error = findError(this.caseval(`${RESULT}:=(${arg})`), this.takePrinted(), arg);
+      if (error) return { ok: false, error };
+      const shape = this.caseval(`maddox_shape(${RESULT})`);
+      if (!isFunction && (shape === "1" || shape === "2")) {
+        const list = shape === "1" ? `[${RESULT}]` : RESULT;
+        const points = parseNumbers(this.caseval(`evalf(map(${list},p->[p[0],p[1]]))`), 2) as [number, number][];
+        if (points === null) return { ok: false, error: `${arg} has points that are not numbers` };
+        items.push({ kind: "points", label: this.exactLatex(RESULT), points });
+        continue;
+      }
+      if (!isFunction) {
+        const others = this.caseval(`lname(${RESULT})`).replace(/^\[|\]$/g, "").split(",").map((s) => s.trim()).filter((s) => s && s !== "x");
+        if (others.length) return { ok: false, error: `plot draws functions of x, but ${others.join(", ")} ${others.length > 1 ? "have" : "has"} no value` };
+      }
+      const body = isFunction ? this.caseval(`string(${arg})`) : this.caseval(`string(${RESULT})`);
+      if (/\b(sin|cos|tan|cot|sec|csc)\(/.test(body)) trig = true;
+      items.push({
+        kind: "function",
+        label: isFunction ? arg : this.exactLatex(RESULT),
+        fn: isFunction ? arg : `unapply(${this.caseval(`string(${RESULT})`).replace(/^"|"$/g, "")},x)`,
+      });
+    }
+    this.takePrinted();
+    const deg = this.options.angle === "deg" && trig;
+    return { ok: true, items, xRange: deg ? [-360, 360] : [-10, 10] };
+  }
+
+  /** fn's values at n+1 evenly spaced x from a to b; NaN where it has no real value. */
+  sample(fn: string, a: number, b: number, n: number): number[] {
+    const raw = this.caseval(`maddox_sample(${fn},${a},${b},${n})`);
+    this.takePrinted();
+    return raw.replace(/^\[|\]$/g, "").split(",").map((v) => (/^-?[\d.]+(e[+-]?\d+)?$/.test(v.trim()) ? Number(v) : NaN));
   }
 
   // Giac's own switch (angle_radian) plus the value ° stands for. restart
@@ -636,6 +699,13 @@ function unitLatexOf(text: string): string | null {
   const top = above.join("\\cdot ");
   if (!below.length) return top;
   return below.length === 1 ? `${top}/${below[0]}` : `${top}/\\left(${below.join("\\cdot ")}\\right)`;
+}
+
+/** "[[1.0,3.0],[3.0,8.0]]" as rows of `width` numbers; null if any is not a number. */
+function parseNumbers(text: string, width: number): number[][] | null {
+  const numbers = text.replace(/[[\]\s]/g, "").split(",").map(Number);
+  if (numbers.some((n) => !Number.isFinite(n)) || numbers.length % width) return null;
+  return Array.from({ length: numbers.length / width }, (_, k) => numbers.slice(k * width, k * width + width));
 }
 
 function unquote(s: string): string {
