@@ -35,7 +35,16 @@ docs updated, a short report of what changed.
   options first, as above.
 - **Small, explicit instructions** ("rename this", "commit this") need no
   proposal: just do them.
-- **Never commit or push unless asked.** `legacy_python` stays on the remote.
+- **Branches** (decided 2026-10-25):
+  - `main` is the latest release. It changes only through a pull request
+    from `development`, when the owner makes a release.
+  - `development` collects finished work. Merge or commit into it when
+    the owner says so.
+  - Feature branches `fix/<short-name>` or `feature/<short-name>` are cut
+    from `development`, one per bug or feature. You may commit and push
+    freely on them.
+  - Never commit to `main` or open a release pull request unless asked.
+    `legacy_python` stays on the remote.
 
 ## Product rules (decided by the owner — don't change without asking)
 
