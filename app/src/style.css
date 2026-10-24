@@ -499,9 +499,10 @@ button {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.05);
 }
 
-/* Taller than the window (main.ts): room to scroll the last cell up. */
+/* Taller than the window (main.ts): room to scroll the last cell up to the
+   middle (the "keep the current cell centred" setting). */
 .notebook.tall .sheet {
-  margin-bottom: 40vh;
+  margin-bottom: 55vh;
 }
 
 @media (max-width: 700px) {

@@ -94,10 +94,14 @@ export class Notebook {
   private unitMode = false;
   /** The global answer mode (settings); Alt+Enter switches a cell to the other form. */
   answerMode: AnswerMode = "auto";
+  /** Settings: scroll so the current cell is never below the middle of the window. */
+  centreCell = true;
   private resizeObserver = new ResizeObserver((records) => {
     for (const r of records) {
       const entry = this.entries.find((e) => e.el === r.target);
       if (entry) this.layoutResults(entry);
+      // The current cell grew (a new line, a tall result, a graph): keep it centred.
+      if (entry && entry === this.active && entry.mf.hasFocus()) this.centre(entry);
     }
   });
 
@@ -268,6 +272,8 @@ export class Notebook {
       mf.inlineShortcuts = this.shortcuts!;
     });
     mf.addEventListener("focus", () => {
+      // A click into a cell low on the screen brings it up to the middle too.
+      if (this.active !== entry) this.centreSoon(entry);
       this.active = entry;
       this.emitContext(entry);
     });
@@ -335,8 +341,60 @@ export class Notebook {
       entry.mf.executeCommand(where === "start" ? "moveToMathfieldStart" : "moveToMathfieldEnd");
     };
     ensureFocused(entry.mf, attempt);
-    entry.el.scrollIntoView({ block: "nearest" });
+    this.keepInView(entry);
   }
+
+  /** Brings a cell into view; with centring, one below the middle goes to the middle. */
+  private keepInView(entry: Entry) {
+    const scroller = this.container.closest(".notebook");
+    const above = scroller instanceof HTMLElement && entry.el.getBoundingClientRect().top < scroller.getBoundingClientRect().top;
+    // An instant scrollIntoView would cut a smooth centring short; centre() also handles cells below the window.
+    if (!this.centreCell || above) entry.el.scrollIntoView({ block: "nearest" });
+    this.centreSoon(entry);
+  }
+
+  /** The room to scroll appeared (main.ts): centre the current cell again. */
+  recentre() {
+    if (this.active) this.centre(this.active);
+  }
+
+  /**
+   * With the "centred" setting: when the current cell's middle is below the
+   * middle of the window, scroll it to the middle (above the middle, leave
+   * it). A cell taller than the window goes to the top instead, so as much
+   * of it as possible shows, unless that would hide the caret's line, which
+   * is then centred.
+   */
+  private centre(entry: Entry) {
+    if (!this.centreCell) return;
+    const scroller = this.container.closest(".notebook");
+    if (!(scroller instanceof HTMLElement)) return;
+    const view = scroller.getBoundingClientRect();
+    const cell = entry.el.getBoundingClientRect();
+    let by = (cell.top + cell.bottom) / 2 - (view.top + view.height / 2);
+    if (cell.height > view.height - 24) {
+      const line = lineBoxes(entry.mf)[caretLine(entry.mf)];
+      by = cell.top - view.top - 12;
+      const lineAfter = line ? line.bottom - by : 0;
+      if (line && line.bottom > line.top && lineAfter > view.bottom - 24) by = (line.top + line.bottom) / 2 - (view.top + view.height / 2);
+    }
+    if (by <= 1) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    scroller.scrollBy({ top: by, behavior: reduce ? "auto" : "smooth" });
+  }
+
+  /**
+   * Centring after moving to a cell waits for MathLive, which scrolls its
+   * caret into view when the field takes focus; that instant scroll would
+   * cut a smooth centring short.
+   */
+  private centreSoon(entry: Entry) {
+    clearTimeout(this.centreTimer);
+    this.centreTimer = window.setTimeout(() => {
+      if (this.active === entry) this.centre(entry);
+    }, 90);
+  }
+  private centreTimer: number | undefined;
 
   // ---- keys ---------------------------------------------------------------
 
@@ -518,7 +576,7 @@ export class Notebook {
     await this.evaluate(entry);
     // Results arrive after the caret moved on; a tall one (a graph) can push
     // the caret's cell out of view. Bring it back: the graph is right above it.
-    if (this.active && this.active !== entry) this.active.el.scrollIntoView({ block: "nearest" });
+    if (this.active && this.active !== entry) this.keepInView(this.active);
     if (!this.entries.includes(entry) || entry.evaluatedLatex === null) return;
     const now = cellNames(entry.evaluatedLatex);
     const dropped = [...before].filter((name) => !now.assigns.has(name));

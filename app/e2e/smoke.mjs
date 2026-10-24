@@ -1173,6 +1173,39 @@ const savedTabSliders = await page.evaluate(() => JSON.stringify(JSON.parse(loca
 check("the slider value is saved with the tab", /"pa":1.1/.test(savedTabSliders), savedTabSliders);
 await page.keyboard.press("Control+g");
 
+// 36. Keep the current cell centred (Settings → Appearance, on by default):
+// a cell below the middle of the window scrolls up to the middle.
+const cellPosition = () => page.evaluate(() => {
+  const n = document.querySelector("#notebook").getBoundingClientRect();
+  const c = document.activeElement.closest(".entry").getBoundingClientRect();
+  return Math.round(((c.top + c.bottom) / 2 - n.top) / n.height * 100);
+});
+for (let i = 0; i < 3; i++) await typeAndRun(`${i}+${i}`);
+await page.waitForTimeout(700);
+let centredAt = await cellPosition();
+check("the current cell is centred, not left below the middle", centredAt >= 45 && centredAt <= 55, centredAt);
+await openSettingsAt("centre");
+await page.keyboard.press("ArrowRight"); // On → Off
+await page.keyboard.press("Escape");
+for (let i = 0; i < 6; i++) await typeAndRun(`${i}*2`);
+await page.waitForTimeout(700);
+centredAt = await cellPosition();
+check("with the setting Off, cells scroll only into view", centredAt > 60, centredAt);
+await openSettingsAt("centre");
+await page.keyboard.press("ArrowLeft"); // back On
+await page.keyboard.press("Escape");
+// Going up, then down again with ↓: no cell is left below the middle
+// (MathLive's own caret scroll on focus used to cut the centring short).
+for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowUp");
+await page.waitForTimeout(600);
+let worst = 0;
+for (let i = 0; i < 5; i++) {
+  await page.keyboard.press("ArrowDown");
+  await page.waitForTimeout(700);
+  worst = Math.max(worst, await cellPosition());
+}
+check("stepping down with ↓ keeps each cell at or above the middle", worst <= 55, worst);
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

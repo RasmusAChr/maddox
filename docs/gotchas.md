@@ -63,6 +63,11 @@ Re-check this list after upgrading.
   a Ctrl+N right after typing would discard the edit unasked. `main.ts`
   decides "unsaved changes?" by comparing the content with the last saved
   content (`hasUnsavedChanges`), not by the flag alone.
+- **MathLive scrolls its caret into view on focus**, instantly, which cuts
+  short any smooth scroll started just before. The "keep the current cell
+  centred" scroll therefore waits ~90 ms after a cell takes focus
+  (`Notebook.centreSoon`); without that, moving down with ↓ left cells
+  below the middle.
 - **Forcing a re-render.** After editing the model directly, request a
   render with `mf.placeholderSymbol = mf.placeholderSymbol` (a public
   setter that calls `requestUpdate`).

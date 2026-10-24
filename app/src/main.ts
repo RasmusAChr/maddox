@@ -31,18 +31,26 @@ void applyZoom();
 
 // Room to scroll the last cell up off the bottom edge, but only once the
 // sheet is taller than the window: a notebook that fits gets no scrollbar.
-{
+// With "keep the current cell centred", once it reaches below the middle
+// (a cell there must be able to scroll up to the middle).
+const fitRoom = (() => {
   const scroller = $("#notebook");
   const sheet = $("#sheet");
   const fit = () => {
     // 28: the sheet's bottom margin when not tall (style.css).
     const needed = sheet.offsetHeight + parseFloat(getComputedStyle(sheet).marginTop) + 28;
-    scroller.classList.toggle("tall", needed > scroller.clientHeight);
+    const limit = prefs.centreCell ? scroller.clientHeight / 2 : scroller.clientHeight;
+    const tall = needed > limit;
+    if (tall === scroller.classList.contains("tall")) return;
+    scroller.classList.toggle("tall", tall);
+    // A centring scroll asked for before there was room fell short; redo it.
+    if (tall) requestAnimationFrame(() => notebook.recentre());
   };
   const observer = new ResizeObserver(fit);
   observer.observe(sheet);
   observer.observe(scroller);
-}
+  return fit;
+})();
 
 // ---- document state -----------------------------------------------------------
 
@@ -281,6 +289,17 @@ function settingsList(): Setting[] {
       },
     },
     {
+      kind: "choice", id: "centre", section: "Appearance", label: "Keep the current cell centred",
+      hint: "Scrolls when the cell you work in is below the middle",
+      options: [{ value: "on", label: "On" }, { value: "off", label: "Off" }],
+      get: () => (prefs.centreCell ? "on" : "off"),
+      set: (v) => {
+        setPref("centreCell", v === "on");
+        notebook.centreCell = prefs.centreCell;
+        fitRoom();
+      },
+    },
+    {
       kind: "stepper", id: "zoom", section: "Appearance", label: "Zoom", hint: "Ctrl + / Ctrl − / Ctrl 0",
       display: () => `${Math.round(zoomLevel() * 100)}%`,
       step: async (dir) => {
@@ -403,6 +422,7 @@ function showMessage(text: string) {
 }
 
 notebook.onChange = markDirty;
+notebook.centreCell = prefs.centreCell;
 notebook.onEvaluated = () => panel.refresh();
 panel.onChange = markDirty;
 panel.onExit = () => notebook.refocus();

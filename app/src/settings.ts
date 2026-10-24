@@ -13,12 +13,14 @@ export type Prefs = {
   theme: Theme;
   /** Start with the last notebook (on) or an empty one (off). */
   reopenLast: boolean;
+  /** Scroll so the current cell is never below the middle of the window. */
+  centreCell: boolean;
 };
 
 export const DIGIT_CHOICES = [4, 6, 8, 10, 12];
 
 const KEY = "maddox.prefs";
-const DEFAULTS: Prefs = { solveStyle: "textbook", digits: 6, answerMode: "auto", theme: "system", reopenLast: true };
+const DEFAULTS: Prefs = { solveStyle: "textbook", digits: 6, answerMode: "auto", theme: "system", reopenLast: true, centreCell: true };
 
 function load(): Prefs {
   const prefs = { ...DEFAULTS };
@@ -31,6 +33,7 @@ function load(): Prefs {
     if (["auto", "exact", "approx"].includes(saved.answerMode)) prefs.answerMode = saved.answerMode;
     if (["system", "light", "dark"].includes(saved.theme)) prefs.theme = saved.theme;
     if (typeof saved.reopenLast === "boolean") prefs.reopenLast = saved.reopenLast;
+    if (typeof saved.centreCell === "boolean") prefs.centreCell = saved.centreCell;
   } catch {
     // defaults
   }

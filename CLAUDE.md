@@ -93,6 +93,12 @@ docs updated, a short report of what changed.
   in `settingsList()` in `main.ts`. Keep the quick ways (chip, shortcuts,
   Ctrl+P actions) next to it. "Reopen last notebook: Off" still restores
   unsaved work.
+- **The current cell stays centred** (Settings → Appearance, on by
+  default): when its middle is below the middle of the window, the notebook
+  scrolls it up to the middle; above the middle nothing moves. A cell taller
+  than the window goes to the top (its caret's line is centred only if it
+  would otherwise be hidden). A notebook that only fills the
+  top half still gets no scrollbar. Decided 2026-10-24.
 - **Alt+Enter switches one cell** to the other answer form (decimals, or
   exact when the setting is "Decimals only") and back. The cell shows ≈
   (or =) and the choice is saved with it (`"answers"` in the file).
