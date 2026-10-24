@@ -15,12 +15,14 @@ export type Prefs = {
   reopenLast: boolean;
   /** Scroll so the current cell is never below the middle of the window. */
   centreCell: boolean;
+  /** Look for a new version at startup and once a day (the desktop app). */
+  checkUpdates: boolean;
 };
 
 export const DIGIT_CHOICES = [4, 6, 8, 10, 12];
 
 const KEY = "maddox.prefs";
-const DEFAULTS: Prefs = { solveStyle: "textbook", digits: 6, answerMode: "auto", theme: "system", reopenLast: true, centreCell: true };
+const DEFAULTS: Prefs = { solveStyle: "textbook", digits: 6, answerMode: "auto", theme: "system", reopenLast: true, centreCell: true, checkUpdates: true };
 
 function load(): Prefs {
   const prefs = { ...DEFAULTS };
@@ -34,6 +36,7 @@ function load(): Prefs {
     if (["system", "light", "dark"].includes(saved.theme)) prefs.theme = saved.theme;
     if (typeof saved.reopenLast === "boolean") prefs.reopenLast = saved.reopenLast;
     if (typeof saved.centreCell === "boolean") prefs.centreCell = saved.centreCell;
+    if (typeof saved.checkUpdates === "boolean") prefs.checkUpdates = saved.checkUpdates;
   } catch {
     // defaults
   }

@@ -35,6 +35,7 @@
     <footer class="statusbar">
       <span id="engine-status" class="engine-status" data-status="loading" data-shown="loading">Loading engine…</span>
       <button type="button" id="angle-chip" class="mode-chip">DEG</button>
+      <button type="button" id="update-chip" class="mode-chip update-chip" hidden></button>
       <span id="hints" class="hints"></span>
       <span id="message" class="message" role="status"></span>
     </footer>
@@ -63,6 +64,15 @@
         <button type="button" data-choice="save" class="primary">Save <kbd>Enter</kbd></button>
         <button type="button" data-choice="discard">Don't save <kbd>D</kbd></button>
         <button type="button" data-choice="cancel">Cancel <kbd>Esc</kbd></button>
+      </div>
+    </dialog>
+    <dialog id="update-dialog" class="small-dialog update-dialog" aria-label="Update available">
+      <h2>Maddox <span class="update-version"></span> is available</h2>
+      <p>You have <span class="update-current"></span>. Maddox restarts with the new version; unsaved changes are asked about first.</p>
+      <div class="update-notes"></div>
+      <div class="dialog-buttons">
+        <button type="button" data-choice="install" class="primary">Install and restart <kbd>Enter</kbd></button>
+        <button type="button" data-choice="later">Later <kbd>Esc</kbd></button>
       </div>
     </dialog>
 

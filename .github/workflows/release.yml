@@ -1,0 +1,110 @@
+name: release
+
+# Pushing a tag v1.2.3 (made by `npm run release -- 1.2.3` in app/) builds the
+# installers on Windows and Linux and puts them, with the signed updates and
+# latest.json, in a DRAFT GitHub Release. Nothing reaches users until the
+# draft is published by hand. See docs/releasing.md.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.create.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: The tag matches the app's version
+        run: |
+          version="$(node -p "require('./app/package.json').version")"
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "package.json says $version, the tag is $GITHUB_REF_NAME"; exit 1; }
+
+      - name: Create the draft release
+        id: create
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node app/scripts/release.mjs --notes "$GITHUB_REF_NAME" > notes.md
+          id="$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
+            -f tag_name="$GITHUB_REF_NAME" -f name="Maddox ${GITHUB_REF_NAME#v}" \
+            -F body=@notes.md -F draft=true --jq .id)"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Release notes
+        id: notes
+        shell: bash
+        run: |
+          { echo 'text<<END_OF_NOTES'; node scripts/release.mjs --notes "$GITHUB_REF_NAME"; echo END_OF_NOTES; } >> "$GITHUB_OUTPUT"
+
+      # Builds, signs the updates with TAURI_SIGNING_PRIVATE_KEY, uploads the
+      # installers, and adds this platform to the release's latest.json.
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: app
+          releaseId: ${{ needs.create-release.outputs.id }}
+          releaseBody: ${{ steps.notes.outputs.text }}
+          updaterJsonPreferNsis: true
+          args: --config src-tauri/tauri.release.conf.json
+
+  # Both builds write latest.json; make sure neither overwrote the other
+  # before anyone publishes the draft.
+  check-updates-file:
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ID: ${{ needs.create-release.outputs.id }}
+        run: |
+          url="$(gh api "repos/$GITHUB_REPOSITORY/releases/$ID" --jq '.assets[] | select(.name == "latest.json") | .url')"
+          gh api -H "Accept: application/octet-stream" "$url" > latest.json
+          cat latest.json
+          jq -e '.platforms | has("windows-x86_64") and has("linux-x86_64")' latest.json

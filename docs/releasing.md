@@ -1,0 +1,62 @@
+# Releasing Maddox
+
+A release is a GitHub Release on `RasmusAChr/maddox` with the installers,
+the signed updates, and `latest.json`, which the app's updater reads.
+
+## Once: the update signing key
+
+Updates are signed so the app only installs files we made. This key is not
+Windows code signing (Maddox ships unsigned for now; SmartScreen warns on
+the first install).
+
+1. `npx tauri signer generate -w ~/.tauri/maddox.key` (in `app/`), with a
+   password. **Back up the key file and the password.** Without them,
+   installed copies can never be updated again.
+2. Put the public key (`~/.tauri/maddox.key.pub`, its contents) in
+   `app/src-tauri/tauri.conf.json` → `plugins.updater.pubkey`, and commit.
+3. Add two repository secrets on GitHub (Settings → Secrets → Actions):
+   `TAURI_SIGNING_PRIVATE_KEY` (the contents of `maddox.key`) and
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+
+The repository must be public: the app downloads `latest.json` and the
+installers without logging in, and the GPL asks for the source to be
+available alongside the binaries.
+
+## Each release
+
+1. Write the notes: rename `## Unreleased` at the top of `CHANGELOG.md`
+   to `## 1.2.3` (or add that section), in plain words for students. The app shows it in the update dialog.
+2. Commit everything, then in `app/`: `npm run release -- 1.2.3`. It writes
+   the version into `package.json` and `Cargo.toml` (`tauri.conf.json`
+   reads it from `package.json`), commits "Release 1.2.3" and tags
+   `v1.2.3`. It refuses without notes, with uncommitted changes, or if the
+   tag exists.
+3. `git push origin main v1.2.3`. `.github/workflows/release.yml` builds on
+   Windows and Ubuntu and fills a **draft** release. Its last job checks
+   that `latest.json` lists both Windows and Linux.
+4. Look at the draft on GitHub, and install one of its files if you like.
+   Press **Publish**. From then on, running copies see the update within a
+   day (at their next start, or at their daily check).
+
+## Versions
+
+`major.minor.patch`. Bump the patch for fixes, the minor for new features.
+A new file format that older versions can't open is a major change.
+
+## What the app does
+
+- At startup (after 3 s) and once a day, unless Settings → Startup and
+  files → Check for updates is Off, it asks for
+  `releases/latest/download/latest.json` (drafts and pre-releases are not
+  "latest"). Failing (offline, no release) is silent.
+- A newer version shows `↑ 1.2.3` in the status bar, and Ctrl+P lists
+  "Install Maddox 1.2.3". Ctrl+P "Check for updates" checks at once and
+  says what it found.
+- Installing: the update dialog (Enter installs, Esc later), then "Save
+  changes?" if needed, then download, install and restart. On Windows the
+  installer runs passively (a progress window) and restarts Maddox; a .deb
+  or .rpm asks for the admin password (pkexec); an AppImage replaces
+  itself.
+- In `npm run dev` there is no updater. The e2e test sets
+  `localStorage["maddox.fake-update"] = {"version": "9.9.9"}` to pretend
+  one exists (`src/updates.ts`).

@@ -757,6 +757,12 @@ button {
   color: var(--accent);
 }
 
+/* ↑ 0.2.0: a newer Maddox is available (click, or Ctrl+P "Install"). */
+.update-chip {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .hints {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -950,6 +956,28 @@ dialog h2 {
 .unsaved-dialog p {
   margin: 0 16px;
   color: var(--muted);
+}
+
+.update-dialog {
+  width: min(480px, calc(100vw - 32px));
+}
+
+.update-dialog p {
+  margin: 0 16px;
+  color: var(--muted);
+}
+
+/* The release notes: CHANGELOG.md's section, shown as written. */
+.update-notes {
+  max-height: 40vh;
+  margin: 12px 16px 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  white-space: pre-wrap;
+  font-size: 13px;
 }
 
 .dialog-buttons {

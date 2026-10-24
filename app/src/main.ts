@@ -12,8 +12,9 @@ import { Notebook, type Context } from "./notebook/notebook";
 import { plotItemsFromLine } from "./notebook/plot-items";
 import { GraphPanel } from "./ui/graph-panel";
 import { CATALOG, CATEGORIES, type CatalogItem } from "./ui/commands";
-import { askUnsaved, openHelp, openMatrixDialog, openSearch, type SearchItem } from "./ui/dialogs";
+import { askUnsaved, askUpdate, openHelp, openMatrixDialog, openSearch, type SearchItem } from "./ui/dialogs";
 import { renderTemplates, toggleTemplates } from "./ui/templates";
+import { appVersion, canUpdate, checkForUpdate, type Update } from "./updates";
 import { applyZoom, zoom, zoomLevel } from "./zoom";
 
 // Fonts come from mathlive/fonts.css above, bundled by Vite.
@@ -321,6 +322,24 @@ function settingsList(): Setting[] {
       enabled: () => recentFiles().length > 0,
       run: clearRecentFiles,
     },
+    {
+      kind: "choice", id: "check-updates", section: "Startup and files", label: "Check for updates",
+      hint: "At startup and once a day; nothing installs without asking",
+      options: [{ value: "on", label: "On" }, { value: "off", label: "Off" }],
+      get: () => (prefs.checkUpdates ? "on" : "off"),
+      set: (v) => setPref("checkUpdates", v === "on"),
+    },
+    {
+      kind: "action", id: "version", section: "Startup and files", label: `Maddox ${appVersion}`,
+      hint: canUpdate ? "Ctrl+P: Check for updates" : "Updates come with the desktop app",
+      button: () => (update ? `Install ${update.version}` : "Check now"),
+      enabled: () => canUpdate,
+      run: () => {
+        // The update dialog replaces settings (one dialog at a time).
+        $<HTMLDialogElement>("#settings-dialog").close();
+        setTimeout(() => (update ? void offerUpdate() : void lookForUpdate(true)));
+      },
+    },
   ];
 }
 
@@ -351,6 +370,55 @@ function toggleAngle() {
   }
   markDirty();
   void notebook.runAll();
+}
+
+// ---- updates ----------------------------------------------------------------------
+
+// A newer version found by the last check: the status bar shows ↑ 0.2.0, and
+// Ctrl+P lists "Install Maddox 0.2.0". Installing asks the update dialog first.
+let update: Update | null = null;
+const DAY = 24 * 60 * 60 * 1000;
+
+/** manual: Ctrl+P or Settings asked, so say what happened (an automatic check stays quiet). */
+async function lookForUpdate(manual: boolean) {
+  if (!canUpdate) return manual && showMessage("Updates come with the desktop app");
+  if (manual) showMessage("Checking for updates…");
+  try {
+    update = await checkForUpdate();
+  } catch (err) {
+    if (manual) showMessage(`Could not check for updates (${err instanceof Error ? err.message : err})`);
+    return;
+  }
+  const chip = $("#update-chip");
+  chip.hidden = !update;
+  if (update) {
+    chip.textContent = `↑ ${update.version}`;
+    chip.title = `Maddox ${update.version} is available: click, or Ctrl+P Install`;
+    chip.setAttribute("aria-label", chip.title);
+  }
+  if (manual) {
+    if (update) void offerUpdate();
+    else showMessage(`Maddox ${appVersion} is the newest version`);
+  } else if (update) {
+    showMessage(`Maddox ${update.version} is available: Ctrl+P, Install`);
+  }
+}
+
+/** The update dialog; Enter installs (after "Save changes?") and restarts. */
+async function offerUpdate() {
+  const offered = update;
+  if (!offered) return;
+  if (!(await askUpdate($("#update-dialog"), offered.version, appVersion, offered.notes))) return refocus();
+  if (!(await confirmDiscard())) return refocus();
+  const downloading = `Downloading Maddox ${offered.version}…`;
+  showMessage(downloading);
+  try {
+    await offered.install((fraction) => showMessage(fraction === null ? downloading : `${downloading} ${Math.round(fraction * 100)}%`));
+    showMessage(`Maddox ${offered.version} is installed; restarting…`);
+  } catch (err) {
+    showMessage(`Could not install the update (${err instanceof Error ? err.message : err})`);
+  }
+  refocus();
 }
 
 // ---- status bar -----------------------------------------------------------------
@@ -491,6 +559,8 @@ function searchItems(): SearchItem[] {
     action("Type a unit", "Letters typed next are a unit (5 m/s), upright; Space ends it", () => notebook.startUnit(), "Ctrl+U", "units metre meter second km/h kg newton convert physics"),
     action("Switch this cell: exact / decimal", "Show this cell's answers in the other form, or follow the setting again", () => notebook.toggleAnswers(), "Alt+Enter", "approximate approx decimal exact numeric evalf cell answers"),
     action("Settings", "Angles, answers, digits, theme, zoom, startup", settings, "Ctrl+,", "preferences options configure theme digits"),
+    ...(update ? [action(`Install Maddox ${update.version}`, "Download the new version and restart", () => void offerUpdate(), undefined, "update upgrade install new version")] : []),
+    action("Check for updates", `You have Maddox ${appVersion}`, () => void lookForUpdate(true), undefined, "update upgrade new version release download about"),
     action("Show or hide templates", "The template sidebar", ACTIONS.templates, "Ctrl+B", "sidebar panel"),
     action("Keyboard shortcuts", "List every shortcut", help, "F1", "help keys"),
   ];
@@ -617,6 +687,9 @@ if (!restoreSession(!prefs.reopenLast)) {
 const angleChip = $("#angle-chip");
 angleChip.addEventListener("mousedown", (e) => e.preventDefault()); // keep focus in the cell
 angleChip.addEventListener("click", toggleAngle);
+const updateChip = $("#update-chip");
+updateChip.addEventListener("mousedown", (e) => e.preventDefault());
+updateChip.addEventListener("click", () => void offerUpdate());
 updateTitle();
 showContext({ matrix: null, unit: false });
 notebook.focusLast();
@@ -629,3 +702,7 @@ void launchFile()
     if (launched) return openPath(launched);
   })
   .catch(() => {});
+
+// A few seconds in, so starting up stays quick; then once a day while open.
+if (prefs.checkUpdates) setTimeout(() => void lookForUpdate(false), 3000);
+setInterval(() => prefs.checkUpdates && void lookForUpdate(false), DAY);

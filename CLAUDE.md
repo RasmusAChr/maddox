@@ -107,6 +107,12 @@ docs updated, a short report of what changed.
   cells below that use r (and what they define); a deleted definition is
   cleared. Changed results flash briefly. Top to bottom only. Decided
   2026-10-24, see `docs/decisions/0007-recalculation.md`.
+- **Updates are offered, never forced.** The desktop app checks GitHub at
+  startup and once a day (Settings can turn it off); a newer version shows
+  `↑ 0.2.0` in the status bar and "Install Maddox 0.2.0" in Ctrl+P. Enter
+  in the update dialog installs after "Save changes?". Releases are drafts
+  until the owner publishes them; Windows installers are unsigned for now.
+  Decided 2026-10-24, see `docs/decisions/0009-releases-and-updates.md`.
 - Full key map: `docs/decisions/0004-keyboard-model.md`, and the F1 dialog
   in `app/index.html`.
 
@@ -122,7 +128,12 @@ npm run dev          # browser at http://localhost:1420
 npm run e2e          # keyboard-driven smoke test; needs a dev server on :1420
 npm run tauri dev    # desktop window
 npm run tauri build  # installers in src-tauri/target/release/bundle/
+npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md)
 ```
+
+- **Keep `CHANGELOG.md` current**: add what users notice to the top
+  section (`## Unreleased` until a release names it). Its text is shown in
+  the update dialog.
 
 - **After any UI or keyboard change**, run `npm run e2e`.
   `app/e2e/smoke.mjs` is the executable spec of the behaviour the owner
@@ -166,6 +177,7 @@ npm run tauri build  # installers in src-tauri/target/release/bundle/
 | `app/src/notebook/graph.ts`, `graph-math.ts` | a graph (SVG, trace/zoom keys); its window and tick arithmetic |
 | `app/src/ui/graph-panel.ts`, `notebook/plot-items.ts` | the Ctrl+G panel (tabs, lists); what Ctrl+Shift+G adds from a line |
 | `app/src/settings.ts`, `ui/settings-dialog.ts` | preferences of this computer; the Ctrl+, dialog |
+| `app/src/updates.ts`, `scripts/release.mjs` | the updater; making a release (`.github/workflows/release.yml`, `docs/releasing.md`) |
 | `app/src/main.ts` | app shell: files, status bar, global keys, click handling, the settings list |
 
 ## Read before changing things

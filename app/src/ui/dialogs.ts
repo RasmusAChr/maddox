@@ -192,6 +192,24 @@ export function askUnsaved(dialog: HTMLDialogElement, name: string): Promise<Uns
   });
 }
 
+// ---- update -----------------------------------------------------------------
+
+/** "Maddox 0.2.0 is available": Enter installs (true), Esc is later (false). */
+export function askUpdate(dialog: HTMLDialogElement, version: string, current: string, notes: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    dialog.querySelector(".update-version")!.textContent = version;
+    dialog.querySelector(".update-current")!.textContent = current;
+    const notesEl = dialog.querySelector<HTMLElement>(".update-notes")!;
+    notesEl.textContent = notes.trim();
+    notesEl.hidden = !notes.trim();
+    const finish = openDialog(dialog, () => resolve(false));
+    for (const button of dialog.querySelectorAll<HTMLButtonElement>("button[data-choice]")) {
+      button.onclick = () => finish(() => resolve(button.dataset.choice === "install"));
+    }
+    dialog.querySelector<HTMLButtonElement>('button[data-choice="install"]')!.focus();
+  });
+}
+
 // ---- help -------------------------------------------------------------------
 
 export function openHelp(dialog: HTMLDialogElement, onClose: () => void) {
