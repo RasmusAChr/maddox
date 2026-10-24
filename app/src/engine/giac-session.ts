@@ -7,6 +7,16 @@ export type EvalResult =
 
 export type Caseval = (input: string) => string;
 
+/** A point worth knowing on a curve (graph release 3); `other` is the curve it meets. */
+export type Feature = {
+  kind: "zero" | "yint" | "min" | "max" | "intersection";
+  x: number;
+  y: number;
+  xLatex: string;
+  yLatex: string;
+  other?: number;
+};
+
 /** One thing a graph draws: a function of x (sampled per view) or fixed points. */
 export type DrawnItem =
   | { kind: "function"; label: string; fn: string }
@@ -42,6 +52,11 @@ export type SessionOptions = {
 };
 
 import { ANS_VARIABLE, CALL_OR_PRODUCT, DEGREE_VARIABLE, POINT, splitTopLevel } from "./latex-to-giac";
+
+// The curve being analysed by features(), and the variable it is solved for
+// (not x: the user may have given x a value).
+const FN = "maddox_ff";
+const T = "maddox_t";
 
 // Every result is stored here so its LaTeX and decimal value can be read back
 // without evaluating the input twice (which would repeat side effects).
@@ -188,6 +203,76 @@ export class GiacSession {
     const y = Number(this.caseval(`evalf(${RESULT})`));
     this.takePrinted();
     return Number.isFinite(x) && Number.isFinite(y) ? { point: [x, y] } : {};
+  }
+
+  /**
+   * The points worth knowing on a curve between x = a and b: its zeros,
+   * y-intercept, maxima and minima, and where it meets each of `others`.
+   * Exact when Giac finds a short exact form (√2, π/6), else decimals.
+   */
+  features(fn: string, others: string[], a: number, b: number): Feature[] {
+    try {
+      this.caseval(`${FN}:=${fn}`);
+      const out: Feature[] = [];
+      const add = (kind: Feature["kind"], equation: string, other?: number) => {
+        for (const x of this.solveIn(equation, a, b)) {
+          const point = this.pointAt(x);
+          if (point) out.push({ kind, ...point, ...(other === undefined ? {} : { other }) });
+        }
+      };
+      add("zero", `${FN}(${T})=0`);
+      if (a <= 0 && b >= 0) {
+        const point = this.pointAt("0");
+        if (point) out.push({ kind: "yint", ...point });
+      }
+      for (const x of this.solveIn(`diff(${FN}(${T}),${T})=0`, a, b)) {
+        const point = this.pointAt(x);
+        if (!point) continue;
+        const curvature = Number(this.caseval(`evalf(subst(diff(${FN}(${T}),${T},2),${T},${x}))`));
+        const h = (b - a) * 1e-4;
+        const side = Number(this.caseval(`evalf(${FN}(${point.x - h})+${FN}(${point.x + h})-2*(${point.y}))`));
+        const bend = Number.isFinite(curvature) && curvature !== 0 ? curvature : side;
+        if (bend > 0) out.push({ kind: "min", ...point });
+        else if (bend < 0) out.push({ kind: "max", ...point });
+      }
+      others.forEach((g, i) => add("intersection", `${FN}(${T})=(${g})(${T})`, i));
+      this.takePrinted();
+      return out.sort((p, q) => p.x - q.x);
+    } catch {
+      this.takePrinted();
+      return [];
+    }
+  }
+
+  /** Solutions of an equation in T between a and b: exact Giac text when short, else decimals. */
+  private solveIn(equation: string, a: number, b: number): string[] {
+    const exact = this.caseval(`solve([${equation},${T}>=${a},${T}<=${b}],${T})`);
+    this.takePrinted();
+    const items = exact.match(/^list\[(.*)\]$/s)?.[1];
+    if (items !== undefined) {
+      const parts = items ? splitTopLevel(items).map((s) => s.trim()) : [];
+      if (parts.every(isShortExact)) return parts.slice(0, 50);
+    }
+    // No short exact form (eˣ = 3x, x⁵ − x − 1): look for decimals in the window.
+    const numeric = this.caseval(`fsolve(${equation},${T}=${a}..${b})`);
+    this.takePrinted();
+    return numeric
+      .replace(/^\[|\]$/g, "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => /^-?[\d.]+(e[+-]?\d+)?$/.test(s))
+      .slice(0, 50);
+  }
+
+  /** The point (x, f(x)) for Giac text x, with LaTeX for both; null if f has no real value there. */
+  private pointAt(x: string): { x: number; y: number; xLatex: string; yLatex: string } | null {
+    const xv = Number(this.caseval(`evalf(${x})`));
+    const yv = Number(this.caseval(`evalf(${FN}(${x}))`));
+    if (!Number.isFinite(xv) || !Number.isFinite(yv)) return null;
+    // Exact x (from solve) gives an exact y; a decimal x (from fsolve) only decimals.
+    const decimal = x.includes(".");
+    const latex = (v: string) => (decimal ? this.decimalLatex(v) : this.exactLatex(`simplify(${v})`));
+    return { x: xv, y: yv, xLatex: latex(x), yLatex: latex(`${FN}(${x})`) };
   }
 
   /** fn's values at n+1 evenly spaced x from a to b; NaN where it has no real value. */
@@ -776,6 +861,12 @@ function answerForms(latex: string, approxLatex: string, approxText: string, mod
   // In decimal mode the decimal form takes the exact form's place, when there is one.
   if (mode === "approx") return { latex: showApprox(latex, approxText) ? approxLatex : latex, approxLatex: null };
   return { latex, approxLatex: showApprox(latex, approxText) ? approxLatex : null };
+}
+
+/** A solution worth showing exactly: short, no decimals, built only from numbers, π, roots and elementary functions. */
+function isShortExact(giac: string): boolean {
+  if (giac.length > 40 || /\d\.\d/.test(giac)) return false;
+  return /^[\d+\-*/^().\s]*$/.test(giac.replace(/\b(pi|sqrt|ln|exp|sin|cos|tan|asin|acos|atan)\b/g, ""));
 }
 
 /** "[[1.0,3.0],[3.0,8.0]]" as rows of `width` numbers; null if any is not a number. */

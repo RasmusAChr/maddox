@@ -2,7 +2,7 @@
 // SVG, re-samples functions from the engine whenever the view changes, and is
 // driven by the keyboard (trace, zoom, pan) as well as the mouse.
 import { convertLatexToMarkup } from "mathlive";
-import type { DrawnItem } from "../engine/giac-session";
+import type { DrawnItem, Feature } from "../engine/giac-session";
 import { autoY, formatNumber, niceStep, pointsX, segments, ticks, type View } from "./graph-math";
 
 export type { View };
@@ -22,6 +22,8 @@ export type GraphOptions = {
   onView: (view: View | null) => void;
   /** Esc: back to the cell. */
   onExit: () => void;
+  /** Zeros, extrema, y-intercept and intersections of a curve in [a, b] (release 3). */
+  features?: (fn: string, others: string[], a: number, b: number) => Promise<Feature[]>;
   /** Fill the height of the container (the panel); otherwise a fixed 320 px. */
   fill?: boolean;
   /** Show the legend of chips (the panel's list shows the colours instead). */
@@ -48,6 +50,11 @@ export class Graph {
   private samples = new Map<number, { xs: number[]; ys: number[] }>();
   private trace: Trace | null = null;
   private traceY: number | null = null;
+  /** The traced curve's points worth knowing in the view; Tab jumps between them. */
+  private found: { item: number; others: number[]; list: Feature[] } | null = null;
+  /** The point the trace jumped to with Tab, named in the readout. */
+  private atFeature: Feature | null = null;
+  private featureTimer: number | undefined;
   private generation = 0;
   private resampleTimer: number | undefined;
   private width = 0;
@@ -167,6 +174,7 @@ export class Graph {
     this.view = view;
     this.render();
     this.scheduleResample();
+    this.scheduleFeatures();
     if (save) this.options.onView(this.custom);
   }
 
@@ -216,6 +224,10 @@ export class Graph {
       }
     });
 
+    if (this.trace && this.found?.item === this.trace.item) {
+      for (const f of this.found.list) this.plot.append(svg("circle", { cx: sx(f.x), cy: sy(f.y), r: 4, class: "graph-feature" }));
+    }
+
     if (this.trace && this.traceY !== null && Number.isFinite(this.traceY)) {
       const colour = this.colour(this.trace.item);
       this.plot.append(svg("circle", { cx: sx(this.trace.x), cy: sy(this.traceY), r: 5.5, class: "graph-trace", stroke: colour }));
@@ -249,6 +261,7 @@ export class Graph {
   private async moveTrace(steps: number, item = this.trace?.item ?? 0) {
     const view = this.view;
     if (!view || !this.options.items.length) return;
+    this.atFeature = null;
     const target = this.options.items[item];
     let trace: Trace;
     if (target.kind === "points") {
@@ -269,12 +282,85 @@ export class Graph {
     }
     this.follow();
     this.render();
+    this.showTrace();
+    if (target.kind === "function" && this.found?.item !== item) this.scheduleFeatures(0);
+  }
+
+  /** The readout: the traced curve, and its coordinates or, after Tab, what the point is (exact). */
+  private showTrace() {
+    const trace = this.trace;
+    if (!trace) return;
+    const target = this.options.items[trace.item];
     const y = this.traceY;
     this.readout.innerHTML = "";
     const name = document.createElement("span");
     name.className = "graph-readout-name";
     name.innerHTML = convertLatexToMarkup(target.label);
-    this.readout.append(name, `  x = ${formatNumber(trace.x)},  y = ${y !== null && Number.isFinite(y) ? formatNumber(y) : "undefined"}`);
+    const f = this.atFeature;
+    if (!f) {
+      const hint = target.kind === "function" && this.found?.list.length ? "   Tab: zeros, max/min, intersections" : "";
+      this.readout.append(name, `  x = ${formatNumber(trace.x)},  y = ${y !== null && Number.isFinite(y) ? formatNumber(y) : "undefined"}${hint}`);
+      return;
+    }
+    const what = document.createElement("span");
+    what.className = "graph-readout-kind";
+    const other = f.other !== undefined ? this.options.items[this.found!.others[f.other]] : null;
+    what.textContent = { zero: "Zero", yint: "y-intercept", min: "Minimum", max: "Maximum", intersection: "Intersection" }[f.kind];
+    const coordinate = (axis: string, latex: string, value: number) => {
+      const exact = convertLatexToMarkup(latex);
+      // A whole number or a decimal needs no ≈ beside it.
+      const approx = /\d\.\d|\\cdot 10\^/.test(latex) || String(value) === latex ? "" : ` ≈ ${formatNumber(value)}`;
+      return `${axis} = ${exact}${approx}`;
+    };
+    const values = document.createElement("span");
+    values.className = "graph-readout-values";
+    values.innerHTML = `${coordinate("x", f.xLatex, f.x)},&nbsp; ${coordinate("y", f.yLatex, f.y)}`;
+    this.readout.append(name, "  ", what);
+    if (other) {
+      const with_ = document.createElement("span");
+      with_.innerHTML = ` with ${convertLatexToMarkup(other.label)}`;
+      this.readout.append(with_);
+    }
+    this.readout.append("   ", values);
+  }
+
+  /** Finds the traced curve's points worth knowing in the view, shortly after it settles. */
+  private scheduleFeatures(delay = 250) {
+    clearTimeout(this.featureTimer);
+    const find = this.options.features;
+    const trace = this.trace;
+    if (!find || !trace || this.options.items[trace.item]?.kind !== "function") return;
+    this.featureTimer = window.setTimeout(async () => {
+      const view = this.view;
+      if (!view || this.trace?.item !== trace.item) return;
+      const items = this.options.items;
+      const target = items[trace.item] as Extract<DrawnItem, { kind: "function" }>;
+      const others = items.flatMap((it, i) => (it.kind === "function" && i !== trace.item ? [i] : []));
+      const fns = others.map((i) => (items[i] as Extract<DrawnItem, { kind: "function" }>).fn);
+      const list = await find(target.fn, fns, view.xmin, view.xmax);
+      if (this.trace?.item !== trace.item || this.view !== view) return;
+      this.found = { item: trace.item, others, list };
+      this.render();
+      if (!this.atFeature) this.showTrace();
+    }, delay);
+  }
+
+  /** Tab / Shift+Tab: the trace jumps to the next / previous point worth knowing. */
+  private jumpToFeature(direction: 1 | -1): boolean {
+    const trace = this.trace;
+    const list = this.found && trace && this.found.item === trace.item ? this.found.list : [];
+    if (!trace || !list.length) return false;
+    const eps = (this.view!.xmax - this.view!.xmin) * 1e-9;
+    const at = this.atFeature ? list.indexOf(this.atFeature) : -1;
+    let next: Feature | undefined;
+    if (at >= 0) next = list[(at + direction + list.length) % list.length];
+    else next = direction > 0 ? (list.find((f) => f.x > trace.x + eps) ?? list[0]) : ([...list].reverse().find((f) => f.x < trace.x - eps) ?? list[list.length - 1]);
+    this.trace = { ...trace, x: next.x };
+    this.traceY = next.y;
+    this.atFeature = next;
+    this.render();
+    this.showTrace();
+    return true;
   }
 
   /** Keeps the traced point on screen by panning. */
@@ -305,6 +391,9 @@ export class Graph {
     if (e.key === "Escape") {
       handled();
       this.options.onExit();
+    } else if (e.key === "Tab" && !mod && !e.altKey) {
+      // Only while tracing a curve with points to visit; otherwise Tab moves focus as usual.
+      if (this.jumpToFeature(e.shiftKey ? -1 : 1)) handled();
     } else if (mod && e.key.startsWith("Arrow")) {
       handled();
       const dx = e.key === "ArrowLeft" ? -0.25 * w : e.key === "ArrowRight" ? 0.25 * w : 0;

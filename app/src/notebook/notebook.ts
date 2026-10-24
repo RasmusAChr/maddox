@@ -660,6 +660,7 @@ export class Notebook {
         xRange: result.plot.xRange,
         view: entry.views[i] ?? null,
         sample: (fn, a, b, n) => this.engine.sample(fn, a, b, n),
+        features: (fn, others, a, b) => this.engine.features(fn, others, a, b),
         onView: (view) => {
           if (view) entry.views[i] = view;
           else delete entry.views[i];

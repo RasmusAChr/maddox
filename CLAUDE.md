@@ -69,7 +69,8 @@ docs updated, a short report of what changed.
   trace, +/− zoom, Esc back). Ctrl+G opens a graph panel (right half) with
   tabs, each with its own list; F6 switches pane, Ctrl+Shift+G adds a cell
   line. In a tab, `g(x) = …` defines g for that tab only; `:=` (global) is
-  for cells. Exact intersections and sliders come next; see
+  for cells. Tracing shows the curve's zeros, max/min and intersections (Tab
+  jumps, exact values). Sliders come next; see
   `docs/decisions/0008-graphs.md`.
 - **% is always hundredths**: `20%` is 0.2, so `150+20%` is 150.2 (as on
   the Nspire and in Excel, not a shop calculator). Decided 2026-10-23.

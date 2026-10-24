@@ -1053,6 +1053,35 @@ await page.keyboard.press("Control+g");
 ps = await panelState();
 check("Ctrl+G closes it and returns to the notebook", !ps.open && (await active()).startsWith("MATH-FIELD"), JSON.stringify(ps));
 
+// 34. Points worth knowing: tracing a curve shows its zeros, max/min,
+// y-intercept and intersections as dots; Tab jumps between them, named exactly.
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("plot(fp,x");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(500);
+await page.keyboard.press("ArrowUp");
+await page.keyboard.press("Alt+ArrowDown");
+await page.keyboard.press("ArrowRight"); // trace fp from x = 0
+await page.waitForTimeout(1200);
+const focusedGraph = () => page.evaluate(() => {
+  const g = document.activeElement;
+  return { dots: g?.querySelectorAll(".graph-feature").length ?? 0, readout: g?.querySelector(".graph-readout")?.textContent ?? "" };
+});
+let fg = await focusedGraph();
+check("tracing a curve shows its points worth knowing", fg.dots === 6 && /Tab: zeros/.test(fg.readout), JSON.stringify(fg));
+await page.keyboard.press("Tab");
+fg = await focusedGraph();
+check("Tab jumps to the next one: the zero √2", /Zero/.test(fg.readout) && /1\.41421/.test(fg.readout), fg.readout);
+await page.keyboard.press("Tab");
+fg = await focusedGraph();
+check("…then the intersection with x at (2, 2)", /Intersection/.test(fg.readout) && /with/.test(fg.readout), fg.readout);
+await page.keyboard.press("Shift+Tab");
+fg = await focusedGraph();
+check("Shift+Tab goes back", /Zero/.test(fg.readout), fg.readout);
+check("Tab keeps the keyboard in the graph", await inGraph(), await active());
+await page.keyboard.press("Escape");
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

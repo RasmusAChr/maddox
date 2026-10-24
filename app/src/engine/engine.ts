@@ -1,4 +1,4 @@
-import type { AngleMode, AnswerMode, EvalResult, PlotResult, SessionOptions } from "./giac-session";
+import type { AngleMode, AnswerMode, EvalResult, Feature, PlotResult, SessionOptions } from "./giac-session";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
 
 type Request = WorkerRequest extends infer R ? (R extends { id: number } ? Omit<R, "id"> : never) : never;
@@ -87,6 +87,12 @@ export class Engine {
   /** What plot(…) draws; functions are then sampled per view with sample(). */
   plot(giac: string): Promise<PlotResult> {
     return this.request<PlotResult>({ type: "plot", giac });
+  }
+
+  /** Zeros, extrema, y-intercept and intersections of a curve between a and b (in the background). */
+  async features(fn: string, others: string[], a: number, b: number): Promise<Feature[]> {
+    const found = await this.request<Feature[] | EvalResult>({ type: "features", fn, others, a, b }, true);
+    return Array.isArray(found) ? found : [];
   }
 
   /** A definition (or purge) for the graph panel's own names: no answer, no ans. */

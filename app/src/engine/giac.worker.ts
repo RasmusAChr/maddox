@@ -48,6 +48,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       post({ type: "result", id: msg.id, result: session.evaluate(msg.giac, msg.mode) });
     } else if (msg.type === "plot") {
       post({ type: "result", id: msg.id, result: session.plot(msg.giac) });
+    } else if (msg.type === "features") {
+      post({ type: "result", id: msg.id, result: session.features(msg.fn, msg.others, msg.a, msg.b) });
     } else if (msg.type === "run") {
       post({ type: "result", id: msg.id, result: session.run(msg.giac) });
     } else if (msg.type === "sample") {

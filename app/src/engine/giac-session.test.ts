@@ -353,6 +353,38 @@ describe("units", () => {
   });
 });
 
+describe("graph features", () => {
+  const kinds = (fs: { kind: string; xLatex: string; yLatex: string }[]) => fs.map((f) => `${f.kind} ${f.xLatex} ${f.yLatex}`);
+  it("zeros, y-intercept, minimum and intersections, exact", () => {
+    run("f\\left(x\\right)\\coloneq x^2-2");
+    run("g\\left(x\\right)\\coloneq x");
+    expect(kinds(session.features("f", ["g"], -10, 10))).toEqual([
+      "zero -\\sqrt{2} 0",
+      "intersection -1 -1",
+      "yint 0 -2",
+      "min 0 -2",
+      "zero \\sqrt{2} 0",
+      "intersection 2 2",
+    ]);
+  });
+
+  it("maxima and minima", () => {
+    run("h\\left(x\\right)\\coloneq x^3-3x");
+    const fs = session.features("h", [], -10, 10).filter((f) => f.kind === "min" || f.kind === "max");
+    expect(kinds(fs)).toEqual(["max -1 2", "min 1 -2"]);
+  });
+
+  it("only inside the window, exact multiples of π", () => {
+    const zeros = session.features("unapply(sin(x),x)", [], -10, 10).filter((f) => f.kind === "zero");
+    expect(zeros.map((z) => z.xLatex)).toEqual(["-3\\cdot \\pi", "-2\\cdot \\pi", "-\\pi", "0", "\\pi", "2\\cdot \\pi", "3\\cdot \\pi"]);
+  });
+
+  it("decimals when there is no short exact form", () => {
+    const zeros = session.features("unapply(exp(x)-3*x,x)", [], -10, 10).filter((f) => f.kind === "zero");
+    expect(zeros.map((z) => z.xLatex)).toEqual(["0.619061", "1.51213"]);
+  });
+});
+
 describe("wrong number of inputs", () => {
   // Giac throws here instead of answering; the raw exception text must never show.
   it("is explained in plain words, and the engine keeps working", () => {

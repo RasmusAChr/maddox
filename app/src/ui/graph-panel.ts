@@ -439,7 +439,8 @@ export class GraphPanel {
                 colours.push(i);
                 continue;
               }
-              items.push(item);
+              // The readout names a row as typed (g, not its Giac name maddox_local_g).
+              items.push({ ...item, label: parsed.kind === "function" || parsed.kind === "value" ? parsed.name : latex });
               colours.push(i);
             }
             if (result.xRange[1] > xRange[1]) xRange = result.xRange;
@@ -480,6 +481,7 @@ export class GraphPanel {
       fill: true,
       legend: false,
       sample: (fn, a, b, n) => this.engine.sample(fn, a, b, n),
+      features: (fn, others, a, b) => this.engine.features(fn, others, a, b),
       onView: (view) => {
         if (view) tab.view = view;
         else delete tab.view;

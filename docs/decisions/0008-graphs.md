@@ -1,7 +1,7 @@
 # 0008 — Graphs: plot() in a cell, and a graph panel with tabs
 
-**Status:** accepted, 2026-10-24. Releases 1 (inline `plot()`) and 2 (the
-panel) are built; 3–4 follow, each proposed in detail before it is built.
+**Status:** accepted, 2026-10-24. Releases 1 (inline `plot()`), 2 (the
+panel) and 3 (points worth knowing) are built; 4 (sliders) follows.
 
 ## Problem
 
@@ -79,6 +79,19 @@ Both, built on one graph component (same drawing, keys and maths):
   recalculation after it, shows at once).
 - Saved in the file as `"graphs": {open, active, tabs: [{name, items, view}]}`;
   files without it open with the panel closed.
+
+## Release 3 (built)
+
+- While a curve is traced, its zeros, y-intercept, maxima, minima and
+  intersections with the other curves in view show as grey dots (the
+  owner's choice: for the traced curve only, like Desmos). Tab / Shift+Tab
+  jump the trace between them; the readout names the point exactly with ≈:
+  "Zero  x = √3 ≈ 1.73205, y = 0", "Intersection with g …".
+- `GiacSession.features` solves in the view only
+  (`solve([eq, t>=a, t<=b], t)`, so sin x = 0 gives −3π…3π), keeps short
+  exact forms (`isShortExact`), and falls back to `fsolve` in the window for
+  the rest (eˣ = 3x). Max/min from f′ = 0 and the sign of f″ (or of the
+  neighbours when f″ = 0). Recomputed in the background after zoom or pan.
 
 ## Consequences
 

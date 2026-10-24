@@ -1463,3 +1463,20 @@ body.with-graph-panel .notebook {
 .panel-row.has-error .panel-chip {
   visibility: hidden;
 }
+
+/* Points worth knowing on the traced curve (zeros, max/min, intersections); Tab visits them. */
+.graph-feature {
+  fill: var(--sheet);
+  stroke: var(--muted);
+  stroke-width: 2;
+}
+
+.graph-readout-kind {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.graph-readout-values {
+  color: var(--text);
+  font-family: var(--font, inherit);
+}

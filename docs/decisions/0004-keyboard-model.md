@@ -26,7 +26,7 @@
 | Shift+Enter | cell | New line in the same cell |
 | `#` at the start of a line | cell | The line is text |
 | Ctrl+Enter | cell | New cell below |
-| Alt+↓ | cell with a graph | Into its graph: ←/→ trace, ↑/↓ curve, +/− zoom, Ctrl+arrows pan, 0 reset, Esc back |
+| Alt+↓ | cell with a graph | Into its graph: ←/→ trace, ↑/↓ curve, Tab/Shift+Tab next/previous zero, max/min or intersection, +/− zoom, Ctrl+arrows pan, 0 reset, Esc back |
 | Ctrl+G | anywhere | Graph panel open / close |
 | F6 | panel open | Keyboard between notebook and panel |
 | Ctrl+Shift+G | cell | Add the caret's line to the open graph tab |
