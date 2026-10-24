@@ -438,6 +438,53 @@ describe("plot", () => {
     });
   });
 
+  it("slider names stay symbols, so the curve follows their value", () => {
+    expect(plot("\\operatorname{plot}\\left(q\\cdot x^2\\right)")).toMatchObject({ ok: false, missing: ["q"] });
+    const result = session.plot("plot(q*x^2)", { q: "maddox_s9_q" });
+    if (!result.ok || result.items[0].kind !== "function") throw new Error("expected a function");
+    session.run("maddox_s9_q:=2");
+    expect(session.sample(result.items[0].fn, -1, 1, 2)).toEqual([2, 0, 2]);
+    session.run("maddox_s9_q:=3");
+    expect(session.sample(result.items[0].fn, -1, 1, 2)).toEqual([3, 0, 3]);
+  });
+
+  it("in graphs, an undefined name with x in it is a product: ax is a·x", () => {
+    run("xy\\coloneq3");
+    expect(session.splitUnknown("ax^(2)+b")).toBe("a*x^(2)+b");
+    expect(session.splitUnknown("abx")).toBe("a*b*x");
+    expect(session.splitUnknown("xy*x+fp+max(x,1)+exp(x)+x")).toBe("xy*x+fp+max(x,1)+exp(x)+x");
+    expect(session.splitUnknown("ax+1", ["ax"])).toBe("ax+1");
+    run("\\operatorname{purge}\\left(xy\\right)");
+  });
+
+  it("the axis is never guessed: a function runs over its own parameter, other unknowns are sliders", () => {
+    run("hh\\left(b_0\\right)\\coloneq ab_0+b");
+    // ab_0 ends in the parameter b_0, so it is a·b_0: the sliders are a and b.
+    expect(session.plot("plot(hh)")).toMatchObject({ ok: false, missing: ["a", "b"] });
+    const result = session.plot("plot(hh)", { a: "maddox_s8_a", b: "maddox_s8_b" });
+    if (!result.ok || result.items[0].kind !== "function") throw new Error("expected a function");
+    session.run("maddox_s8_a:=2");
+    session.run("maddox_s8_b:=3");
+    expect(session.sample(result.items[0].fn, -1, 1, 2)).toEqual([1, 3, 5]);
+  });
+
+  it("in a definition, a name ending in the parameter is a product: ab₀ is a·b₀", () => {
+    expect(run("hp\\left(b_0\\right)\\coloneq ab_0+b")).toMatchObject({ ok: true, latex: "b_{0} \\rightarrow a\\cdot b_{0}+b" });
+    expect(run("fq\\left(x\\right)\\coloneq ax^2+b")).toMatchObject({ ok: true, latex: "x \\rightarrow a\\cdot x^{2}+b" });
+    expect(session.plot("plot(hp)")).toMatchObject({ ok: false, missing: ["a", "b"] });
+    run("XTy\\coloneq7");
+    expect(run("gq\\left(y\\right)\\coloneq XTy+1")).toMatchObject({ ok: true, latex: "y \\rightarrow 7+1" });
+    // Outside a definition, letters typed together stay one name.
+    expect(run("ax+1")).toMatchObject({ ok: true, latex: "\\mathrm{ax}+1" });
+    run("\\operatorname{purge}\\left(XTy\\right)");
+  });
+
+  it("explains what falls outside the rule", () => {
+    expect(session.plot("plot(t^2)")).toMatchObject({ ok: false, error: expect.stringContaining("Use x, or define a function") });
+    expect(session.plot("plot(ka*x+kb*x+kc*x+kd*x+kf*x)")).toMatchObject({ ok: false, error: expect.stringContaining("Too many names without a value") });
+    expect(session.plot("plot(ka*x+kb*x+kc*x+kd*x+kf*x)")).not.toHaveProperty("missing");
+  });
+
   it("trig in degrees gets a window in degrees", () => {
     session.setAngle("deg");
     expect(plot("\\operatorname{plot}\\left(\\sin\\left(x\\right)\\right)")).toMatchObject({ ok: true, xRange: [-360, 360] });

@@ -1,7 +1,7 @@
 # 0008 — Graphs: plot() in a cell, and a graph panel with tabs
 
-**Status:** accepted, 2026-10-24. Releases 1 (inline `plot()`), 2 (the
-panel) and 3 (points worth knowing) are built; 4 (sliders) follows.
+**Status:** accepted, 2026-10-24. All four releases are built: inline
+`plot()`, the panel, points worth knowing, and sliders.
 
 ## Problem
 
@@ -92,6 +92,47 @@ Both, built on one graph component (same drawing, keys and maths):
   exact forms (`isShortExact`), and falls back to `fsolve` in the window for
   the rest (eˣ = 3x). Max/min from f′ = 0 and the sign of f″ (or of the
   neighbours when f″ = 0). Recomputed in the background after zoom or pan.
+
+## Release 4 (built)
+
+- Inline: names without a value (`plot(a·x² + b)`) get sliders under the
+  graph, starting at 1, saved with the cell (`"sliders": {line: {a: 1}}`).
+  They are the graph's own: in Giac `maddox_s<n>_a`, left as symbols when
+  the curve is built (`plot(giac, params)`) and set before sampling, so
+  moving a slider redraws without re-plotting. A notebook `a := 2` takes
+  priority (then there is no slider). Keys: S in the graph goes to the
+  first slider; ←/→ change it (Shift ×10), ↑/↓ move between sliders (↑ from
+  the first back to the graph), Esc back to the graph.
+- Panel: a row `a = 3` (a plain number) gets a slider under it; Alt+←/→ in
+  the row nudge it and the row's text follows (so it saves as text). A row
+  that uses names without a value says so ("Enter adds sliders"); Enter, or
+  leaving the row, adds `a = 1` rows (the owner's choice: add, don't ask).
+- Range −10…10 in steps of 0.1, widened by powers of ten for bigger values
+  (`sliderRange`, `nudge`).
+- **The axis is never guessed** (the owner: "fair not to accommodate every
+  possible thing"). One rule: the horizontal axis is x for an expression and
+  a function's own parameter for a function (`plot(hh)` with `hh(b₀) := …`
+  runs over b₀). Every other name without a value is a parameter and gets a
+  slider, also inside a function's definition (the slider names are
+  substituted in, `plot(giac, sliders)`). What falls outside says so: no x
+  ("Use x, or define a function, e.g. f(t) := t²"), and five or more names
+  without a value ("Too many names without a value …: define some in a
+  cell"; usually a typo). Implicit curves (x² + y² = 1), parametric and
+  polar curves are out of scope. Before this, a function whose definition
+  used unknown names gave a silently empty graph.
+- **In a definition, the parameter is known** (the owner's choice, applied
+  where the function is defined, so cells and graphs agree): in
+  `f(p) := …`, an undefined name of letters followed by p is those letters
+  times p. `hh(b₀) := ab₀ + b` is b₀ → a·b₀ + b, and `f(x) := ax² + b` is
+  x → a·x² + b, so `plot(hh)` gets sliders a and b. Defined names (XTy) stay
+  whole; outside a definition letters typed together remain one name
+  (`GiacSession.splitByParameter`, also used for graph-tab definitions).
+- **In graphs, `ax` is a·x** (the owner's choice, as in Desmos and
+  GeoGebra): in `plot(…)` and panel rows, an undefined name of letters that
+  contains x is read letter by letter, so `plot(ax² + b)` gets sliders a and
+  b. Defined names (XT, fp), calls and a tab's own names stay as they are,
+  and cells keep the rule that letters typed together are one name
+  (`GiacSession.splitUnknown`, run before slider names are localised).
 
 ## Consequences
 

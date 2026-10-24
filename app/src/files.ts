@@ -16,7 +16,8 @@ export type NotebookDoc = { cells: Cell[]; angle: AngleMode; graphs?: unknown };
 
 // Each entry is {"latex": ...}: one cell, possibly several lines, plus
 // "answers": "exact" | "approx" when the cell was switched with Alt+Enter, and
-// "views": {line: {xmin, xmax, ymin, ymax}} for graphs zoomed or panned.
+// "views": {line: {xmin, xmax, ymin, ymax}} for graphs zoomed or panned, and
+// "sliders": {line: {a: 1.5}} for their sliders.
 // "settings" and "answers" were added after version 1 shipped; readers treat
 // them as optional.
 export function serialize(doc: NotebookDoc): string {
@@ -46,8 +47,22 @@ export function toCells(entries: unknown[]): Cell[] {
     if (e?.answers === "exact" || e?.answers === "approx") cell.answers = e.answers;
     const views = readViews(e?.views);
     if (views) cell.views = views;
+    const sliders = readSliders(e?.sliders);
+    if (sliders) cell.sliders = sliders;
     return cell;
   });
+}
+
+/** Saved slider values ({line: {a: 1.5}}); anything malformed is dropped. */
+function readSliders(sliders: unknown): Cell["sliders"] | null {
+  if (!sliders || typeof sliders !== "object") return null;
+  const out: NonNullable<Cell["sliders"]> = {};
+  for (const [line, values] of Object.entries(sliders as Record<string, any>)) {
+    if (!/^\d+$/.test(line) || !values || typeof values !== "object") continue;
+    const kept = Object.fromEntries(Object.entries(values).filter(([n, v]) => /^[A-Za-z][A-Za-z0-9_]*$/.test(n) && Number.isFinite(v))) as Record<string, number>;
+    if (Object.keys(kept).length) out[Number(line)] = kept;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /** Saved graph views ({line: {xmin, xmax, ymin, ymax}}); anything malformed is dropped. */

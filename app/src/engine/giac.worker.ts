@@ -47,9 +47,11 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     if (msg.type === "eval") {
       post({ type: "result", id: msg.id, result: session.evaluate(msg.giac, msg.mode) });
     } else if (msg.type === "plot") {
-      post({ type: "result", id: msg.id, result: session.plot(msg.giac) });
+      post({ type: "result", id: msg.id, result: session.plot(msg.giac, msg.sliders) });
     } else if (msg.type === "features") {
       post({ type: "result", id: msg.id, result: session.features(msg.fn, msg.others, msg.a, msg.b) });
+    } else if (msg.type === "split") {
+      post({ type: "result", id: msg.id, result: session.splitUnknown(msg.giac, msg.keep) });
     } else if (msg.type === "run") {
       post({ type: "result", id: msg.id, result: session.run(msg.giac) });
     } else if (msg.type === "sample") {

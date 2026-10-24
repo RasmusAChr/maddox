@@ -87,3 +87,16 @@ export function formatNumber(v: number, digits = 6): string {
   const text = Math.abs(v) >= 1e6 || Math.abs(v) < 1e-4 ? v.toExponential(digits - 1) : v.toPrecision(digits);
   return text.replace(/(\.\d*?)0+(e|$)/, "$1$2").replace(/\.(e|$)/, "$1").replace("-", "−");
 }
+
+/** A slider's range for a value: −10…10 in steps of 0.1, widened by powers of ten for bigger values. */
+export function sliderRange(value: number): { min: number; max: number; step: number } {
+  const size = Math.abs(value);
+  const max = size <= 10 ? 10 : 10 ** Math.ceil(Math.log10(size));
+  return { min: -max, max, step: max / 100 };
+}
+
+/** value + steps × step, rounded to the step (no 0.30000000000000004). */
+export function nudge(value: number, steps: number, step: number): number {
+  const places = Math.max(0, -Math.floor(Math.log10(step)) + 1);
+  return Number((Math.round((value + steps * step) / step) * step).toFixed(places));
+}

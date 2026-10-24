@@ -85,14 +85,20 @@ export class Engine {
   }
 
   /** What plot(…) draws; functions are then sampled per view with sample(). */
-  plot(giac: string): Promise<PlotResult> {
-    return this.request<PlotResult>({ type: "plot", giac });
+  plot(giac: string, sliders?: Record<string, string>): Promise<PlotResult> {
+    return this.request<PlotResult>({ type: "plot", giac, sliders });
   }
 
   /** Zeros, extrema, y-intercept and intersections of a curve between a and b (in the background). */
   async features(fn: string, others: string[], a: number, b: number): Promise<Feature[]> {
     const found = await this.request<Feature[] | EvalResult>({ type: "features", fn, others, a, b }, true);
     return Array.isArray(found) ? found : [];
+  }
+
+  /** In graphs, an undefined name like ax read as a·x (see GiacSession.splitUnknown). */
+  async splitUnknown(giac: string, keep: string[] = []): Promise<string> {
+    const out = await this.request<string | EvalResult>({ type: "split", giac, keep }, true);
+    return typeof out === "string" ? out : giac;
   }
 
   /** A definition (or purge) for the graph panel's own names: no answer, no ans. */

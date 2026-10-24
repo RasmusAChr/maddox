@@ -6,6 +6,7 @@ import type { Engine } from "../engine/engine";
 import type { DrawnItem } from "../engine/giac-session";
 import { latexToGiac, UnsupportedLatex } from "../engine/latex-to-giac";
 import { Graph, type View } from "../notebook/graph";
+import { formatNumber, nudge, sliderRange } from "../notebook/graph-math";
 import { focusImmediately } from "../notebook/mathlive-internals";
 import { LOCAL, localise, readPanelRow, type PanelRow } from "../notebook/plot-items";
 
@@ -38,7 +39,9 @@ export class GraphPanel {
   private tabsEl: HTMLElement;
   private listEl: HTMLElement;
   private graphEl: HTMLElement;
-  private rows: { mf: MathfieldElement; error: HTMLElement; value: HTMLElement }[] = [];
+  private rows: { mf: MathfieldElement; error: HTMLElement; value: HTMLElement; slider: HTMLInputElement }[] = [];
+  /** Per row: names it uses that have no value yet; they become a = 1 rows with sliders. */
+  private missing = new Map<MathfieldElement, string[]>();
   private graph: Graph | null = null;
   private plotTimer: number | undefined;
   private generation = 0;
@@ -286,12 +289,24 @@ export class GraphPanel {
     leader.setAttribute("aria-hidden", "true");
     const value = document.createElement("span");
     value.className = "panel-value";
-    row.append(chip, mf, leader, value, error);
+    // A row a = 3 (a plain number) gets a slider under it (release 4).
+    const sliderBox = document.createElement("div");
+    sliderBox.className = "panel-slider";
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.tabIndex = -1; // the keyboard uses Alt+←/→ in the row
+    sliderBox.append(slider);
+    row.append(chip, mf, leader, value, error, sliderBox);
     this.listEl.insertBefore(row, this.listEl.children[index] ?? null);
-    this.rows.splice(index, 0, { mf, error, value });
+    this.rows.splice(index, 0, { mf, error, value, slider });
+    slider.addEventListener("input", () => {
+      const number = numberRow(mf.value);
+      if (number) this.setNumber(mf, number.name, Number(slider.value));
+    });
     this.configureField(mf);
     mf.value = latex;
     mf.placeholder = "f, D or x^2";
+    this.showSlider(this.rows[index]);
     this.colourChips();
 
     mf.addEventListener("keydown", (e) => this.onRowKey(mf, e), { capture: true });
@@ -308,9 +323,51 @@ export class GraphPanel {
     mf.addEventListener("input", () => {
       const i = this.rows.findIndex((r) => r.mf === mf);
       this.tab.items[i] = mf.value;
+      this.showSlider(this.rows[i]);
       this.onChange();
       this.refresh(400);
     });
+    // Leaving a row that uses names without a value adds their slider rows.
+    mf.addEventListener("blur", () => {
+      if (this.missing.get(mf)?.length) this.addSliderRows(mf);
+    });
+  }
+
+  /** The row's slider shows for a = number rows, set to the number. */
+  private showSlider(row: (typeof this.rows)[number] | undefined) {
+    if (!row) return;
+    const number = numberRow(row.mf.value);
+    row.mf.parentElement!.classList.toggle("has-slider", number !== null);
+    if (!number) return;
+    const { min, max, step } = sliderRange(number.value);
+    Object.assign(row.slider, { min: String(min), max: String(max), step: String(step) });
+    row.slider.value = String(number.value);
+    row.slider.setAttribute("aria-label", `${number.name} = ${formatNumber(number.value)}`);
+  }
+
+  /** A slider or Alt+←/→ changed a = 3: the row's text follows, and the graph redraws soon. */
+  private setNumber(mf: MathfieldElement, name: string, value: number) {
+    const i = this.rows.findIndex((r) => r.mf === mf);
+    mf.value = `${name}=${value}`;
+    this.tab.items[i] = mf.value;
+    this.showSlider(this.rows[i]);
+    this.onChange();
+    this.refresh(60);
+  }
+
+  /** a = 1 rows (with sliders) under the row, for the names it uses that have no value. */
+  private addSliderRows(mf: MathfieldElement) {
+    const names = this.missing.get(mf) ?? [];
+    this.missing.delete(mf);
+    const i = this.rows.findIndex((r) => r.mf === mf);
+    if (i < 0 || !names.length) return;
+    names.forEach((name, k) => {
+      this.tab.items.splice(i + 1 + k, 0, `${name}=1`);
+      this.addRow(`${name}=1`, i + 1 + k);
+    });
+    this.colourChips();
+    this.onChange();
+    this.refresh(0);
   }
 
   private colourChips() {
@@ -334,6 +391,18 @@ export class GraphPanel {
     };
     const i = this.rows.findIndex((r) => r.mf === mf);
     const mod = e.ctrlKey || e.metaKey;
+    const number = numberRow(mf.value);
+    if (number && e.altKey && !mod && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      claim();
+      const steps = (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 10 : 1);
+      this.setNumber(mf, number.name, nudge(number.value, steps, sliderRange(number.value).step));
+      return;
+    }
+    if (e.key === "Enter" && !mod && !e.altKey && this.missing.get(mf)?.length) {
+      claim();
+      this.addSliderRows(mf);
+      return;
+    }
     if (e.key === "Enter" && !mod && !e.altKey) {
       claim();
       this.tab.items.splice(i + 1, 0, "");
@@ -387,6 +456,7 @@ export class GraphPanel {
   /** Plots every row of the open tab; a row that fails shows why, the others still draw. */
   private async plotTab() {
     const generation = ++this.generation;
+    this.missing.clear();
     const tab = this.tab;
     const items: DrawnItem[] = [];
     const colours: number[] = [];
@@ -410,6 +480,10 @@ export class GraphPanel {
       names.add(row.name);
       return "";
     });
+    // ax is a·x in a graph (an undefined name with x in it), unless the tab defines ax itself.
+    for (const row of read) {
+      if (row && row.kind !== "error") row.body = await this.engine.splitUnknown(row.body, [...names]);
+    }
     if (this.locals.length) await this.engine.run(`purge(${this.locals.join(",")})`);
     this.locals = [...names].map((n) => LOCAL + n);
     for (let i = 0; i < read.length; i++) {
@@ -428,7 +502,9 @@ export class GraphPanel {
       if (parsed && !error) {
         try {
           const what = parsed.kind === "function" || parsed.kind === "value" ? LOCAL + parsed.name : parsed.kind === "expression" ? localise(parsed.body, names) : "";
-          const result = await this.engine.plot(`plot(${what})`);
+          // The tab's values (a = 1) also reach inside notebook functions (hh uses b).
+          const values = Object.fromEntries(read.flatMap((r) => (r?.kind === "value" ? [[r.name, LOCAL + r.name]] : [])));
+          const result = await this.engine.plot(`plot(${what})`, values);
           if (result.ok) {
             for (const item of result.items) {
               if (item.kind === "value") {
@@ -444,7 +520,14 @@ export class GraphPanel {
               colours.push(i);
             }
             if (result.xRange[1] > xRange[1]) xRange = result.xRange;
-          } else error = result.error.replaceAll(LOCAL, "");
+          } else {
+            error = result.error.replaceAll(LOCAL, "");
+            const unknown = (result.missing ?? []).filter((n) => !n.startsWith(LOCAL) && !names.has(n));
+            if (unknown.length && row) {
+              this.missing.set(row.mf, unknown);
+              error = `${unknown.join(", ")} ${unknown.length > 1 ? "have" : "has"} no value · Enter adds ${unknown.length > 1 ? "sliders" : "a slider"}`;
+            }
+          }
         } catch (err) {
           if (!(err instanceof UnsupportedLatex)) throw err;
           error = err.message;
@@ -462,6 +545,13 @@ export class GraphPanel {
       }
     }
     if (generation !== this.generation || this.tab !== tab) return;
+    // Rows the caret isn't in add their slider rows at once; the row being typed waits (Enter or leaving it).
+    for (const row of this.rows) {
+      if (this.missing.get(row.mf)?.length && document.activeElement !== row.mf) {
+        this.addSliderRows(row.mf);
+        return;
+      }
+    }
     const hadFocus = this.graph?.el === document.activeElement;
     this.graph?.destroy();
     this.graph = null;
@@ -493,4 +583,10 @@ export class GraphPanel {
     this.graphEl.append(this.graph.el);
     if (hadFocus) this.graph.focus();
   }
+}
+
+/** a = 3 (a name and a plain number): the rows that get a slider. */
+function numberRow(latex: string): { name: string; value: number } | null {
+  const m = latex.replace(/\s+/g, "").match(/^([A-Za-z][A-Za-z0-9_]*)=(-?\d+(?:\.\d+)?)$/);
+  return m ? { name: m[1], value: Number(m[2]) } : null;
 }

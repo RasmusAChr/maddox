@@ -1480,3 +1480,68 @@ body.with-graph-panel .notebook {
   color: var(--text);
   font-family: var(--font, inherit);
 }
+
+/* Sliders (graph release 4): under a graph for names without a value, and under a = 3 rows in the panel. */
+.graph-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.graph-sliders:empty {
+  display: none;
+}
+
+.graph-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.graph-slider-name {
+  min-width: 1.5em;
+  font-family: "KaTeX_Math", "Times New Roman", serif;
+  font-style: italic;
+  font-size: 1.1rem;
+}
+
+.graph-slider input,
+.panel-slider input {
+  flex: 1 1 auto;
+  accent-color: var(--accent);
+}
+
+.graph-slider-value {
+  min-width: 4em;
+  color: var(--result);
+  font: 12px ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  text-align: right;
+}
+
+.panel-row {
+  flex-wrap: wrap;
+}
+
+.panel-slider {
+  display: none;
+  flex-basis: 100%;
+  padding: 0 0 4px 24px;
+}
+
+.panel-row.has-slider .panel-slider {
+  display: flex;
+}
+
+/* A graph never makes its cell wider than the sheet (the readout's hint line is long). */
+.entry-graphs,
+.graph {
+  min-width: 0;
+}
+
+/* a = 3 rows show their slider, not "= 3" again. */
+.panel-row.has-slider .panel-leader,
+.panel-row.has-slider .panel-value {
+  display: none;
+}

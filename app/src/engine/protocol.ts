@@ -5,12 +5,13 @@ export type WorkerRequest =
   | { type: "eval"; id: number; giac: string; mode?: AnswerMode }
   | { type: "reset"; id: number }
   | { type: "options"; id: number; options: Partial<SessionOptions> }
-  | { type: "plot"; id: number; giac: string }
+  | { type: "plot"; id: number; giac: string; sliders?: Record<string, string> }
   | { type: "run"; id: number; giac: string }
+  | { type: "split"; id: number; giac: string; keep: string[] }
   | { type: "features"; id: number; fn: string; others: string[]; a: number; b: number }
   | { type: "sample"; id: number; fn: string; a: number; b: number; n: number };
 
 export type WorkerResponse =
   | { type: "ready" }
   | { type: "failed"; error: string }
-  | { type: "result"; id: number; result: EvalResult | PlotResult | number[] | Feature[] | { ok: true } };
+  | { type: "result"; id: number; result: EvalResult | PlotResult | number[] | Feature[] | string | { ok: true } };

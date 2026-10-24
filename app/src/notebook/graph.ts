@@ -3,7 +3,7 @@
 // driven by the keyboard (trace, zoom, pan) as well as the mouse.
 import { convertLatexToMarkup } from "mathlive";
 import type { DrawnItem, Feature } from "../engine/giac-session";
-import { autoY, formatNumber, niceStep, pointsX, segments, ticks, type View } from "./graph-math";
+import { autoY, formatNumber, niceStep, nudge, pointsX, segments, sliderRange, ticks, type View } from "./graph-math";
 
 export type { View };
 
@@ -22,6 +22,11 @@ export type GraphOptions = {
   onView: (view: View | null) => void;
   /** Esc: back to the cell. */
   onExit: () => void;
+  /**
+   * Names without a value get a slider under the graph (release 4). The
+   * curves read the names when sampled, so after onChange the graph redraws.
+   */
+  sliders?: { names: string[]; values: Record<string, number>; onChange: (name: string, value: number) => Promise<void> };
   /** Zeros, extrema, y-intercept and intersections of a curve in [a, b] (release 3). */
   features?: (fn: string, others: string[], a: number, b: number) => Promise<Feature[]>;
   /** Fill the height of the container (the panel); otherwise a fixed 320 px. */
@@ -84,7 +89,7 @@ export class Graph {
     });
     this.readout = document.createElement("div");
     this.readout.className = "graph-readout";
-    this.el.append(legend, this.plot, this.readout);
+    this.el.append(legend, this.plot, this.buildSliders(), this.readout);
     this.showHint();
 
     this.el.addEventListener("keydown", (e) => this.onKey(e));
@@ -178,6 +183,78 @@ export class Graph {
     if (save) this.options.onView(this.custom);
   }
 
+  /** After a slider moved: the curves, their points and the trace follow. */
+  redraw() {
+    this.scheduleResample(0);
+    this.scheduleFeatures(0);
+    if (this.trace) void this.moveTrace(0);
+  }
+
+  // ---- sliders --------------------------------------------------------------
+
+  private sliderInputs: HTMLInputElement[] = [];
+
+  private buildSliders(): HTMLElement {
+    const box = document.createElement("div");
+    box.className = "graph-sliders";
+    const sliders = this.options.sliders;
+    if (!sliders) return box;
+    sliders.names.forEach((name, i) => {
+      const row = document.createElement("label");
+      row.className = "graph-slider";
+      const label = document.createElement("span");
+      label.className = "graph-slider-name";
+      // ab_0 is drawn as ab₀, like the name in the cell.
+      label.innerHTML = convertLatexToMarkup(name.replace(/_([A-Za-z0-9]+)$/, "_{$1}"));
+      const input = document.createElement("input");
+      input.type = "range";
+      input.setAttribute("aria-label", `Slider for ${name}`);
+      const shown = document.createElement("span");
+      shown.className = "graph-slider-value";
+      const set = (value: number) => {
+        const { min, max, step } = sliderRange(value);
+        input.min = String(min);
+        input.max = String(max);
+        input.step = String(step);
+        input.value = String(value);
+        shown.textContent = formatNumber(value);
+        sliders.values[name] = value;
+      };
+      const change = async (value: number) => {
+        set(value);
+        await sliders.onChange(name, value);
+        this.redraw();
+      };
+      set(sliders.values[name] ?? 1);
+      input.addEventListener("input", () => void change(Number(input.value)));
+      input.addEventListener("keydown", (e) => {
+        const handled = () => {
+          e.preventDefault();
+          e.stopPropagation();
+        };
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          handled();
+          const steps = (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 10 : 1);
+          void change(nudge(sliders.values[name], steps, Number(input.step)));
+        } else if (e.key === "ArrowUp") {
+          handled();
+          if (i > 0) this.sliderInputs[i - 1].focus();
+          else this.el.focus();
+        } else if (e.key === "ArrowDown") {
+          handled();
+          this.sliderInputs[i + 1]?.focus();
+        } else if (e.key === "Escape") {
+          handled();
+          this.el.focus();
+        }
+      });
+      row.append(label, input, shown);
+      box.append(row);
+      this.sliderInputs.push(input);
+    });
+    return box;
+  }
+
   // ---- drawing ------------------------------------------------------------
 
   private render() {
@@ -247,7 +324,8 @@ export class Graph {
 
   private showHint() {
     if (this.trace) return;
-    this.readout.textContent = "← → trace · ↑ ↓ switch curve · + − zoom · Ctrl+arrows pan · 0 reset · Esc back";
+    const sliders = this.sliderInputs.length ? " · S sliders" : "";
+    this.readout.textContent = `← → trace · ↑ ↓ switch curve · + − zoom · Ctrl+arrows pan · 0 reset${sliders} · Esc back`;
   }
 
   // ---- trace --------------------------------------------------------------
@@ -391,6 +469,9 @@ export class Graph {
     if (e.key === "Escape") {
       handled();
       this.options.onExit();
+    } else if ((e.key === "s" || e.key === "S") && !mod && !e.altKey && this.sliderInputs.length) {
+      handled();
+      this.sliderInputs[0].focus();
     } else if (e.key === "Tab" && !mod && !e.altKey) {
       // Only while tracing a curve with points to visit; otherwise Tab moves focus as usual.
       if (this.jumpToFeature(e.shiftKey ? -1 : 1)) handled();

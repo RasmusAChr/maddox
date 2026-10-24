@@ -52,11 +52,18 @@ export function readPanelRow(giac: string): PanelRow {
   return { kind: "error", error: "Write g(x) = … to define a function here, or y = … to draw one" };
 }
 
-/** The tab's own names (g, a) in Giac text, renamed to their LOCAL form. */
-export function localise(giac: string, names: Iterable<string>): string {
+/** Names (g, a) in Giac text, renamed to their local form: the tab's, or an inline graph's sliders'. */
+export function localise(giac: string, names: Iterable<string>, prefix = LOCAL): string {
   let out = giac;
-  for (const name of names) out = out.replace(new RegExp(`(?<![A-Za-z0-9_])${name}(?![A-Za-z0-9_])`, "g"), LOCAL + name);
+  for (const name of names) out = out.replace(new RegExp(`(?<![A-Za-z0-9_])${name}(?![A-Za-z0-9_])`, "g"), prefix + name);
   return out;
+}
+
+/** LaTeX that Giac wrote for a localised name (maddox_s1_a, maddox_local_g) back to the name as typed. */
+export function unlocalise(latex: string): string {
+  return latex
+    .replace(/\\mathrm\{maddox\\_(?:local|s\d+)\\_([A-Za-z0-9\\_]+)\}/g, (_m, name: string) => name.replaceAll("\\_", "_"))
+    .replace(/maddox\\?_(?:local|s\d+)\\?_/g, "");
 }
 
 /** Splits LaTeX on commas outside {…} and \left…\right. */

@@ -5,12 +5,18 @@ import { lineNames } from "../engine/dependencies";
 import { ANS_VARIABLE, latexToGiac, UnsupportedLatex } from "../engine/latex-to-giac";
 import { OPERATOR_NAMES } from "../ui/commands";
 import { Graph, type View } from "./graph";
+import { unlocalise } from "./plot-items";
 import { isTextLine, splitLines } from "./lines";
 import { editMatrix, matrixAtCaret, matrixLatex, type MatrixAction, type MatrixInfo } from "./matrix";
 import { atLineStart, breakLine, caretLine, deleteAtBrackets, fillEmptyMatrixCells, focusImmediately, lineBoxes, moveByWord, type LineBox } from "./mathlive-internals";
 
 /** plot(…): the line's result is a graph, drawn below the cell. */
-type PlotLine = { ok: true; plot: Extract<PlotResult, { ok: true }> };
+/** sliders: names without a value (a in a·x²), kept in Giac as prefix + name. */
+type PlotLine = {
+  ok: true;
+  plot: Extract<PlotResult, { ok: true }>;
+  sliders?: { prefix: string; names: string[]; values: Record<string, number> };
+};
 
 /** What one line of a cell shows on the right: nothing (text or empty line), a result, or "computing". */
 type LineResult = EvalResult | PlotLine | "pending" | null;
@@ -31,13 +37,20 @@ type Entry = {
   graphs: Map<number, { result: PlotLine; graph: Graph }>;
   /** Views zoomed or panned to, by line index; saved with the cell. */
   views: Record<number, View>;
+  /** Slider values, by line index; saved with the cell. */
+  sliders: Record<number, Record<string, number>>;
 };
 
 /** A cell's own answer form, overriding the global setting. */
 export type Answers = "exact" | "approx";
 
 /** One cell as saved: its input, its own answer form, and its graphs' views (by line). */
-export type Cell = { latex: string; answers?: Answers; views?: Record<number, View> };
+export type Cell = {
+  latex: string;
+  answers?: Answers;
+  views?: Record<number, View>;
+  sliders?: Record<number, Record<string, number>>;
+};
 
 // Shortcuts MathLive applies while typing. Its defaults include surprises for
 // a calculator (e.g. "in" becomes ∈), so start from a short allowlist.
@@ -122,6 +135,7 @@ export class Notebook {
       const cell: Cell = { latex: e.mf.value };
       if (e.answers) cell.answers = e.answers;
       if (Object.keys(e.views).length) cell.views = e.views;
+      if (Object.keys(e.sliders).length) cell.sliders = e.sliders;
       return cell;
     });
   }
@@ -133,7 +147,7 @@ export class Notebook {
     this.entries = [];
     this.active = null;
     const list = cells.length ? cells : [{ latex: "" }];
-    list.forEach((cell, i) => this.createEntry(cell.latex, i, cell.answers ?? null, cell.views));
+    list.forEach((cell, i) => this.createEntry(cell.latex, i, cell.answers ?? null, cell.views, cell.sliders));
   }
 
   /**
@@ -209,7 +223,13 @@ export class Notebook {
 
   // ---- entries ------------------------------------------------------------
 
-  private createEntry(latex: string, index: number, answers: Answers | null = null, views: Record<number, View> = {}): Entry {
+  private createEntry(
+    latex: string,
+    index: number,
+    answers: Answers | null = null,
+    views: Record<number, View> = {},
+    sliders: Record<number, Record<string, number>> = {},
+  ): Entry {
     const el = document.createElement("div");
     el.className = "entry";
     const mf = new MathfieldElement();
@@ -225,7 +245,7 @@ export class Notebook {
     graphsEl.className = "entry-graphs";
     el.append(mf, resultEl, graphsEl, chip);
 
-    const entry: Entry = { el, mf, resultEl, evaluatedLatex: null, results: [], answers, chip, graphsEl, graphs: new Map(), views: { ...views } };
+    const entry: Entry = { el, mf, resultEl, evaluatedLatex: null, results: [], answers, chip, graphsEl, graphs: new Map(), views: { ...views }, sliders: { ...sliders } };
     chip.addEventListener("click", () => this.toggleAnswers(entry));
     this.showAnswersChip(entry);
     const next = this.entries[index];
@@ -496,6 +516,9 @@ export class Notebook {
     else if (entry.mf.value.trim()) this.insertEntryAfter(entry);
     const before = entry.evaluatedLatex === null ? new Set<string>() : cellNames(entry.evaluatedLatex).assigns;
     await this.evaluate(entry);
+    // Results arrive after the caret moved on; a tall one (a graph) can push
+    // the caret's cell out of view. Bring it back: the graph is right above it.
+    if (this.active && this.active !== entry) this.active.el.scrollIntoView({ block: "nearest" });
     if (!this.entries.includes(entry) || entry.evaluatedLatex === null) return;
     const now = cellNames(entry.evaluatedLatex);
     const dropped = [...before].filter((name) => !now.assigns.has(name));
@@ -575,8 +598,7 @@ export class Notebook {
       try {
         const giac = latexToGiac(lines[i]);
         if (/^plot\W?\(/.test(giac)) {
-          const plot = await this.engine.plot(giac);
-          result = plot.ok ? { ok: true, plot } : plot;
+          result = await this.plotLine(entry, i, giac);
         } else {
           result = await this.engine.evaluate(giac, entry.answers ?? undefined);
         }
@@ -667,6 +689,17 @@ export class Notebook {
           this.onChange();
         },
         onExit: () => focusImmediately(entry.mf),
+        sliders: result.sliders && {
+          names: result.sliders.names,
+          values: result.sliders.values,
+          onChange: async (name, value) => {
+            const { prefix, values } = result.sliders!;
+            values[name] = value;
+            entry.sliders[i] = { ...values };
+            await this.engine.run(`${prefix}${name}:=${value}`);
+            this.onChange();
+          },
+        },
       });
       graph.el.addEventListener("focus", () => {
         this.active = entry;
@@ -676,6 +709,31 @@ export class Notebook {
     }
     const els = [...entry.graphs.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => g.graph.el);
     if (els.length !== entry.graphsEl.children.length || els.some((el, k) => entry.graphsEl.children[k] !== el)) entry.graphsEl.replaceChildren(...els);
+  }
+
+  private sliderIds = 0;
+
+  /**
+   * plot(…) for one line. Names without a value become sliders: they keep a
+   * name of this graph's own (prefix + name) so they don't clash with other
+   * graphs or the notebook, stay symbols in the curves, and get their value
+   * (1, or the saved one) before the graph samples them.
+   */
+  private async plotLine(entry: Entry, line: number, typed: string): Promise<EvalResult | PlotLine> {
+    // ax is a·x here (graphs only), before slider names get their own form.
+    const giac = await this.engine.splitUnknown(typed);
+    const plain = await this.engine.plot(giac);
+    if (plain.ok) return { ok: true, plot: plain };
+    if (!plain.missing?.length) return plain;
+    const names = plain.missing;
+    const prefix = `maddox_s${++this.sliderIds}_`;
+    const saved = entry.sliders[line] ?? {};
+    const values = Object.fromEntries(names.map((n) => [n, Number.isFinite(saved[n]) ? saved[n] : 1]));
+    const plot = await this.engine.plot(giac, Object.fromEntries(names.map((n) => [n, prefix + n])));
+    if (!plot.ok) return { ok: false, error: unlocalise(plot.error) };
+    for (const n of names) await this.engine.run(`${prefix}${n}:=${values[n]}`);
+    const items = plot.items.map((item) => ({ ...item, label: unlocalise(item.label) }));
+    return { ok: true, plot: { ...plot, items }, sliders: { prefix, names, values } };
   }
 
   /** Alt+↓ on a cell with a graph: the keyboard goes into the (first) graph. */

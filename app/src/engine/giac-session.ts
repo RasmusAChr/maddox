@@ -29,7 +29,8 @@ export type DrawnItem =
 export type PlotItem = DrawnItem | { kind: "value"; label: string; latex: string; approxLatex: string | null; point?: [number, number] };
 
 /** xRange: the default window's x (−360…360 for trig in degrees). */
-export type PlotResult = { ok: true; items: PlotItem[]; xRange: [number, number] } | { ok: false; error: string };
+/** missing: names without a value (a in a·x²), which can become sliders. */
+export type PlotResult = { ok: true; items: PlotItem[]; xRange: [number, number] } | { ok: false; error: string; missing?: string[] };
 
 /** How trigonometric functions read and return angles. */
 export type AngleMode = "deg" | "rad";
@@ -125,22 +126,35 @@ export class GiacSession {
    * defined function, or an expression in x) or points (a point or a list
    * of points). Functions are sampled later with sample(), per view.
    */
-  plot(giac: string): PlotResult {
+  /**
+   * `sliders`: names without a value mapped to the graph's own names
+   * (a → maddox_s1_a). They are swapped in, also inside a function's
+   * definition, and stay symbols, so a curve follows its slider (the value
+   * is set before sampling, not baked in here).
+   */
+  plot(giac: string, sliders: Record<string, string> = {}): PlotResult {
     try {
-      return this.plotUnguarded(giac);
+      return this.plotUnguarded(giac, sliders);
     } catch {
       this.takePrinted();
       return { ok: false, error: thrownError(giac) };
     }
   }
 
-  private plotUnguarded(giac: string): PlotResult {
+  private plotUnguarded(giac: string, sliders: Record<string, string>): PlotResult {
     const input = this.resolveCalls(giac).trim();
     const m = input.match(/^plot\((.*)\)$/s);
     if (!m || !m[1].trim()) return { ok: false, error: "Write what to plot inside the brackets, e.g. plot(f, x^2)" };
     const unknown = this.unknownUnit(input);
     if (unknown) return { ok: false, error: unknown };
+    // Slider names, swapped for the graph's own names (whose values are set before sampling).
+    const names = Object.keys(sliders);
+    const targets = new Set(Object.values(sliders));
+    const swap = (expr: string) => (names.length ? `subst(${expr},[${names.join(",")}],[${names.map((n) => sliders[n]).join(",")}])` : expr);
+    const freeNames = (expr: string, axis: string) =>
+      this.caseval(`lname(${expr})`).replace(/^\[|\]$/g, "").split(",").map((s) => s.trim()).filter((s) => s && s !== axis && !targets.has(s));
     const items: PlotItem[] = [];
+    const missing: string[] = [];
     let trig = false;
     for (const arg of splitTopLevel(m[1]).map((a) => a.trim())) {
       this.takePrinted();
@@ -162,21 +176,77 @@ export class GiacSession {
         items.push({ kind: "value", label: this.exactLatex(RESULT), ...forms, ...this.pointOfCall(arg) });
         continue;
       }
-      if (!isFunction) {
-        const others = this.caseval(`lname(${RESULT})`).replace(/^\[|\]$/g, "").split(",").map((s) => s.trim()).filter((s) => s && s !== "x");
-        if (others.length) return { ok: false, error: `plot draws functions of x, but ${others.join(", ")} ${others.length > 1 ? "have" : "has"} no value` };
+      // The axis is never guessed (decision 0008): x for an expression, a
+      // function's own parameter for a function. Every other name without a
+      // value is a parameter, i.e. a slider.
+      const axis = isFunction ? T : "x";
+      this.caseval(`${RESULT}:=${swap(isFunction ? `${arg}(${T})` : RESULT)}`);
+      const free = freeNames(RESULT, axis);
+      if (free.length) {
+        if (!isFunction && !this.caseval(`lname(${RESULT})`).match(/\bx\b/)) {
+          const typed = arg.replace(/\^\((-?\d+)\)/g, "^$1").replace(/\*/g, "·");
+          return { ok: false, error: `plot draws functions of x. Use x, or define a function, e.g. f(t) := at+b` };
+        }
+        missing.push(...free.filter((n) => !missing.includes(n)));
+        continue;
       }
-      const body = isFunction ? this.caseval(`string(${arg})`) : this.caseval(`string(${RESULT})`);
+      const body = this.caseval(`string(${RESULT})`).replace(/^"|"$/g, "");
       if (/\b(sin|cos|tan|cot|sec|csc)\(/.test(body)) trig = true;
       items.push({
         kind: "function",
         label: isFunction ? arg : this.exactLatex(RESULT),
-        fn: isFunction ? arg : `unapply(${this.caseval(`string(${RESULT})`).replace(/^"|"$/g, "")},x)`,
+        // A defined function is sampled as itself, unless sliders were swapped into it.
+        fn: isFunction && !names.length ? arg : `unapply(${body},${axis})`,
       });
     }
     this.takePrinted();
+    if (missing.length >= 5) return { ok: false, error: `Too many names without a value (${missing.join(", ")}): define some in a cell` };
+    if (missing.length) return { ok: false, error: `plot draws functions of x, but ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no value`, missing };
     const deg = this.options.angle === "deg" && trig;
     return { ok: true, items, xRange: deg ? [-360, 360] : [-10, 10] };
+  }
+
+
+  /**
+   * In graphs, ax means a·x (as in Desmos and GeoGebra): an undefined name of
+   * letters that contains x is read letter by letter. Defined names (XT, fp),
+   * calls (max(…)) and `keep` (a graph tab's own names) stay as they are.
+   * Only plot(…) and graph-panel rows use this; cells keep ax as one name.
+   */
+  splitUnknown(giac: string, keep: string[] = []): string {
+    try {
+      return giac.replace(/(?<![A-Za-z0-9_])([A-Za-z]*x[A-Za-z]*)(?![A-Za-z0-9_(\u0002])/g, (name: string) => {
+        if (name.length < 2 || keep.includes(name)) return name;
+        const unknown = this.caseval(`type(${name})`) === "identifier";
+        this.takePrinted();
+        return unknown ? name.split("").join("*") : name;
+      });
+    } catch {
+      this.takePrinted();
+      return giac;
+    }
+  }
+
+  /**
+   * In a definition f(p) := …, p is known to be the variable, so an undefined
+   * name of letters followed by p means those letters times p: in
+   * hh(b_0) := ab_0 + b, ab_0 is a·b_0, and in f(x) := ax^2 + b, ax is a·x.
+   * Defined names (XTy) and calls stay as they are. Elsewhere, letters typed
+   * together remain one name.
+   */
+  private splitByParameter(giac: string): string {
+    const m = giac.match(/^\s*([A-Za-z][A-Za-z0-9_]*)\(([^()]*)\)\s*:=(.*)$/s);
+    if (!m) return giac;
+    const params = m[2].split(",").map((p) => p.trim()).filter((p) => /^[A-Za-z][A-Za-z0-9_]*$/.test(p));
+    if (!params.length) return giac;
+    const body = m[3].replace(/(?<![A-Za-z0-9_])([A-Za-z][A-Za-z0-9_]*)(?![A-Za-z0-9_(])/g, (name: string) => {
+      if (params.includes(name) || name === m[1]) return name;
+      const param = params.find((p) => name.length > p.length && name.endsWith(p) && /^[A-Za-z]+$/.test(name.slice(0, -p.length)));
+      if (!param || this.caseval(`type(${name})`) !== "identifier") return name;
+      this.takePrinted();
+      return [...name.slice(0, -param.length).split(""), param].join("*");
+    });
+    return giac.slice(0, giac.length - m[3].length) + body;
   }
 
   /**
@@ -186,7 +256,7 @@ export class GiacSession {
   run(giac: string): { ok: true } | { ok: false; error: string } {
     try {
       this.takePrinted();
-      const raw = this.caseval(this.resolveCalls(giac));
+      const raw = this.caseval(this.splitByParameter(this.resolveCalls(giac)));
       const error = findError(raw, this.takePrinted(), giac);
       return error ? { ok: false, error } : { ok: true };
     } catch {
@@ -313,7 +383,7 @@ export class GiacSession {
       this.reset();
       return { ok: true, latex: "\\text{All variables cleared}", approxLatex: null };
     }
-    giac = this.resolveCalls(giac);
+    giac = this.splitByParameter(this.resolveCalls(giac));
     const notSquare = this.squareCheck(giac);
     if (notSquare) return { ok: false, error: notSquare };
     if (/_deg[CF]/.test(giac)) return { ok: false, error: "Temperatures can only be converted with →, e.g. 20 °C → K. Use K to calculate." };

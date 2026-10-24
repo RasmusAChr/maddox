@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoY, formatNumber, niceStep, pointsX, segments, ticks } from "./graph-math";
+import { autoY, formatNumber, niceStep, nudge, pointsX, segments, sliderRange, ticks } from "./graph-math";
 
 describe("graph arithmetic", () => {
   it("tick steps are 1, 2 or 5 × 10ⁿ", () => {
@@ -41,5 +41,13 @@ describe("graph arithmetic", () => {
     expect(formatNumber(1 / 3)).toBe("0.333333");
     expect(formatNumber(1e-15)).toBe("0");
     expect(formatNumber(2)).toBe("2");
+  });
+
+  it("sliders: −10…10 by 0.1, wider for big values; steps stay round", () => {
+    expect(sliderRange(1)).toEqual({ min: -10, max: 10, step: 0.1 });
+    expect(sliderRange(-37)).toEqual({ min: -100, max: 100, step: 1 });
+    expect(nudge(0.2, 1, 0.1)).toBe(0.3);
+    expect(nudge(1, -10, 0.1)).toBe(0);
+    expect(nudge(37, 1, 1)).toBe(38);
   });
 });

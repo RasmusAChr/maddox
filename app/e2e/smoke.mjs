@@ -1082,6 +1082,92 @@ check("Shift+Tab goes back", /Zero/.test(fg.readout), fg.readout);
 check("Tab keeps the keyboard in the graph", await inGraph(), await active());
 await page.keyboard.press("Escape");
 
+// 35. Sliders: names without a value get one under an inline graph (S goes to
+// it, ←/→ change it, saved with the cell); in the panel, Enter adds a = 1 rows
+// whose sliders Alt+←/→ nudge.
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("plot(sa*x^2+sb");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(600);
+const sliderCell = () => page.$$eval(".entry", (els) => {
+  const el = els.find((e) => /sa\*x\^2\+sb/.test(e.querySelector("math-field")?.value ?? ""));
+  if (!el) return null;
+  const graph = el.querySelector(".graph");
+  return {
+    names: [...el.querySelectorAll(".graph-slider-name")].map((n) => n.textContent),
+    values: [...el.querySelectorAll(".graph-slider-value")].map((n) => n.textContent),
+    curve: el.querySelector(".graph-curve")?.getAttribute("d")?.slice(0, 80) ?? "",
+    fits: graph ? graph.getBoundingClientRect().right <= el.getBoundingClientRect().right + 1 : false,
+  };
+});
+const inView = await page.evaluate(() => {
+  const n = document.querySelector("#notebook").getBoundingClientRect();
+  const a = document.activeElement.getBoundingClientRect();
+  return a.top >= n.top && a.bottom <= n.bottom;
+});
+check("after Enter the caret's cell stays in view below the new graph", inView);
+let sc = await sliderCell();
+check("names without a value get sliders under the graph", sc?.names.join(",") === "sa,sb" && sc.values.join(",") === "1,1", JSON.stringify(sc));
+check("the graph fits inside its cell", sc?.fits === true, JSON.stringify(sc));
+const curveBefore = sc?.curve;
+await page.keyboard.press("ArrowUp");
+await page.keyboard.press("Alt+ArrowDown");
+await page.keyboard.press("s");
+check("S goes to the first slider", (await page.evaluate(() => document.activeElement?.getAttribute("aria-label"))) === "Slider for sa");
+await page.keyboard.press("Shift+ArrowRight");
+await page.waitForTimeout(700);
+sc = await sliderCell();
+check("Shift+→ moves the slider by 1 and the curve follows", sc?.values[0] === "2" && sc.curve !== curveBefore, JSON.stringify(sc));
+const savedSliders = await page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem("maddox.session") ?? "{}").entries?.map((e) => e.sliders).filter(Boolean)));
+check("slider values are saved with the cell", /"sa":2,"sb":1/.test(savedSliders), savedSliders);
+await page.keyboard.press("Escape"); // slider → graph
+await page.keyboard.press("Escape"); // graph → cell
+// In a graph, kx means k·x (k has no value): the slider is k, not kx.
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("plot(kx^2");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(600);
+const kSliders = await page.$$eval(".entry", (els) => [...(els.find((e) => /\(kx\^2/.test(e.querySelector("math-field")?.value ?? ""))?.querySelectorAll(".graph-slider-name") ?? [])].map((n) => n.textContent));
+check("plot(kx²) gives a slider for k (kx is k·x in a graph)", kSliders.join(",") === "k", JSON.stringify(kSliders));
+// The axis is never guessed: hq runs over its own t; mq and nq inside it are sliders.
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("hq(t");
+await page.keyboard.press("ArrowRight");
+await page.keyboard.type(":=mq*t+nq");
+await page.keyboard.press("Shift+Enter");
+await page.keyboard.type("plot(hq");
+await page.keyboard.press("ArrowUp");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(700);
+const hq = await page.$$eval(".entry", (els) => {
+  const el = els.find((e) => /hq\\left\(t\\right\)/.test(e.querySelector("math-field")?.value ?? ""));
+  return { sliders: el?.querySelectorAll(".graph-slider").length ?? 0, curve: (el?.querySelector(".graph-curve")?.getAttribute("d") ?? "").length > 20 };
+});
+check("names inside a plotted function get sliders too", hq.sliders === 2 && hq.curve, JSON.stringify(hq));
+await page.keyboard.type("plot(tq^2");
+await page.keyboard.press("Enter");
+await waitIdle();
+await page.waitForTimeout(200);
+check("an expression without x says so", /Use x, or define a function/.test((await resultOfCurrent()) ?? ""), await resultOfCurrent());
+await page.keyboard.press("Control+g");
+await page.keyboard.press("Control+Enter"); // a fresh tab
+await page.keyboard.type("y=pa*x^2");
+await page.waitForTimeout(900);
+const rowErrors = () => page.$$eval(".panel-error", (els) => els.map((e) => e.textContent).filter(Boolean));
+check("a row with an unknown name offers a slider", /pa has no value · Enter adds a slider/.test((await rowErrors()).join("|")), JSON.stringify(await rowErrors()));
+await page.keyboard.press("Enter");
+await page.waitForTimeout(900);
+ps = await panelState();
+check("Enter adds pa = 1 with a slider, and the curve draws", ps.rows.join("|") === "y=pa*x^2|pa=1" && ps.curves === 1 && (await page.$$eval(".panel-row.has-slider", (r) => r.length)) === 1, JSON.stringify(ps));
+await page.keyboard.press("ArrowDown");
+await page.keyboard.press("Alt+ArrowRight");
+await page.waitForTimeout(300);
+check("Alt+→ nudges the value in the row", (await panelState()).rows[1] === "pa=1.1", JSON.stringify((await panelState()).rows));
+await page.keyboard.press("Control+g");
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 

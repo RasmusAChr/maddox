@@ -70,10 +70,17 @@ docs updated, a short report of what changed.
   tabs, each with its own list; F6 switches pane, Ctrl+Shift+G adds a cell
   line. In a tab, `g(x) = …` defines g for that tab only; `:=` (global) is
   for cells. Tracing shows the curve's zeros, max/min and intersections (Tab
-  jumps, exact values). Sliders come next; see
+  jumps, exact values). Names without a value get sliders (S in a graph; Alt+←/→ on
+  an `a = 3` row in the panel). In graphs only, an undefined `ax` is a·x;
+  in cells letters typed together stay one name. The axis is never guessed:
+  x for expressions, a function's own parameter for functions. See
   `docs/decisions/0008-graphs.md`.
 - **% is always hundredths**: `20%` is 0.2, so `150+20%` is 150.2 (as on
   the Nspire and in Excel, not a shop calculator). Decided 2026-10-23.
+- **Letters typed together are one name** (`xy`, `XTy`), except: in a
+  definition `f(p) := …` an undefined name ending in p is a product
+  (`ab₀` with p = b₀ is a·b₀), and in graphs an undefined name with x in it
+  is (`ax` is a·x). Decided 2026-10-24.
 - **Decimal point only.** `2.5`, never `2,5`, even on Danish setups. The
   owner decided this on 2026-10-23: students learn the international
   convention. Commas separate arguments and list items. Don't add a
