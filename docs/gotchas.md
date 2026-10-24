@@ -200,6 +200,14 @@ Re-check this list after upgrading.
   `dropRestoredFocus()` in `dialogs.ts` blurs the restored cell, so the
   caller's focus is a real one. Never rely on dialog focus restoration for
   a math-field.
+- **WebKitGTK: Esc didn't close the settings dialog** (2026-10-25), from
+  Ctrl+, or from Ctrl+P, even though focus stayed in it and ↑/↓ worked.
+  Chromium closes it fine. WebKit hands a key to its editor
+  (`Editor::handleKeyboardEvent`, on GTK the input-method key bindings)
+  before its default Esc handling closes a modal dialog. If the editor
+  marks the key as handled, the dialog never closes. `openDialog()` in
+  `dialogs.ts` therefore closes every dialog on Esc itself. Don't rely on
+  the browser's own Esc for a `<dialog>`.
 - **WebKitGTK (Linux) navigation:**
   - MathLive's `move-out` event is unreliable at the top and bottom rows,
     so ↑/↓ also move between cells when the caret provably did not move.

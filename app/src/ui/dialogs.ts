@@ -8,9 +8,19 @@ import { queryWords, score, type Searchable } from "./search";
  */
 export function openDialog(dialog: HTMLDialogElement, onCancel: () => void) {
   let finished = false;
+  // Esc closes the dialog here rather than by the browser's own handling:
+  // in WebKitGTK (Linux) the settings dialog ignored Esc, even though focus
+  // stayed in it. Closing fires "close", which cancels as below.
+  const onEscape = (e: KeyboardEvent) => {
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    e.preventDefault();
+    dialog.close();
+  };
+  dialog.addEventListener("keydown", onEscape);
   dialog.addEventListener(
     "close",
     () => {
+      dialog.removeEventListener("keydown", onEscape);
       if (finished) return;
       dropRestoredFocus();
       onCancel();

@@ -666,6 +666,14 @@ check("Esc closes settings back into the cell", !(await page.isVisible("#setting
 await page.keyboard.type("5");
 check("typing works after settings closed", (await page.evaluate(() => document.activeElement?.value)) === "5", await page.evaluate(() => document.activeElement?.value));
 await page.keyboard.press("Backspace");
+// Opened from Ctrl+P, Esc closes it too (it didn't in WebKitGTK; see openDialog).
+await page.keyboard.press("Control+p");
+await page.keyboard.type("settings");
+await page.keyboard.press("Enter");
+await page.waitForSelector("#settings-dialog[open]");
+await page.keyboard.press("Escape");
+await page.waitForTimeout(150);
+check("Ctrl+P Settings, then Esc, closes it back into the cell", !(await page.isVisible("dialog[open]")) && (await page.evaluate(() => document.activeElement?.tagName === "MATH-FIELD")));
 await page.click('[data-action="settings"]');
 await page.waitForSelector("#settings-dialog[open]");
 check("the gear button opens settings", await page.isVisible("#settings-dialog[open]"));
