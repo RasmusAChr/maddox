@@ -27,9 +27,11 @@ available alongside the binaries.
 Work happens on feature branches, which are merged into `development`.
 `main` is always the latest release (see "Branches" in `CLAUDE.md`).
 
-1. On `development`, write the notes: rename `## Unreleased` at the top
-   of `CHANGELOG.md` to `## 1.2.3` (or add that section), in plain words
-   for students. The app shows it in the update dialog.
+1. Check the notes on `development`. Every fix or feature already has its
+   own `CHANGELOG.md` section with its own version (see the top of that
+   file), so the release version is the top section's. The release notes
+   are every section since the previous release's tag. Preview them with
+   `node scripts/release.mjs --notes 1.2.3`.
 2. Open a pull request from `development` to `main`, let CI pass, and
    merge it. Then `git switch main && git pull`, and in `app/`:
    `npm run release -- 1.2.3`. It writes

@@ -140,9 +140,13 @@ npm run tauri build  # installers in src-tauri/target/release/bundle/
 npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md)
 ```
 
-- **Keep `CHANGELOG.md` current**: add what users notice to the top
-  section (`## Unreleased` until a release names it). Its text is shown in
-  the update dialog.
+- **Every fix or feature gets its own `CHANGELOG.md` section** with the
+  next version number, committed on its branch (decided 2026-10-25).
+  Use semantic versioning: a fix bumps the patch (1.0.0 → 1.0.1), new or
+  changed behaviour the minor (→ 1.1.0), a file format older versions
+  can't open the major. Write what users notice, in plain words. A
+  release's notes are all sections since the previous release, and they
+  are shown in the update dialog.
 
 - **After any UI or keyboard change**, run `npm run e2e`.
   `app/e2e/smoke.mjs` is the executable spec of the behaviour the owner
