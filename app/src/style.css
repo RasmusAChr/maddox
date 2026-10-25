@@ -1587,29 +1587,23 @@ body.with-graph-panel .notebook {
   display: none;
 }
 
-/* About Maddox (Ctrl+P): version, licences, source; the GPL text scrolls. */
+/* About Maddox (Ctrl+P): version, licences, where the source is. */
 .about-dialog {
   width: min(680px, 100vw - 32px);
-  padding: 20px 22px;
   max-height: min(86vh, 900px);
-  display: none;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.about-dialog[open] {
-  display: flex;
-  /* The licence text scrolls, not the whole dialog. */
-  overflow: hidden;
+  padding: 22px 24px 18px;
+  outline: none;
 }
 
 .about-dialog h2 {
-  margin: 0;
+  margin: 0 0 8px;
+  font-size: 1.6rem;
+  font-weight: 700;
 }
 
 .about-dialog h3 {
-  margin: 10px 0 2px;
-  font-size: 0.95rem;
+  margin: 16px 0 4px;
+  font-size: 1.15rem;
 }
 
 .about-dialog p,
@@ -1618,8 +1612,12 @@ body.with-graph-panel .notebook {
   line-height: 1.5;
 }
 
+.about-dialog p + p {
+  margin-top: 8px;
+}
+
 .about-parts dt {
-  margin-top: 6px;
+  margin-top: 8px;
   font-weight: 600;
 }
 
@@ -1632,21 +1630,4 @@ body.with-graph-panel .notebook {
   color: var(--accent);
   user-select: all;
   word-break: break-all;
-}
-
-.about-license {
-  flex: 1 1 auto;
-  min-height: 140px;
-  margin: 0;
-  padding: 10px 12px;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-2);
-  font: 11.5px/1.45 ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
-  white-space: pre-wrap;
-}
-
-.about-license:focus-visible {
-  outline: 2px solid var(--accent);
 }

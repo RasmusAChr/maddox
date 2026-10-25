@@ -13,7 +13,6 @@ import { plotItemsFromLine } from "./notebook/plot-items";
 import { GraphPanel } from "./ui/graph-panel";
 import { CATALOG, CATEGORIES, type CatalogItem } from "./ui/commands";
 import { askUnsaved, askUpdate, openAbout, openHelp, openMatrixDialog, openSearch, type SearchItem } from "./ui/dialogs";
-import licence from "../LICENSE?raw";
 import { renderTemplates, toggleTemplates } from "./ui/templates";
 import { appVersion, canUpdate, checkForUpdate, type Update } from "./updates";
 import { applyZoom, zoom, zoomLevel } from "./zoom";
@@ -578,7 +577,7 @@ function help() {
 }
 
 function about() {
-  openAbout($("#about-dialog"), appVersion, licence, refocus);
+  openAbout($("#about-dialog"), appVersion, refocus);
 }
 
 /** Inserts a catalog or template item; "Matrix…" asks for a size first. */

@@ -76,12 +76,13 @@
       </div>
     </dialog>
 
-    <dialog id="about-dialog" class="about-dialog" aria-label="About Maddox">
+    <dialog id="about-dialog" class="about-dialog" aria-label="About Maddox" tabindex="-1">
       <h2>Maddox <span class="about-version"></span></h2>
       <p>A free, keyboard-first maths notebook. © 2026 the Maddox authors.</p>
       <p>
         Maddox is free software under the GNU General Public License, version 3 or later: you may use, study,
         share and change it. Its source code is at <span class="about-url">https://github.com/RasmusAChr/maddox</span>.
+        The full licence comes with the installer and is at <span class="about-url">https://www.gnu.org/licenses/gpl-3.0.html</span>.
       </p>
       <h3>Built on</h3>
       <dl class="about-parts">
@@ -98,9 +99,7 @@
         <dt>Tauri 2</dt>
         <dd>The desktop window. MIT License or Apache License 2.0.</dd>
       </dl>
-      <h3>GNU General Public License</h3>
-      <pre class="about-license" tabindex="0" aria-label="The GNU General Public License, version 3"></pre>
-      <div class="dialog-foot"><kbd>↑</kbd><kbd>↓</kbd> <kbd>PgUp</kbd><kbd>PgDn</kbd> scroll the licence · <kbd>Esc</kbd> close</div>
+      <div class="dialog-foot"><kbd>Esc</kbd> close</div>
     </dialog>
 
     <dialog id="settings-dialog" class="settings-dialog" aria-label="Settings">
