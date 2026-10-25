@@ -37,7 +37,7 @@ result row ◀──cleanLatex── latex(regroup(result)) + evalf ◀───
 npm install          # also downloads Giac (~19 MB, sha256-pinned) to public/giac/
 npm test             # unit tests + Giac integration tests (vitest)
 npm run dev          # browser at http://localhost:1420
-npm run e2e          # keyboard-driven browser test; needs `npm run dev` running
+npm run e2e          # keyboard-driven browser tests (e2e/scenarios); needs `npm run dev` running
 npm run tauri dev    # desktop window with hot reload
 npm run tauri build  # installers in src-tauri/target/release/bundle/
 ```

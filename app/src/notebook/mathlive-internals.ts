@@ -1,7 +1,7 @@
 // Everything that reaches into MathLive's private state lives here, because
 // the public API has no way to do it. mathlive is pinned to an exact version
-// in package.json; re-check these after upgrading it (e2e/smoke.mjs covers
-// all of them).
+// in package.json; re-check these after upgrading it (`npm run e2e`
+// covers all of them).
 import { MathfieldElement } from "mathlive";
 
 type ArrayAtom = { environmentName?: string; rowCount: number; colCount: number };

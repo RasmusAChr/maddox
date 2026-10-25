@@ -137,7 +137,8 @@ npm install          # also fetches Giac into public/giac/ (sha256-pinned)
 npm test             # vitest: converter + real-Giac integration tests
 npx tsc --noEmit
 npm run dev          # browser at http://localhost:1420
-npm run e2e          # keyboard-driven smoke test; needs a dev server on :1420
+npm run e2e          # keyboard-driven e2e scenarios; needs a dev server on :1420
+npm run e2e -- graphs settings   # only those scenarios
 npm run tauri dev    # desktop window
 npm run tauri build  # installers in src-tauri/target/release/bundle/
 npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md)
@@ -151,10 +152,19 @@ npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md
   release's notes are all sections since the previous release, and they
   are shown in the update dialog.
 
-- **After any UI or keyboard change**, run `npm run e2e`.
-  `app/e2e/smoke.mjs` is the executable spec of the behaviour the owner
-  asked for. Add a check for every new behaviour. The same script can drive
-  the built desktop app (see its header).
+- **After any UI or keyboard change**, run `npm run e2e`. The scenarios in
+  `app/e2e/scenarios/` are the executable spec of the behaviour the owner
+  asked for. Add a check for every new behaviour, in the scenario it
+  belongs to. Each scenario starts on a fresh page (empty notebook and
+  settings), so it must set up what it needs. Shared helpers are in
+  `e2e/lib.mjs`, and a new scenario goes in the list in `e2e/run.mjs`.
+  While working, run only the scenario you touch, then all of them before
+  committing. The same runner can drive the built desktop app (see the
+  header of `run.mjs`).
+- **Keep the scenarios fast.** A slow cell (e.g. the 15 s `ifactor` the
+  basics scenario cancels) must not stay in a notebook that is re-run
+  later. Each "re-run everything" would compute it again; that once made
+  the whole run take 5 minutes.
 - **Linux (WebKitGTK) can only be verified in CI**
   (`.github/workflows/app.yml`, Windows + Ubuntu). Check the run after
   pushing UI changes.
