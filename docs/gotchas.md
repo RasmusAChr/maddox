@@ -53,6 +53,12 @@ Re-check this list after upgrading.
   `solve(…)` removes only `(`, leaving `\left.`. Delete on empty `()`
   removes only `)`. Ctrl+Backspace at a group's start does nothing. Fix:
   `deleteAtBrackets()`; a function name is any atom with `isFunction`.
+- **LaTeX mode owns Enter, Tab and ↑/↓.** Typing `\` switches the field to
+  `mode === "latex"` and shows suggestions (`\alp` → `\alpha`). Enter or
+  Tab accepts one, and ↑/↓ choose, all without moving the caret. Our
+  capture-phase key handler must leave these keys alone in that mode.
+  Otherwise Enter evaluates the half-typed command, and ↑/↓ look like
+  "caret didn't move" and leave the cell.
 - **Ctrl+←/→ get stuck.** MathLive binds them to move to the start or end
   of the current group, so at a group's edge (e.g. right before the `(` of
   `transpose(A)`) they do nothing. Its Alt+arrows (word moves) step through

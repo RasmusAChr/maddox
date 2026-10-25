@@ -417,6 +417,11 @@ export class Notebook {
       return;
     }
 
+    // Typing \ opens MathLive's LaTeX mode and its list of suggestions
+    // (\alp → \alpha): there Enter and Tab accept one and ↑/↓ choose. Leave
+    // those keys to MathLive, or Enter would evaluate the half-typed command.
+    if (entry.mf.mode === "latex" && !mod && !e.altKey && ["Enter", "Tab", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+
     if (e.key === "Enter" && e.altKey && !mod && !e.shiftKey) {
       claim();
       this.toggleAnswers(entry);
