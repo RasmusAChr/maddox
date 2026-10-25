@@ -1,7 +1,9 @@
 // The settings dialog (Ctrl+,). Built from a list of settings, so adding one
-// means adding an entry in main.ts. Keyboard: ↑/↓ move between settings,
-// ←/→ change the value, Enter or Space runs a button, Esc closes. Changes
-// apply at once; there is no Save.
+// means adding an entry in main.ts; each setting's section is a tab.
+// Keyboard: on the tab list, ↑/↓ choose a tab (the right side follows) and
+// Enter or → goes into it; inside, ↑/↓ move between settings, ←/→ change
+// the value, Enter or Space runs a button, and Esc goes back to the tabs.
+// Esc on the tabs closes. Changes apply at once; there is no Save.
 import { openDialog } from "./dialogs";
 
 type Base = { id: string; section: string; label: string; hint?: string };
@@ -11,27 +13,71 @@ export type Setting =
   | (Base & { kind: "stepper"; display: () => string; step: (dir: 1 | -1) => void | Promise<void> })
   | (Base & { kind: "action"; button: () => string; enabled: () => boolean; run: () => void });
 
+const FOOT_TABS = "<kbd>↑</kbd><kbd>↓</kbd> tab · <kbd>Enter</kbd> or <kbd>→</kbd> open · <kbd>Esc</kbd> close · changes apply at once";
+const FOOT_SETTINGS = "<kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>←</kbd><kbd>→</kbd> change · <kbd>Esc</kbd> back to the tabs";
+
+/** The tab shown when the dialog opens again (for this run of the app). */
+let lastTab = "";
+
 export function openSettings(dialog: HTMLDialogElement, settings: Setting[], onClose: () => void) {
+  const tabList = dialog.querySelector<HTMLElement>(".settings-tabs")!;
   const list = dialog.querySelector<HTMLElement>(".settings-list")!;
-  list.replaceChildren();
-  let section = "";
-  for (const setting of settings) {
-    if (setting.section !== section) {
-      section = setting.section;
-      const h = document.createElement("h3");
-      h.className = "settings-section";
-      h.textContent = section;
-      list.append(h);
-    }
-    list.append(row(setting));
+  const foot = dialog.querySelector<HTMLElement>(".dialog-foot")!;
+  const sections = [...new Set(settings.map((s) => s.section))];
+
+  tabList.replaceChildren(
+    ...sections.map((section) => {
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "settings-tab";
+      tab.setAttribute("role", "tab");
+      tab.dataset.section = section;
+      tab.textContent = section;
+      tab.addEventListener("click", () => {
+        show(section);
+        tab.focus(); // WebKit doesn't focus a clicked button by itself
+      });
+      tab.addEventListener("focus", () => (foot.innerHTML = FOOT_TABS));
+      return tab;
+    }),
+  );
+  const tabs = () => [...tabList.querySelectorAll<HTMLElement>(".settings-tab")];
+  const rows = () => [...list.querySelectorAll<HTMLElement>(".setting")];
+
+  /** Shows a tab's settings on the right; focus stays where it is. */
+  function show(section: string) {
+    lastTab = section;
+    for (const tab of tabs()) tab.setAttribute("aria-selected", String(tab.dataset.section === section));
+    list.replaceChildren(...settings.filter((s) => s.section === section).map(row));
+    for (const el of rows()) el.addEventListener("focus", () => (foot.innerHTML = FOOT_SETTINGS));
   }
 
-  const rows = () => [...list.querySelectorAll<HTMLElement>(".setting")];
+  const onTabs = () => tabList.contains(document.activeElement);
+
+  // Runs before openDialog's own Esc (registered after this), which skips a
+  // key handled here: inside a tab, Esc only goes back to the tab list.
   dialog.onkeydown = (e) => {
+    if (onTabs()) {
+      const all = tabs();
+      const i = all.indexOf(document.activeElement as HTMLElement);
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const next = all[Math.min(all.length - 1, Math.max(0, i + (e.key === "ArrowDown" ? 1 : -1)))];
+        show(next.dataset.section!);
+        next.focus();
+      } else if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight") {
+        e.preventDefault();
+        rows()[0]?.focus();
+      }
+      return;
+    }
     const current = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(".setting");
     const all = rows();
     const i = current ? all.indexOf(current) : -1;
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      tabs().find((t) => t.dataset.section === lastTab)?.focus();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       const next = all[Math.min(all.length - 1, Math.max(0, i + (e.key === "ArrowDown" ? 1 : -1)))];
       next?.focus();
@@ -117,9 +163,10 @@ export function openSettings(dialog: HTMLDialogElement, settings: Setting[], onC
     }
   }
 
+  show(sections.includes(lastTab) ? lastTab : sections[0]);
   openDialog(dialog, () => {
     dialog.onkeydown = null;
     onClose();
   });
-  rows()[0]?.focus();
+  tabs().find((t) => t.dataset.section === lastTab)?.focus();
 }

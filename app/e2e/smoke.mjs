@@ -618,14 +618,26 @@ await setAndRun(String.raw`\operatorname{inv}\left(\begin{pmatrix}1&2\\2&4\end{p
 const invError = await page.$$eval(".entry", (els) => els.find((e) => e.querySelector("math-field")?.value.includes("inv"))?.querySelector(".error")?.textContent ?? null);
 check("errors are in plain words", invError === "This matrix can't be inverted: its determinant is 0.", invError);
 
-// 25. Settings (Ctrl+,): ↑/↓ choose, ←/→ change at once, Esc back to the cell.
+// 25. Settings (Ctrl+,): tabs on the left (↑/↓, Enter or → goes in); inside,
+// ↑/↓ choose, ←/→ change at once, Esc back to the tabs; Esc there closes.
 const approxOf = (latex) =>
   page.$$eval(".entry", (els, latex) => els.find((e) => e.querySelector("math-field")?.value === latex)?.querySelector(".approx")?.textContent ?? null, latex);
 const focusedSetting = () => page.evaluate(() => document.activeElement?.closest(".setting")?.dataset.id ?? null);
+const focusedTab = () => page.evaluate(() => document.activeElement?.closest(".settings-tab")?.dataset.section ?? null);
+const settingsOpen = () => page.isVisible("#settings-dialog[open]");
+const closeSettings = async () => {
+  for (let i = 0; i < 2 && (await settingsOpen()); i++) await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+};
+/** Opens settings fresh, goes to the tab holding setting `id`, and onto it. */
 const openSettingsAt = async (id) => {
+  await closeSettings();
   await page.keyboard.press("Control+,");
   await page.waitForSelector("#settings-dialog[open]");
-  for (let i = 0; i < 12 && (await focusedSetting()) !== id; i++) await page.keyboard.press("ArrowDown");
+  for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowUp");
+  for (let i = 0; i < 6 && !(await page.$(`#settings-dialog .setting[data-id="${id}"]`)); i++) await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  for (let i = 0; i < 6 && (await focusedSetting()) !== id; i++) await page.keyboard.press("ArrowDown");
 };
 const settled = async () => {
   await page.waitForTimeout(150);
@@ -635,7 +647,20 @@ const settled = async () => {
 await setAndRun(String.raw`9\pi`);
 await page.keyboard.press("Control+,");
 await page.waitForSelector("#settings-dialog[open]");
-check("Ctrl+, opens settings on the first setting", (await focusedSetting()) === "angle", await focusedSetting());
+check("Ctrl+, opens settings on the tab list, first tab", (await focusedTab()) === "Notebook" && !!(await page.$('#settings-dialog .setting[data-id="angle"]')), await focusedTab());
+await page.keyboard.press("ArrowDown");
+check("↓ picks the next tab and shows its settings", (await focusedTab()) === "Answers" && !!(await page.$('#settings-dialog .setting[data-id="digits"]')) && !(await page.$('#settings-dialog .setting[data-id="angle"]')), await focusedTab());
+await page.keyboard.press("Enter");
+check("Enter goes into the tab", (await focusedSetting()) === "answer-mode", await focusedSetting());
+check("the foot shows the keys for inside a tab", /back to the tabs/.test(await page.textContent("#settings-dialog .dialog-foot")), await page.textContent("#settings-dialog .dialog-foot"));
+await page.keyboard.press("Escape");
+check("Esc inside a tab goes back to the tabs", (await settingsOpen()) && (await focusedTab()) === "Answers", await focusedTab());
+await page.keyboard.press("ArrowRight");
+check("→ goes into the tab too", (await focusedSetting()) === "answer-mode", await focusedSetting());
+await closeSettings();
+await page.keyboard.press("Control+,");
+await page.waitForSelector("#settings-dialog[open]");
+check("settings reopen on the last tab", (await focusedTab()) === "Answers", await focusedTab());
 await openSettingsAt("digits");
 await page.keyboard.press("ArrowRight");
 await settled();
@@ -661,8 +686,9 @@ await page.keyboard.press("ArrowLeft");
 await page.keyboard.press("ArrowLeft");
 check("Theme → System follows the system again", (await page.evaluate(() => document.documentElement.dataset.theme)) === undefined);
 await page.keyboard.press("Escape");
+await page.keyboard.press("Escape");
 await page.waitForTimeout(150);
-check("Esc closes settings back into the cell", !(await page.isVisible("#settings-dialog[open]")) && (await page.evaluate(() => document.activeElement?.tagName === "MATH-FIELD")));
+check("Esc, Esc closes settings back into the cell", !(await page.isVisible("#settings-dialog[open]")) && (await page.evaluate(() => document.activeElement?.tagName === "MATH-FIELD")));
 await page.keyboard.type("5");
 check("typing works after settings closed", (await page.evaluate(() => document.activeElement?.value)) === "5", await page.evaluate(() => document.activeElement?.value));
 await page.keyboard.press("Backspace");
@@ -677,19 +703,21 @@ check("Ctrl+P Settings, then Esc, closes it back into the cell", !(await page.is
 await page.click('[data-action="settings"]');
 await page.waitForSelector("#settings-dialog[open]");
 check("the gear button opens settings", await page.isVisible("#settings-dialog[open]"));
+await page.click('#settings-dialog .settings-tab[data-section="Notebook"]');
+check("clicking a tab shows it", (await focusedTab()) === "Notebook" && !!(await page.$('#settings-dialog .setting[data-id="angle"]')));
 await page.click('#settings-dialog [data-id="angle"] .seg button:last-child');
 await settled();
 check("clicking Radians changes the notebook's mode", (await chip()) === "RAD", await chip());
 await page.click('#settings-dialog [data-id="angle"] .seg button:first-child');
 await settled();
-await page.keyboard.press("Escape");
+await closeSettings();
 const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("maddox.prefs") ?? "{}"));
 check("settings are remembered", stored.digits === 6 && stored.answerMode === "auto" && stored.theme === "system", JSON.stringify(stored));
 // Reopen last notebook: Off starts empty, but unsaved work is still restored.
 await page.waitForTimeout(150);
 await openSettingsAt("reopen");
 await page.keyboard.press("ArrowRight");
-await page.keyboard.press("Escape");
+await closeSettings();
 await page.waitForTimeout(150);
 const cleanSave = page.waitForEvent("download", { timeout: 5000 }).catch(() => null);
 await page.keyboard.press("Control+s");
@@ -1194,14 +1222,14 @@ let centredAt = await cellPosition();
 check("the current cell is centred, not left below the middle", centredAt >= 45 && centredAt <= 55, centredAt);
 await openSettingsAt("centre");
 await page.keyboard.press("ArrowRight"); // On → Off
-await page.keyboard.press("Escape");
+await closeSettings();
 for (let i = 0; i < 6; i++) await typeAndRun(`${i}*2`);
 await page.waitForTimeout(700);
 centredAt = await cellPosition();
 check("with the setting Off, cells scroll only into view", centredAt > 60, centredAt);
 await openSettingsAt("centre");
 await page.keyboard.press("ArrowLeft"); // back On
-await page.keyboard.press("Escape");
+await closeSettings();
 // Going up, then down again with ↓: no cell is left below the middle
 // (MathLive's own caret scroll on focus used to cut the centring short).
 for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowUp");
@@ -1262,7 +1290,7 @@ await page.waitForFunction(() => /newest version/.test(document.querySelector("#
 check("Check for updates says when Maddox is up to date", /is the newest version/.test(await message()) && (await page.isHidden("#update-chip")), await message());
 await openSettingsAt("check-updates");
 await page.keyboard.press("ArrowRight"); // On → Off
-await page.keyboard.press("Escape");
+await closeSettings();
 await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ version: "9.9.9" })), FAKE);
 await page.reload();
 await page.waitForSelector("math-field");
@@ -1271,7 +1299,7 @@ check("Check for updates: Off stays quiet at startup", await page.isHidden("#upd
 await page.evaluate((key) => localStorage.removeItem(key), FAKE);
 await openSettingsAt("check-updates");
 await page.keyboard.press("ArrowLeft"); // back On
-await page.keyboard.press("Escape");
+await closeSettings();
 
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));

@@ -1075,27 +1075,58 @@ dialog h2 {
 /* ---- settings (Ctrl+,) ---- */
 
 .settings-dialog {
-  width: min(640px, calc(100vw - 32px));
+  width: min(760px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   margin-top: 8vh;
+}
+
+/* Tabs on the left (one per section), that tab's settings on the right. */
+.settings-body {
+  display: grid;
+  grid-template-columns: minmax(150px, 22%) 1fr;
+  gap: 8px;
+  padding: 12px 10px 10px;
+}
+
+.settings-tabs {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding-right: 8px;
+  border-right: 1px solid var(--border);
+}
+
+.settings-tab {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.settings-tab[aria-selected="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.settings-tab:focus {
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 .settings-dialog > h2 {
   padding: 16px 18px 0;
 }
 
+/* A fixed height, so switching tabs doesn't make the dialog jump. */
 .settings-list {
-  max-height: calc(100vh - 200px);
+  height: min(330px, calc(100vh - 200px));
   overflow-y: auto;
-  padding: 0 10px 10px;
-}
-
-.settings-section {
-  margin: 14px 8px 4px;
-  color: var(--muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .setting {

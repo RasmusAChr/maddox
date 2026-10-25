@@ -94,9 +94,12 @@ docs updated, a short report of what changed.
   owner decided this on 2026-10-23: students learn the international
   convention. Commas separate arguments and list items. Don't add a
   decimal-comma mode.
-- **One settings dialog (Ctrl+, or ⚙).** Sections: this notebook (angles),
-  answers (exact/decimal/both, solve style, digits), appearance (theme,
-  zoom), startup and files. ↑/↓ choose, ←/→ change, changes apply at once,
+- **One settings dialog (Ctrl+, or ⚙)** with tabs on the left (decided
+  2026-10-25): Notebook (angles), Answers (exact/decimal/both, solve style,
+  digits), Appearance (theme, centring, zoom), Startup & updates. It opens
+  on the tab list, at the last tab used. ↑/↓ choose a tab and Enter or →
+  goes in. Inside a tab, ↑/↓ choose, ←/→ change (← never goes back), and
+  Esc returns to the tabs; Esc there closes. Changes apply at once, with
   no Save. Everything except the angle is a preference of this computer
   (`app/src/settings.ts`, key `maddox.prefs`). A new setting is one entry
   in `settingsList()` in `main.ts`. Keep the quick ways (chip, shortcuts,

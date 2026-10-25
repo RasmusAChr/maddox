@@ -57,7 +57,8 @@
 | Enter / D / Esc | "Save changes?" dialog | Save / don't save / cancel. Shown before New, Open, opening a recent or launch file, and closing the window, whenever there are unsaved changes |
 | Ctrl+Shift+A (or the DEG/RAD chip) | anywhere | Switch degrees / radians for this notebook, then re-run everything |
 | Ctrl+, (or the ⚙ button) | anywhere | Settings |
-| ↑ / ↓, ← / →, Enter, Esc | settings dialog | Choose a setting; change it (applies at once); press a button (Clear recent files); close, back to the cell |
+| ↑ / ↓, Enter or →, Esc | settings: tab list | Choose a tab (its settings show at once); go into it; close, back to the cell |
+| ↑ / ↓, ← / →, Enter, Esc | settings: inside a tab | Choose a setting; change it (applies at once); press a button (Clear recent files); back to the tab list |
 | Ctrl++ (or Ctrl+=) / Ctrl+− / Ctrl+0 | anywhere | Zoom in / out / reset (remembered; matched by character, so `+` works on Danish and US layouts alike) |
 | F1 (or Ctrl+/) | anywhere | Shortcut list |
 
