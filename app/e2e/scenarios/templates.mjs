@@ -32,20 +32,29 @@ export default async ({ page, check, waitIdle, entries, active }) => {
   check("« collapses it again", await page.$eval("#templates", (el) => el.classList.contains("collapsed")));
 
   // Ctrl+P searches templates and app actions; all query words must match.
+  // The first match for q, and what the page looked like (for a failure).
   const searchFor = async (q) => {
     await page.keyboard.press("Control+p");
     await page.waitForSelector("#search-dialog[open]");
     await page.keyboard.type(q);
-    const first = await page.$eval('#search-dialog .catalog-item[aria-selected="true"] .catalog-name', (e) => e.textContent);
-    return first;
+    return page.evaluate(() => ({
+      first: document.querySelector('#search-dialog .catalog-item[aria-selected="true"] .catalog-name')?.textContent ?? null,
+      query: document.querySelector("#search-dialog input").value,
+      focus: document.activeElement?.tagName + "." + document.activeElement?.className,
+      open: [...document.querySelectorAll("dialog[open]")].map((d) => d.id),
+    }));
   };
-  check("search 'derivative'", (await searchFor("derivative")) === "Derivative");
+  let found = await searchFor("derivative");
+  check("search 'derivative'", found.first === "Derivative", JSON.stringify(found));
   await page.keyboard.press("Escape");
-  check("search 'def int'", (await searchFor("def int")) === "Definite integral");
+  found = await searchFor("def int");
+  check("search 'def int'", found.first === "Definite integral", JSON.stringify(found));
   await page.keyboard.press("Escape");
-  check("search finds app actions", (await searchFor("save as")) === "Save as…");
+  found = await searchFor("save as");
+  check("search finds app actions", found.first === "Save as…", JSON.stringify(found));
   await page.keyboard.press("Escape");
-  check("search by command name", (await searchFor("eigenvals")) === "Eigenvalues");
+  found = await searchFor("eigenvals");
+  check("search by command name", found.first === "Eigenvalues", JSON.stringify(found));
   await page.keyboard.press("Enter");
   const inserted = (await entries()).at(-1);
   check("Enter inserts the result", inserted.includes("eigenvals"), inserted);
