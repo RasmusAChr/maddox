@@ -214,6 +214,14 @@ Re-check this list after upgrading.
   marks the key as handled, the dialog never closes. `openDialog()` in
   `dialogs.ts` therefore closes every dialog on Esc itself. Don't rely on
   the browser's own Esc for a `<dialog>`.
+- **A `<dialog>`'s `close` event can arrive after it reopened** (2026-10-25).
+  Esc, then a quick Ctrl+P: Chrome handles the input before the queued
+  `close` event, so the event reaches the search dialog while it is open
+  again. It ran the old opening's cancel (focus back to the cell), and focus
+  left the new dialog. This happened only on the slower CI machines.
+  `openDialog()` settles a close it makes itself at once, and ignores a
+  `close` while the dialog is open. The templates scenario forces the race
+  with synthetic keys.
 - **WebKitGTK (Linux) navigation:**
   - MathLive's `move-out` event is unreliable at the top and bottom rows,
     so ↑/↓ also move between cells when the caret provably did not move.

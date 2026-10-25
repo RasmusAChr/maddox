@@ -58,6 +58,20 @@ export default async ({ page, check, waitIdle, entries, active }) => {
   await page.keyboard.press("Enter");
   const inserted = (await entries()).at(-1);
   check("Enter inserts the result", inserted.includes("eigenvals"), inserted);
+  // Esc, then Ctrl+P at once: the first closing's late "close" event must
+  // not pull focus out of the reopened search (it did in CI).
+  await page.keyboard.press("Control+p");
+  await page.waitForSelector("#search-dialog[open]");
+  await page.evaluate(() => {
+    const key = (target, init) => target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init }));
+    key(document.querySelector("#search-dialog input"), { key: "Escape" });
+    key(window, { key: "p", ctrlKey: true });
+  });
+  await page.waitForTimeout(150);
+  await page.keyboard.type("deriv");
+  found = await page.evaluate(() => ({ query: document.querySelector("#search-dialog input").value, focus: document.activeElement?.tagName }));
+  check("Esc then Ctrl+P at once: the reopened search keeps the keyboard", found.query === "deriv" && found.focus === "INPUT", JSON.stringify(found));
+  await page.keyboard.press("Escape");
 
   // The sidebar's own search field filters templates; Enter inserts the best match.
   await page.keyboard.press("Control+Enter");

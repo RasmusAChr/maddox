@@ -5,32 +5,45 @@ import { queryWords, score, type Searchable } from "./search";
  * the returned `finish`. finish() runs its action synchronously: the "close"
  * event fires a task later, after focus is already back in the entry, and a
  * key typed in between would land before the inserted text.
+ *
+ * Closing is settled at once whenever we close the dialog ourselves (Esc,
+ * finish). Only a close by the browser waits for the "close" event. That
+ * event can arrive late: after Esc, a quick Ctrl+P reopened the search before
+ * it came (Chrome handles input first). If it then ran the old opening's
+ * cancel, focus left the new dialog and the typed query went nowhere.
  */
 export function openDialog(dialog: HTMLDialogElement, onCancel: () => void) {
   let finished = false;
+  let settled = false;
+  const settle = () => {
+    if (settled) return;
+    settled = true;
+    dialog.removeEventListener("keydown", onEscape);
+    dialog.removeEventListener("close", onClose);
+    if (finished) return;
+    dropRestoredFocus();
+    onCancel();
+  };
   // Esc closes the dialog here rather than by the browser's own handling:
   // in WebKitGTK (Linux) the settings dialog ignored Esc, even though focus
-  // stayed in it. Closing fires "close", which cancels as below.
+  // stayed in it.
   const onEscape = (e: KeyboardEvent) => {
     if (e.key !== "Escape" || e.defaultPrevented) return;
     e.preventDefault();
     dialog.close();
+    settle();
+  };
+  // A late "close" from an earlier opening finds the dialog open again: not ours.
+  const onClose = () => {
+    if (!dialog.open) settle();
   };
   dialog.addEventListener("keydown", onEscape);
-  dialog.addEventListener(
-    "close",
-    () => {
-      dialog.removeEventListener("keydown", onEscape);
-      if (finished) return;
-      dropRestoredFocus();
-      onCancel();
-    },
-    { once: true },
-  );
+  dialog.addEventListener("close", onClose);
   dialog.showModal();
   return (action: () => void) => {
     finished = true;
     dialog.close();
+    settle();
     dropRestoredFocus();
     action();
     // An action that focuses nothing (Run all, Save as…): back to the notebook.

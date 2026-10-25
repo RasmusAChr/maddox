@@ -8,6 +8,11 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. So write them for students, in
 plain words. See `docs/releasing.md`.
 
+## 1.1.1
+
+- Pressing Esc and then Ctrl+P quickly could open the search without the
+  keyboard in it, so what you typed went nowhere. Fixed.
+
 ## 1.1.0
 
 - Settings are sorted into tabs: Notebook, Answers, Appearance, and
