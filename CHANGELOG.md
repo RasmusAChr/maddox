@@ -13,6 +13,12 @@ plain words. See `docs/releasing.md`.
 - Settings are sorted into tabs: Notebook, Answers, Appearance, and
   Startup & updates. ↑/↓ pick a tab, Enter opens it, Esc goes back.
 
+## 1.0.2
+
+- Typing \ followed by a name (\alp) suggests commands such as \alpha.
+  Enter now takes the suggestion; before, it ran the cell with the
+  command half typed.
+
 ## 1.0.1
 
 - Esc closes Settings on Linux. Before, it did nothing there.

@@ -1242,6 +1242,20 @@ for (let i = 0; i < 5; i++) {
 }
 check("stepping down with ↓ keeps each cell at or above the middle", worst <= 55, worst);
 
+// Typing \alp offers \alpha; Enter takes the suggestion instead of evaluating.
+await page.keyboard.press("Control+Enter");
+await page.keyboard.type("2\\alp");
+await page.waitForTimeout(150);
+const cellCount = (await entries()).length;
+await page.keyboard.press("Enter");
+await page.waitForTimeout(200);
+const latexDone = await page.evaluate(() => ({ value: document.activeElement?.value, mode: document.activeElement?.mode }));
+check("Enter on a \\alp suggestion types α and stays in the cell", latexDone.value === "2\\alpha" && latexDone.mode === "math" && (await entries()).length === cellCount, JSON.stringify(latexDone));
+await page.keyboard.press("Enter");
+await waitIdle();
+const alphaResult = await page.$$eval(".entry", (els) => els.find((e) => e.querySelector("math-field")?.value === "2\\alpha")?.querySelector(".exact")?.dataset.latex ?? null);
+check("…and the next Enter evaluates", alphaResult !== null, alphaResult);
+
 // Updates: a newer version shows ↑ 9.9.9 in the status bar; Ctrl+P "Install"
 // or the chip opens the update dialog, Enter installs after "Save changes?".
 // In the browser a pretend update stands in for GitHub (src/updates.ts).
