@@ -212,6 +212,29 @@ export function askUpdate(dialog: HTMLDialogElement, version: string, current: s
 
 // ---- help -------------------------------------------------------------------
 
+/**
+ * About Maddox: version, licences, and where the source is (GPL). The
+ * keyboard starts on the licence text, so ↑/↓ and PgUp/PgDn scroll it.
+ */
+export function openAbout(dialog: HTMLDialogElement, version: string, licence: string, onClose: () => void) {
+  dialog.querySelector(".about-version")!.textContent = version;
+  const text = dialog.querySelector<HTMLElement>(".about-license")!;
+  if (!text.textContent) {
+    text.textContent = licence;
+    // Scrolled here rather than by the browser, which doesn't do it reliably in a dialog.
+    text.addEventListener("keydown", (e) => {
+      const page = text.clientHeight - 40;
+      const by = { ArrowDown: 40, ArrowUp: -40, PageDown: page, PageUp: -page, End: text.scrollHeight, Home: -text.scrollHeight }[e.key];
+      if (by === undefined) return;
+      e.preventDefault();
+      text.scrollBy({ top: by });
+    });
+  }
+  openDialog(dialog, onClose);
+  text.scrollTop = 0;
+  text.focus();
+}
+
 export function openHelp(dialog: HTMLDialogElement, onClose: () => void) {
   openDialog(dialog, onClose);
   dialog.querySelector<HTMLButtonElement>("button")?.focus();

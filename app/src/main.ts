@@ -12,7 +12,8 @@ import { Notebook, type Context } from "./notebook/notebook";
 import { plotItemsFromLine } from "./notebook/plot-items";
 import { GraphPanel } from "./ui/graph-panel";
 import { CATALOG, CATEGORIES, type CatalogItem } from "./ui/commands";
-import { askUnsaved, askUpdate, openHelp, openMatrixDialog, openSearch, type SearchItem } from "./ui/dialogs";
+import { askUnsaved, askUpdate, openAbout, openHelp, openMatrixDialog, openSearch, type SearchItem } from "./ui/dialogs";
+import licence from "../LICENSE?raw";
 import { renderTemplates, toggleTemplates } from "./ui/templates";
 import { appVersion, canUpdate, checkForUpdate, type Update } from "./updates";
 import { applyZoom, zoom, zoomLevel } from "./zoom";
@@ -563,6 +564,7 @@ function searchItems(): SearchItem[] {
     action("Check for updates", `You have Maddox ${appVersion}`, () => void lookForUpdate(true), undefined, "update upgrade new version release download about"),
     action("Show or hide templates", "The template sidebar", ACTIONS.templates, "Ctrl+B", "sidebar panel"),
     action("Keyboard shortcuts", "List every shortcut", help, "F1", "help keys"),
+    action("About Maddox", `Version ${appVersion}, licences, source code`, about, undefined, "about version licence license gpl giac credits source copyright"),
   ];
   return [...recentItems(), ...templates, ...actions];
 }
@@ -573,6 +575,10 @@ function matrix() {
 
 function help() {
   openHelp($("#help-dialog"), refocus);
+}
+
+function about() {
+  openAbout($("#about-dialog"), appVersion, licence, refocus);
 }
 
 /** Inserts a catalog or template item; "Matrix…" asks for a size first. */

@@ -1265,6 +1265,24 @@ await openSettingsAt("check-updates");
 await page.keyboard.press("ArrowLeft"); // back On
 await page.keyboard.press("Escape");
 
+// 37. About Maddox (Ctrl+P): version, the licences and where the source is;
+// the GPL text scrolls by keyboard, Esc returns to the notebook.
+await searchRun("about maddox");
+await page.waitForSelector("#about-dialog[open]");
+const about = await page.$eval("#about-dialog", (d) => ({
+  version: d.querySelector(".about-version").textContent,
+  text: d.textContent,
+  licence: d.querySelector(".about-license").textContent.trim().slice(0, 40),
+  focus: document.activeElement?.className,
+}));
+check("About shows the version, Giac's authors and both sources", /\d+\.\d+\.\d+/.test(about.version) && /Parisse/.test(about.text) && /github\.com\/RasmusAChr\/maddox/.test(about.text) && /engine-giac-1\.9\.0/.test(about.text), JSON.stringify({ ...about, text: undefined }));
+check("…and the GPL text, with the keyboard on it", /GNU GENERAL PUBLIC LICENSE/.test(about.licence) && about.focus === "about-license", JSON.stringify(about));
+await page.keyboard.press("PageDown");
+check("PgDn scrolls the licence", (await page.$eval(".about-license", (e) => e.scrollTop)) > 0);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(100);
+check("Esc closes About and returns to the notebook", !(await page.$eval("#about-dialog", (d) => d.open)) && (await active()).startsWith("MATH-FIELD"), await active());
+
 if (shotDir) await page.screenshot({ path: `${shotDir}/maddox.png` });
 check("no page errors", errors.length === 0, errors.join("\n"));
 
