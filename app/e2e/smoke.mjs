@@ -1225,7 +1225,8 @@ const latexDone = await page.evaluate(() => ({ value: document.activeElement?.va
 check("Enter on a \\alp suggestion types α and stays in the cell", latexDone.value === "2\\alpha" && latexDone.mode === "math" && (await entries()).length === cellCount, JSON.stringify(latexDone));
 await page.keyboard.press("Enter");
 await waitIdle();
-check("…and the next Enter evaluates", (await entries()).length === cellCount + 1, JSON.stringify(await entries()));
+const alphaResult = await page.$$eval(".entry", (els) => els.find((e) => e.querySelector("math-field")?.value === "2\\alpha")?.querySelector(".exact")?.dataset.latex ?? null);
+check("…and the next Enter evaluates", alphaResult !== null, alphaResult);
 
 // Updates: a newer version shows ↑ 9.9.9 in the status bar; Ctrl+P "Install"
 // or the chip opens the update dialog, Enter installs after "Save changes?".
