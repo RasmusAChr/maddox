@@ -9,7 +9,7 @@ export default async ({ page, check, waitIdle, chip, closeSettings, openSettings
   const FAKE = "maddox.fake-update";
   const fakeUpdate = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null"), FAKE);
   const message = () => page.textContent("#message");
-  await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ version: "9.9.9", notes: "- Something new" })), FAKE);
+  await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ version: "9.9.9", notes: "### New\n\n- Something new" })), FAKE);
   await page.reload();
   await page.waitForSelector("math-field");
   await waitIdle();
@@ -20,7 +20,7 @@ export default async ({ page, check, waitIdle, chip, closeSettings, openSettings
   await page.keyboard.type("install maddox");
   await page.keyboard.press("Enter");
   await page.waitForSelector("#update-dialog[open]");
-  check("Ctrl+P Install opens the update dialog with the notes", (await page.textContent("#update-dialog .update-notes")) === "- Something new", await page.textContent("#update-dialog .update-notes"));
+  check("Ctrl+P Install opens the update dialog with the notes, headings without ###", (await page.textContent("#update-dialog .update-notes")) === "New\n\n- Something new", await page.textContent("#update-dialog .update-notes"));
   check("Enter would install", await page.evaluate(() => document.activeElement?.dataset.choice === "install"));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(150);

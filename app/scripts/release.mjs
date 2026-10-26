@@ -6,8 +6,10 @@
 //   starts .github/workflows/release.yml, which builds a draft GitHub Release.
 // `node scripts/release.mjs --notes 0.2.0` prints that release's notes: every
 // CHANGELOG.md section after the previous release's tag, up to 0.2.0 (each
-// fix or feature has its own section). The workflow uses them for the
-// release text and the in-app update dialog; it needs the tags fetched.
+// fix or feature has its own section), with each "### New", "### Improved"
+// and "### Fixed" heading once and "### Behind the scenes" left out. The
+// workflow uses them for the release text and the in-app update dialog; it
+// needs the tags fetched.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -48,9 +50,33 @@ function releaseNotes(changelog, version) {
     .filter((v) => /^\d+\.\d+\.\d+$/.test(v) && compare(v, version) < 0)
     .sort(compare)
     .at(-1);
-  return all
-    .filter((s) => compare(s.version, version) <= 0 && (!previous || compare(s.version, previous) > 0))
-    .map((s) => s.text)
+  const included = all.filter((s) => compare(s.version, version) <= 0 && (!previous || compare(s.version, previous) > 0));
+  return mergeHeadings(included.map((s) => s.text));
+}
+
+const headings = ["New", "Improved", "Fixed"];
+const hidden = ["Behind the scenes"];
+
+/**
+ * Joins sections' texts under one "### New", "### Improved" and "### Fixed"
+ * each (in that order, newest bullets first, as one list), dropping
+ * "### Behind the scenes". Text before a section's first heading goes first.
+ */
+function mergeHeadings(texts) {
+  const parts = new Map([["", []], ...[...headings, ...hidden].map((h) => [h, []])]);
+  for (const text of texts) {
+    let current = "";
+    for (const line of text.split("\n")) {
+      const heading = /^### (.+?)\s*$/.exec(line);
+      if (heading) {
+        current = heading[1];
+        if (!parts.has(current)) fail(`CHANGELOG.md: unknown heading "### ${current}" (use ${[...headings, ...hidden].join(", ")})`);
+      } else if (line.trim() || !current) parts.get(current).push(line);
+    }
+    parts.get("").push("");
+  }
+  const body = (lines) => lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return [body(parts.get("")), ...headings.map((h) => body(parts.get(h)) && `### ${h}\n\n${body(parts.get(h))}`)]
     .filter(Boolean)
     .join("\n\n");
 }

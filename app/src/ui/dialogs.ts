@@ -223,7 +223,7 @@ export function askUpdate(dialog: HTMLDialogElement, version: string, current: s
     dialog.querySelector(".update-version")!.textContent = version;
     dialog.querySelector(".update-current")!.textContent = current;
     const notesEl = dialog.querySelector<HTMLElement>(".update-notes")!;
-    notesEl.textContent = notes.trim();
+    notesEl.textContent = notes.trim().replace(/^#+ /gm, ""); // plain text: "### Fixed" shows as "Fixed"
     notesEl.hidden = !notes.trim();
     const finish = openDialog(dialog, () => resolve(false));
     for (const button of dialog.querySelectorAll<HTMLButtonElement>("button[data-choice]")) {
