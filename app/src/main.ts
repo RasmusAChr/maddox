@@ -563,6 +563,9 @@ function searchItems(): SearchItem[] {
     action("Undo", "Take back the last change, in whichever cell it was", () => notebook.undo(), "Ctrl+Z", "undo revert back restore deleted cell"),
     action("Redo", "Put back what Undo took", () => notebook.redo(), "Ctrl+Y", "redo again"),
     action("Switch this cell: exact / decimal", "Show this cell's answers in the other form, or follow the setting again", () => notebook.toggleAnswers(), "Alt+Enter", "approximate approx decimal exact numeric evalf cell answers"),
+    action("Print / Save as PDF", "The notebook on paper, or as a PDF from the print dialog", print, "Ctrl+Shift+P", "print pdf export paper hand in"),
+    action("Copy result", "The result of the caret's line, as plain text", () => copyResult(), "Ctrl+Shift+C", "copy clipboard result answer text export"),
+    action("Copy result as LaTeX", "The result of the caret's line, for LaTeX or Overleaf", () => copyResult("latex"), undefined, "copy clipboard result latex tex overleaf export"),
     action("Settings", "Angles, answers, digits, theme, zoom, startup", settings, "Ctrl+,", "preferences options configure theme digits"),
     ...(update ? [action(`Install Maddox ${update.version}`, "Download the new version and restart", () => void offerUpdate(), undefined, "update upgrade install new version")] : []),
     action("Check for updates", `You have Maddox ${appVersion}`, () => void lookForUpdate(true), undefined, "update upgrade new version release download about"),
@@ -571,6 +574,70 @@ function searchItems(): SearchItem[] {
     action("About Maddox", `Version ${appVersion}, licences, source code`, about, undefined, "about version licence license gpl giac credits source copyright"),
   ];
   return [...recentItems(), ...templates, ...actions];
+}
+
+// ---- export: print / PDF, copy a result ------------------------------------------
+
+/**
+ * Ctrl+Shift+P: the system's print dialog, which also saves a PDF. The page
+ * switches to a fixed print width and the light theme first, so results and
+ * their leaders are placed where they will print, then switches back.
+ */
+function print() {
+  const root = document.documentElement;
+  const theme = root.dataset.theme;
+  $("#print-title").textContent = $("#doc-name").textContent ?? "";
+  $("#print-date").textContent = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  root.classList.add("printing");
+  root.dataset.theme = "light";
+  (document.activeElement as HTMLElement | null)?.blur(); // no caret or selection on paper
+  notebook.preparePrint(true);
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    root.classList.remove("printing");
+    if (theme) root.dataset.theme = theme;
+    else delete root.dataset.theme;
+    notebook.preparePrint(false);
+    refocus();
+  };
+  window.addEventListener("afterprint", finish, { once: true });
+  // If a webview never reports the dialog closing, the next key or click does.
+  const later = () => setTimeout(() => {
+    window.addEventListener("keydown", finish, { once: true, capture: true });
+    window.addEventListener("pointerdown", finish, { once: true, capture: true });
+  });
+  requestAnimationFrame(() => {
+    window.print();
+    later();
+  });
+}
+
+/** Ctrl+Shift+C: the result of the caret's line to the clipboard (Ctrl+P: as LaTeX). */
+function copyResult(format: "text" | "latex" = "text") {
+  const text = notebook.resultAtCaret(format);
+  if (text === null) return showMessage("This line has no result to copy.");
+  void writeClipboard(text).then((ok) => showMessage(ok ? `Copied: ${text}` : "Couldn't copy to the clipboard."));
+}
+
+async function writeClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Older webviews: copy from a hidden text field, then give the keyboard back.
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    refocus();
+    return ok;
+  }
 }
 
 function matrix() {
@@ -646,6 +713,8 @@ window.addEventListener(
     if (e.shiftKey && e.key === "Enter") return run(ACTIONS["run-all"]);
     if (e.shiftKey && key === "a") return run(toggleAngle);
     if (e.key === ",") return run(settings);
+    if (e.shiftKey && key === "p") return run(print);
+    if (e.shiftKey && key === "c") return run(() => copyResult());
     if (key === "p" || key === "k") return run(search);
     // By character, not physical key: on a Danish keyboard "+" has its own
     // key (whose code is "Minus"), on a US one it is "=".

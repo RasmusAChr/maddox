@@ -115,6 +115,13 @@ Re-check this list after upgrading.
   selection, not a caret, so `deleteAtBrackets()` treats a lone selected
   box like the caret in empty brackets; otherwise MathLive deleted the
   brackets and left the name (`\ln`).
+- **Print layout is measured on screen.** Results and leaders are placed
+  in pixels from screen measurements, and `--math-size` follows the
+  window width, so the print media alone would misplace them. `print()`
+  in `main.ts` first sets `html.printing` (a fixed 680px sheet and maths
+  size, the same in print), the light theme and blank-cell marks, lays
+  out again, then calls `window.print()`, and undoes it on `afterprint`
+  (or the next key or click, in case a webview never sends it).
 - **Matrix results need `pmatrix`.** Giac's `\left(\begin{array}…\right)`
   renders with misaligned brackets and pastes back as uneditable.
   `cleanLatex()` rewrites it to `pmatrix`.

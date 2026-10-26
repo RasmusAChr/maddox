@@ -27,6 +27,7 @@
     <div class="workspace">
       <aside id="templates" class="templates" aria-label="Templates"></aside>
       <main id="notebook" class="notebook" aria-label="Calculations">
+        <div class="print-header" aria-hidden="true"><span id="print-title"></span><span id="print-date"></span></div>
         <div id="sheet" class="sheet"></div>
       </main>
       <aside id="graph-panel" class="graph-panel" aria-label="Graphs" hidden></aside>
@@ -128,6 +129,8 @@
             <dt><kbd>Ctrl</kbd> <kbd>Z</kbd></dt><dd>Undo the last change, in any entry</dd>
             <dt><kbd>Ctrl</kbd> <kbd>Y</kbd></dt><dd>Redo (also <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd>)</dd>
             <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Enter</kbd></dt><dd>Run all from the top</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>C</kbd></dt><dd>Copy this line's result as text (LaTeX: <kbd>Ctrl</kbd> <kbd>P</kbd>)</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>P</kbd></dt><dd>Print, or save as PDF</dd>
             <dt><kbd>Esc</kbd></dt><dd>Cancel a long computation</dd>
           </dl>
         </section>

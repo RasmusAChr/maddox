@@ -37,6 +37,8 @@
 | Ctrl+U | cell | Type a unit (upright): / stays inline, * is ·, Space / Esc / Ctrl+U ends it |
 | Alt+Enter | cell | Show this cell's answers as decimals (exact ones when the setting is "Decimals only"), or follow the setting again. Saved with the cell, marked ≈ (or =) |
 | Ctrl+Shift+Enter | anywhere | Run all (resets the engine first) |
+| Ctrl+Shift+C | cell | Copy the result of the caret's line as plain text (as LaTeX: Ctrl+P "Copy result as LaTeX"). See 0012 |
+| Ctrl+Shift+P | anywhere | Print, or save as PDF from the print dialog |
 | ↑ / ↓ at the first or last line | cell | Previous / next cell |
 | Ctrl+← / Ctrl+→ | cell | Jump by word: a run of letters or digits, an operator, a function name, or a whole structure such as `(…)`, a fraction or a matrix. At a group's edge, leave the group |
 | Shift+Ctrl+← / → | cell | Select by the same jumps |

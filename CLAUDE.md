@@ -134,6 +134,13 @@ docs updated, a short report of what changed.
   comes back with its results, and what it defined applies again. Cells
   are never reordered. Graph-panel rows keep their own undo for now.
   Decided 2026-10-26, see `docs/decisions/0010-undo.md`.
+- **Export is print/PDF and copying a result.** Ctrl+Shift+P opens the
+  system print dialog (which saves PDFs): only the notebook, laid out like
+  the screen (results right, leaders), light colours, the notebook's name
+  and the date on top, empty cells left out. Ctrl+Shift+C copies the
+  caret's line's result as plain text (`1/2 ≈ 0.5`); Ctrl+P has "Copy
+  result as LaTeX". No Markdown/LaTeX document export for now. Decided
+  2026-10-26, see `docs/decisions/0012-export.md`.
 - **Updates are offered, never forced.** The desktop app checks GitHub at
   startup and once a day (Settings can turn it off); a newer version shows
   `↑ 0.2.0` in the status bar and "Install Maddox 0.2.0" in Ctrl+P. Enter
@@ -217,6 +224,7 @@ npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md
 | `app/src/engine/dependencies.ts` | names a line assigns and uses (for recalculation) |
 | `app/src/notebook/lines.ts` | multi-line cells, `#` text lines |
 | `app/src/notebook/suggestions.ts`, `suggest-field.ts` | grey name suggestions: what matches, and the grey text + Tab in a field |
+| `app/src/notebook/plain-text.ts` | a result as plain text for the clipboard (Ctrl+Shift+C); printing is `print()` in `main.ts` |
 | `app/src/notebook/history.ts` | the notebook-wide undo/redo history (steps live in `notebook.ts`) |
 | `app/src/notebook/matrix.ts`, `mathlive-internals.ts` | matrix editing; all MathLive private access |
 | `app/src/ui/commands.ts` | every template and its category (sidebar + search) |

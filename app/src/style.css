@@ -1676,3 +1676,88 @@ body.with-graph-panel .notebook {
 .suggestion-ghost[hidden] {
   display: none;
 }
+
+/* ---- printing (Ctrl+Shift+P) ------------------------------------------------
+   main.ts adds .printing (and the light theme) while the print dialog is
+   open: a fixed width and maths size, so the results and leaders placed on
+   screen land in the same spots on paper. 680px is 180 mm: A4 less margins. */
+.print-header {
+  display: none;
+}
+
+html.printing {
+  --math-size: 1.3rem;
+}
+
+html.printing .sheet,
+html.printing .print-header {
+  width: 680px;
+}
+
+/* Hidden before the layout, so no leader points at it. */
+html.printing .graph-note {
+  display: none;
+}
+
+@page {
+  margin: 15mm;
+}
+
+@media print {
+  html,
+  body {
+    height: auto;
+  }
+  body {
+    display: block;
+    overflow: visible;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .topbar,
+  .statusbar,
+  .templates,
+  .graph-panel,
+  dialog,
+  .suggestion-ghost,
+  .entry.blank,
+  .graph-readout {
+    display: none !important;
+  }
+  .workspace {
+    display: block;
+  }
+  .notebook {
+    overflow: visible;
+    background: none;
+  }
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 0 6mm;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .sheet,
+  .notebook.tall .sheet {
+    margin: 0;
+    overflow: visible;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .entry {
+    break-inside: avoid;
+  }
+  .entry:focus-within {
+    border-left-color: transparent;
+    background: none;
+  }
+  .answers-chip {
+    border: none;
+    background: none;
+  }
+}
