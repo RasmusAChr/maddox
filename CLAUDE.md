@@ -174,7 +174,9 @@ npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md
   `### New`, `### Improved` or `### Fixed` (`### Behind the scenes` for
   what users don't notice); say what works now, not how it broke. A
   release's notes are all sections since the previous release, merged by
-  heading, and they are shown in the update dialog.
+  heading, and they are shown in the update dialog. A fix to something
+  not yet released goes under `### Behind the scenes` (users never saw
+  that bug).
 
 - **After any UI or keyboard change**, run `npm run e2e`. The scenarios in
   `app/e2e/scenarios/` are the executable spec of the behaviour the owner

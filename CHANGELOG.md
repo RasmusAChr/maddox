@@ -17,19 +17,24 @@ bullet under one of these headings, in this order:
 - `### Behind the scenes`: changes users don't notice (build, tests).
   Kept here for developers; left out of the release notes.
 
+A fix to something that hasn't been released yet (it came in a section
+since the last release's tag) goes under `### Behind the scenes`: no user
+ever met that bug. If it changes what the feature does, reword the
+feature's own bullet instead.
+
 ## 1.5.2
 
-### Fixed
+### Behind the scenes
 
-- Printing on Linux: the top bar no longer flickers, and cancelling the
-  print dialog brings the notebook straight back.
+- Printing (new in 1.5.0) on Linux: the top bar no longer flickers, and
+  cancelling the print dialog brings the notebook straight back.
 
 ## 1.5.1
 
-### Fixed
+### Behind the scenes
 
-- Ctrl+Z right after taking a suggestion with Tab takes back only the
-  suggestion, not the letters you typed.
+- Ctrl+Z right after taking a suggestion (new in 1.4.0) with Tab takes
+  back only the suggestion, not the letters you typed.
 
 ## 1.5.0
 
@@ -71,10 +76,11 @@ bullet under one of these headings, in this order:
 
 ## 1.2.2
 
-### Fixed
+### Behind the scenes
 
-- Holding Ctrl+Z on Linux keeps undoing until you let go, instead of
-  sometimes typing z's into the notebook.
+- Holding Ctrl+Z (the notebook-wide undo, new in 1.2.0) on Linux keeps
+  undoing until you let go, instead of sometimes typing z's into the
+  notebook.
 
 ## 1.2.1
 
