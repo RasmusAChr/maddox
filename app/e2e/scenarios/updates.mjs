@@ -9,7 +9,7 @@ export default async ({ page, check, waitIdle, chip, closeSettings, openSettings
   const FAKE = "maddox.fake-update";
   const fakeUpdate = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null"), FAKE);
   const message = () => page.textContent("#message");
-  await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ version: "9.9.9", notes: "### New\n\n- Something new" })), FAKE);
+  await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ version: "9.9.9", notes: "### New\n\n- Something new with `code`,\n  wrapped\n- Another\n\n### Fixed\n\n- A fix" })), FAKE);
   await page.reload();
   await page.waitForSelector("math-field");
   await waitIdle();
@@ -20,7 +20,9 @@ export default async ({ page, check, waitIdle, chip, closeSettings, openSettings
   await page.keyboard.type("install maddox");
   await page.keyboard.press("Enter");
   await page.waitForSelector("#update-dialog[open]");
-  check("Ctrl+P Install opens the update dialog with the notes, headings without ###", (await page.textContent("#update-dialog .update-notes")) === "New\n\n- Something new", await page.textContent("#update-dialog .update-notes"));
+  const notesShown = await page.$eval("#update-dialog .update-notes", (el) =>
+    [...el.children].map((c) => c.tagName === "UL" ? [...c.children].map((li) => li.innerHTML) : `${c.tagName}:${c.textContent}`));
+  check("Ctrl+P Install opens the update dialog with the notes as headings and lists", JSON.stringify(notesShown) === JSON.stringify(["H3:New", ["Something new with <code>code</code>, wrapped", "Another"], "H3:Fixed", ["A fix"]]), JSON.stringify(notesShown));
   check("Enter would install", await page.evaluate(() => document.activeElement?.dataset.choice === "install"));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(150);

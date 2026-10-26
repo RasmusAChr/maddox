@@ -30,4 +30,6 @@
 - A tag `v*` builds a **draft** release. A person publishes it, so a bad
   build never reaches users on its own.
 - `CHANGELOG.md` is where the release notes come from: the GitHub Release
-  text and the update dialog both use its section.
+  text and the update dialog both use its section. The dialog shows the
+  markdown as headings and lists (from 1.6.0; 1.5.2 and older show it as
+  plain text).

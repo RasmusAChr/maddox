@@ -1,3 +1,4 @@
+import { inlineCode, parseNotes } from "./release-notes";
 import { queryWords, score, type Searchable } from "./search";
 
 /**
@@ -223,7 +224,7 @@ export function askUpdate(dialog: HTMLDialogElement, version: string, current: s
     dialog.querySelector(".update-version")!.textContent = version;
     dialog.querySelector(".update-current")!.textContent = current;
     const notesEl = dialog.querySelector<HTMLElement>(".update-notes")!;
-    notesEl.textContent = notes.trim().replace(/^#+ /gm, ""); // plain text: "### Fixed" shows as "Fixed"
+    showNotes(notesEl, notes);
     notesEl.hidden = !notes.trim();
     const finish = openDialog(dialog, () => resolve(false));
     for (const button of dialog.querySelectorAll<HTMLButtonElement>("button[data-choice]")) {
@@ -231,6 +232,24 @@ export function askUpdate(dialog: HTMLDialogElement, version: string, current: s
     }
     dialog.querySelector<HTMLButtonElement>('button[data-choice="install"]')!.focus();
   });
+}
+
+/** The release notes as headings and lists. Built from text nodes: the notes come from GitHub. */
+function showNotes(el: HTMLElement, notes: string) {
+  const inline = (parent: HTMLElement, text: string) =>
+    inlineCode(text).forEach((part, i) => {
+      if (i % 2) parent.appendChild(document.createElement("code")).textContent = part;
+      else parent.append(part);
+    });
+  el.replaceChildren();
+  for (const block of parseNotes(notes)) {
+    if (block.kind === "list") {
+      const list = el.appendChild(document.createElement("ul"));
+      for (const item of block.items) inline(list.appendChild(document.createElement("li")), item);
+    } else {
+      inline(el.appendChild(document.createElement(block.kind === "heading" ? "h3" : "p")), block.text);
+    }
+  }
 }
 
 // ---- help -------------------------------------------------------------------

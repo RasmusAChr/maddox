@@ -24,6 +24,12 @@ since the last release's tag) goes under `### Behind the scenes`: no user
 ever met that bug. If it changes what the feature does, reword the
 feature's own bullet instead.
 
+## 1.6.0
+
+### Improved
+
+- The update window shows what's new as tidy headings and lists.
+
 ## 1.5.2
 
 ### Behind the scenes
