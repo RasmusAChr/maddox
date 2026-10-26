@@ -8,6 +8,11 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. So write them for students, in
 plain words. See `docs/releasing.md`.
 
+## 1.1.2
+
+- Behind the scenes: the automatic build and test setup uses current
+  versions of GitHub's tools. Nothing changes in the app.
+
 ## 1.1.1
 
 - Pressing Esc and then Ctrl+P quickly could open the search without the
