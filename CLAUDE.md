@@ -189,7 +189,11 @@ npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md
   `app/src/notebook/mathlive-internals.ts`. Keep it there, and re-run e2e
   after any MathLive upgrade.
 - Giac is GPL-3.0, so Maddox is GPL-3.0-or-later. The engine file is never
-  committed; `app/scripts/fetch-giac.mjs` downloads it and checks its hash.
+  committed; `app/scripts/fetch-giac.mjs` downloads it (our GitHub mirror
+  release `engine-giac-1.9.0` first, the Grenoble original second) and
+  checks its hash. The About dialog (Ctrl+P → About Maddox) carries the
+  licence notices and source links; keep it current when a component
+  changes.
 - Engine-facing code (`app/src/engine/giac-session.ts`,
   `latex-to-giac.ts`) stays free of DOM and worker globals, so the tests
   can run it against real Giac under Node.

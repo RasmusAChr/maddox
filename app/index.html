@@ -76,6 +76,32 @@
       </div>
     </dialog>
 
+    <dialog id="about-dialog" class="about-dialog" aria-label="About Maddox" tabindex="-1">
+      <h2>Maddox <span class="about-version"></span></h2>
+      <p>A free, keyboard-first maths notebook. © 2026 the Maddox authors.</p>
+      <p>
+        Maddox is free software under the GNU General Public License, version 3 or later: you may use, study,
+        share and change it. Its source code is at <span class="about-url">https://github.com/RasmusAChr/maddox</span>.
+        The full licence comes with the installer and is at <span class="about-url">https://www.gnu.org/licenses/gpl-3.0.html</span>.
+      </p>
+      <h3>Built on</h3>
+      <dl class="about-parts">
+        <dt>Giac 1.9.0</dt>
+        <dd>
+          The maths engine (computer algebra), © Bernard Parisse and Renée De Graeve, Institut Fourier, Université
+          Grenoble Alpes; optimisation, signal processing and graph theory © Luka Marohnić. GNU GPL version 3.
+          Maddox ships it unchanged. Source and home page:
+          <span class="about-url">https://www-fourier.univ-grenoble-alpes.fr/~parisse/giac.html</span>; the exact
+          file Maddox uses: <span class="about-url">https://github.com/RasmusAChr/maddox/releases/tag/engine-giac-1.9.0</span>.
+        </dd>
+        <dt>MathLive 0.111.1</dt>
+        <dd>Maths input, © Arno Gourdol and contributors. MIT License.</dd>
+        <dt>Tauri 2</dt>
+        <dd>The desktop window. MIT License or Apache License 2.0.</dd>
+      </dl>
+      <div class="dialog-foot"><kbd>Esc</kbd> close</div>
+    </dialog>
+
     <dialog id="settings-dialog" class="settings-dialog" aria-label="Settings">
       <h2>Settings</h2>
       <div class="settings-body">
@@ -152,6 +178,7 @@
           </dl>
           <p class="help-note">Enter evaluates every maths line of an entry; each result appears next to its line.</p>
           <p class="help-note">Click a result to paste it into the entry you are editing.</p>
+          <p class="help-note">Version, licences and source code: <kbd>Ctrl</kbd> <kbd>P</kbd> → About Maddox.</p>
         </section>
       </div>
       <form method="dialog"><button>Close</button></form>

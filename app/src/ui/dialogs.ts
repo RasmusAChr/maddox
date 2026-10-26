@@ -235,6 +235,13 @@ export function askUpdate(dialog: HTMLDialogElement, version: string, current: s
 
 // ---- help -------------------------------------------------------------------
 
+/** About Maddox: version, licences, and where the source is (GPL). */
+export function openAbout(dialog: HTMLDialogElement, version: string, onClose: () => void) {
+  dialog.querySelector(".about-version")!.textContent = version;
+  openDialog(dialog, onClose);
+  dialog.focus();
+}
+
 export function openHelp(dialog: HTMLDialogElement, onClose: () => void) {
   openDialog(dialog, onClose);
   dialog.querySelector<HTMLButtonElement>("button")?.focus();

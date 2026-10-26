@@ -49,6 +49,29 @@ Work happens on feature branches, which are merged into `development`.
    `git switch development && git merge main && git push`. This keeps
    the version in `development` in step with `main`.
 
+## The engine mirror
+
+Builds take Giac from a pre-release of this repository,
+`engine-giac-<version>`, and fall back to the original on the Grenoble
+server (`app/scripts/fetch-giac.mjs`). Both must match `EXPECTED_SHA256`.
+
+To move to a new Giac build:
+
+1. Download the new `giacjs.tar.gz` from upstream, test Maddox with it, and
+   update `EXPECTED_SHA256`.
+2. Upload it as a new mirror (from the folder holding the archive):
+
+   ```sh
+   gh release create engine-giac-<version> giacjs.tar.gz      --prerelease --latest=false      --title "Giac <version> (engine mirror)"      --notes "Unchanged copy of Giac (GPL-3, B. Parisse and R. De Graeve) used to build Maddox. Source: https://www-fourier.univ-grenoble-alpes.fr/~parisse/giac.html"
+   ```
+
+   **It must be a pre-release and never "latest":** the in-app updater reads
+   `releases/latest/download/latest.json`, so a mirror marked latest would
+   stop every installed Maddox from finding updates. The tag doesn't start
+   with `v`, so it doesn't start the release workflow.
+3. Point the first entry of `SOURCES` in `fetch-giac.mjs` at the new tag,
+   and update the Giac line in the About dialog (`app/index.html`).
+
 ## Versions
 
 `major.minor.patch`. Bump the patch for fixes, the minor for new features.
