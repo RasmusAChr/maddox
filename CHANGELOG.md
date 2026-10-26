@@ -8,6 +8,11 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. So write them for students, in
 plain words. See `docs/releasing.md`.
 
+## 1.2.1
+
+- Ctrl+Backspace in an empty cell deletes the cell, like Backspace does.
+  Before, it did nothing.
+
 ## 1.2.0
 
 - Ctrl+Z undoes the last change anywhere in the notebook, and Ctrl+Y (or

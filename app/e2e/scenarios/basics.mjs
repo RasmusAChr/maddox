@@ -88,6 +88,9 @@ export default async ({ page, check, waitIdle, entries, resultOf, hints, current
   await page.keyboard.press("Backspace");
   await page.keyboard.press("Backspace");
   check("Backspace removes an empty entry", (await entries()).length === n - 1, JSON.stringify(await entries()));
+  await page.keyboard.press("Control+Enter");
+  await page.keyboard.press("Control+Backspace");
+  check("so does Ctrl+Backspace", (await entries()).length === n - 1, JSON.stringify(await entries()));
 
   // Esc cancels a long computation; the restarted engine keeps working.
   await page.keyboard.press("Control+Enter");

@@ -552,7 +552,7 @@ export class Notebook {
       this.removeEntry(entry);
       return;
     }
-    if (e.key === "Backspace" && !mod && entry.mf.value === "" && this.entries.length > 1) {
+    if (e.key === "Backspace" && !e.altKey && entry.mf.value === "" && this.entries.length > 1) {
       claim();
       this.removeEntry(entry);
       return;
