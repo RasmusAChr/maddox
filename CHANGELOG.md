@@ -8,6 +8,14 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. So write them for students, in
 plain words. See `docs/releasing.md`.
 
+## 1.2.0
+
+- Ctrl+Z undoes the last change anywhere in the notebook, and Ctrl+Y (or
+  Ctrl+Shift+Z) redoes it. Delete a word and then the whole cell: the
+  first Ctrl+Z brings the cell back, the second the word. Typing comes
+  back a word at a time. A cell you bring back keeps its answers, and
+  what it defined works again.
+
 ## 1.1.2
 
 - Behind the scenes: the automatic build and test setup uses current

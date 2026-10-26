@@ -11,7 +11,7 @@
 import { connect, helpers } from "./lib.mjs";
 
 // The order they run in; each is independent of the others.
-const SCENARIOS = ["basics", "templates", "layout", "files", "angles", "answers", "settings", "notation", "recalc", "graphs", "updates"];
+const SCENARIOS = ["basics", "templates", "layout", "files", "angles", "answers", "settings", "notation", "recalc", "undo", "graphs", "updates"];
 
 const args = process.argv.slice(2);
 const shotAt = args.indexOf("--shots");
