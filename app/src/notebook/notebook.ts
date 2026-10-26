@@ -1,4 +1,4 @@
-import { MathfieldElement, convertLatexToMarkup } from "mathlive";
+import { MathfieldElement, convertLatexToAsciiMath, convertLatexToMarkup } from "mathlive";
 import type { Engine } from "../engine/engine";
 import type { AnswerMode, EvalResult, PlotResult } from "../engine/giac-session";
 import { lineNames } from "../engine/dependencies";
@@ -8,6 +8,7 @@ import { Graph, type View } from "./graph";
 import { unlocalise } from "./plot-items";
 import { isTextLine, splitLines } from "./lines";
 import { History, typingOf, type Typing } from "./history";
+import { tidyAsciiMath } from "./plain-text";
 import { attachSuggestions } from "./suggest-field";
 import { definedSuggestion, functionSuggestions, SYMBOLS, type Suggestion } from "./suggestions";
 import { editMatrix, matrixAtCaret, matrixLatex, type MatrixAction, type MatrixInfo } from "./matrix";
@@ -235,6 +236,25 @@ export class Notebook {
     focusImmediately((this.active ?? this.entries[this.entries.length - 1]).mf);
   }
 
+  /**
+   * Ctrl+Shift+C: the result of the caret's line as shown (exact, then
+   * ≈ decimal), as plain text or LaTeX. Null when the line has none.
+   */
+  resultAtCaret(format: "text" | "latex"): string | null {
+    const entry = this.active;
+    const result = entry?.results[caretLine(entry.mf)];
+    if (!result || result === "pending" || !result.ok || "plot" in result) return null;
+    const forms = result.approxLatex ? [result.latex, result.approxLatex] : [result.latex];
+    if (format === "latex") return forms.join(" \\approx ");
+    return forms.map((latex) => tidyAsciiMath(convertLatexToAsciiMath(latex))).join(" ≈ ");
+  }
+
+  /** Printing: empty cells are left out (marked "blank" while `on`); results are placed for the print width. */
+  preparePrint(on: boolean) {
+    for (const e of this.entries) e.el.classList.toggle("blank", on && !e.mf.value.trim());
+    this.relayout();
+  }
+
   /** Inserts LaTeX at the caret of the entry being edited. */
   insert(latex: string) {
     const entry = this.active ?? this.entries[this.entries.length - 1];
@@ -289,7 +309,12 @@ export class Notebook {
     this.showAnswersChip(entry);
     this.attach(entry, index);
     // Before the cell's own keys, so Tab takes a suggestion first.
-    attachSuggestions(mf, () => [this.namesAbove(entry), FUNCTIONS, SYMBOLS]);
+    attachSuggestions(mf, () => [this.namesAbove(entry), FUNCTIONS, SYMBOLS], () => {
+      // Taking a suggestion is an undo step of its own, even right after typing.
+      this.record(entry);
+      this.typing = null;
+      this.history.seal();
+    });
     const style = document.createElement("style");
     style.textContent = FIELD_CSS;
     mf.shadowRoot?.append(style);

@@ -1676,3 +1676,117 @@ body.with-graph-panel .notebook {
 .suggestion-ghost[hidden] {
   display: none;
 }
+
+/* ---- printing (Ctrl+Shift+P) ------------------------------------------------
+   main.ts adds .printing while the print dialog is
+   open: a fixed width and maths size, so the results and leaders placed on
+   screen land in the same spots on paper. 680px is 180 mm: A4 less margins. */
+.print-header {
+  display: none;
+}
+
+html.printing {
+  --math-size: 1.3rem;
+}
+
+html.printing .sheet,
+html.printing .print-header {
+  width: 680px;
+}
+
+/* Hidden before the layout, so no leader points at it. */
+html.printing .graph-note {
+  display: none;
+}
+
+@page {
+  margin: 15mm;
+}
+
+@media print {
+  /* Paper is always light: the light tokens again, above the dark theme's
+     selectors. The screen never switches theme (WebKitGTK repainted the
+     switch badly around its print dialog). */
+  :root:root:root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface-2: #f0f0ed;
+    --text: #1d1d1f;
+    --muted: #6b6b70;
+    --border: #e3e3df;
+    --accent: #3b5bdb;
+    --accent-soft: #e8edfd;
+    --result: #1f6f50;
+    --error: #c0392b;
+    --error-soft: #fdecea;
+    --kbd-bg: #ffffff;
+    --page: #eeeeea;
+    --sheet: #ffffff;
+    --active: #f6f7fc;
+    --rule: #ecece8;
+    --leader: #cfcfc8;
+    --plot-1: #2f6fdb;
+    --plot-2: #d9480f;
+    --plot-3: #2b8a3e;
+    --plot-4: #9c36b5;
+    --plot-5: #c2255c;
+    --plot-6: #0b7285;
+    color-scheme: light;
+  }
+  html,
+  body {
+    height: auto;
+  }
+  body {
+    display: block;
+    overflow: visible;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .topbar,
+  .statusbar,
+  .templates,
+  .graph-panel,
+  dialog,
+  .suggestion-ghost,
+  .entry.blank,
+  .graph-readout {
+    display: none !important;
+  }
+  .workspace {
+    display: block;
+  }
+  .notebook {
+    overflow: visible;
+    background: none;
+  }
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 0 6mm;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .sheet,
+  .notebook.tall .sheet {
+    margin: 0;
+    overflow: visible;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .entry {
+    break-inside: avoid;
+  }
+  .entry:focus-within {
+    border-left-color: transparent;
+    background: none;
+  }
+  .answers-chip {
+    border: none;
+    background: none;
+  }
+}

@@ -8,6 +8,25 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. So write them for students, in
 plain words. See `docs/releasing.md`.
 
+## 1.5.2
+
+- Printing on Linux no longer makes the top bar flicker between light and
+  dark, and closing the print dialog without printing puts the notebook
+  back at once (before, it stayed light until you clicked).
+
+## 1.5.1
+
+- Pressing Tab for a suggestion right after typing, then Ctrl+Z, took
+  back the letters too. Now Ctrl+Z goes back to just the letters.
+
+## 1.5.0
+
+- Print your notebook, or save it as a PDF, with Ctrl+Shift+P. The page
+  shows only your calculations, laid out like on screen, with the
+  notebook's name and the date on top.
+- Ctrl+Shift+C copies the result of the line you are on, as plain text
+  (`1/2 ≈ 0.5`). Ctrl+P → "Copy result as LaTeX" copies it as LaTeX.
+
 ## 1.4.0
 
 - Names no longer change while you type, so `determinant` or `solution1`
