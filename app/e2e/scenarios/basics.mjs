@@ -188,7 +188,9 @@ export default async ({ page, check, waitIdle, entries, resultOf, hints, current
 
   // Ctrl+←/→ jump like in a text editor and never get stuck at a group edge.
   await page.keyboard.press("Control+Enter");
-  await page.keyboard.type("AT:=transpose(A");
+  await page.keyboard.type("AT:=transpose");
+  await page.keyboard.press("Tab"); // the suggestion: transpose(□)
+  await page.keyboard.type("A");
   // Mark the caret with a "?" and read the value back.
   const caretAt = () => page.evaluate(() => {
     const f = document.activeElement;

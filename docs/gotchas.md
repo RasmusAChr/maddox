@@ -103,6 +103,18 @@ Re-check this list after upgrading.
   GTK's plain input method (driven on a Broadway display). So the notebook
   remembers a held Ctrl+Z / Ctrl+Y until that key's keyup: every press of
   it (or a `Process` key) undoes, and text arriving meanwhile is dropped.
+- **Invisible atoms after the `:=` shortcut.** MathLive leaves atoms that
+  serialise as nothing, so `getValue(start, end)` over them returns the
+  same text as a shorter range. Walking back over a typed word must stop
+  when a step adds no character, or it swallows the `:=`
+  (`suggest-field.ts`).
+- **`insert(…, { focus: true })` refocuses later.** MathLive's delayed
+  focus can swallow keys typed right after. Don't pass it to a field that
+  already has focus.
+- **Templates leave their first box selected.** Backspace then has a
+  selection, not a caret, so `deleteAtBrackets()` treats a lone selected
+  box like the caret in empty brackets; otherwise MathLive deleted the
+  brackets and left the name (`\ln`).
 - **Matrix results need `pmatrix`.** Giac's `\left(\begin{array}…\right)`
   renders with misaligned brackets and pastes back as uneditable.
   `cleanLatex()` rewrites it to `pmatrix`.

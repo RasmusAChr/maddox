@@ -46,7 +46,7 @@ export const CATALOG: CatalogItem[] = [
   // Basics
   { label: "Fraction", syntax: "a/b", category: "basics", description: "Type / for a fraction", latex: "\\frac{#@}{\\placeholder{}}", keywords: "divide" },
   { label: "Power", syntax: "aⁿ", category: "basics", description: "Type ^ for an exponent", latex: "#@^{\\placeholder{}}", keywords: "exponent square" },
-  { label: "Square root", syntax: "√a", category: "basics", description: "Type sqrt", latex: "\\sqrt{#0}", keywords: "sqrt radical" },
+  { label: "Square root", syntax: "√a", category: "basics", description: "Type sqrt, then Tab", latex: "\\sqrt{#0}", keywords: "sqrt radical" },
   { label: "Absolute value", syntax: "|a|", category: "basics", description: "Distance from zero", latex: "\\left|#0\\right|", keywords: "abs" },
   { label: "π", syntax: "pi", category: "basics", description: "Pi, 3.14159…", latex: "\\pi", keywords: "pi constant" },
   { label: "nth root", syntax: "ⁿ√a", category: "basics", description: "Root of any degree", latex: "\\sqrt[\\placeholder{}]{#0}", keywords: "root radical surd cube", advanced: true },
@@ -161,9 +161,4 @@ export const CATALOG: CatalogItem[] = [
   unit("mi", "mi", "Mile", "mile length imperial", true),
   unit("mph", "mph", "Miles per hour", "speed imperial", true),
   unit("lb", "lb", "Pound", "pound mass imperial", true),
-];
-
-/** Command names that turn upright while typing, e.g. "solve" becomes solve. */
-export const OPERATOR_NAMES = [
-  ...new Set(CATALOG.flatMap((c) => [...c.latex.matchAll(/\\operatorname\{([a-z]+)\}/g)].map((m) => m[1]))),
 ];

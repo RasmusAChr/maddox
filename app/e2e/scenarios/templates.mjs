@@ -1,7 +1,7 @@
 // The template sidebar (Ctrl+B), Ctrl+P search, deleting whole brackets,
 // and clicks that never strand the keyboard.
 
-export default async ({ page, check, waitIdle, entries, active }) => {
+export default async ({ page, check, waitIdle, entries, active, current, setAndRun }) => {
   // Template sidebar: starts collapsed to an icon rail; Ctrl+B opens it;
   // each category shows its everyday templates with the rest behind "More".
   check("sidebar starts collapsed", await page.$eval("#templates", (el) => el.classList.contains("collapsed")));
@@ -88,26 +88,29 @@ export default async ({ page, check, waitIdle, entries, active }) => {
 
   // Deleting at the edge of brackets removes the whole call, never half of it.
   const field = () => page.evaluate(() => document.activeElement.value);
-  const prepare = async (typed, left = 0) => {
+  // A function's name, then Tab (its suggestion), then what goes inside.
+  const prepare = async (name, inside = "", left = 0) => {
     await page.evaluate(() => { const f = document.activeElement; f.value = "2+"; f.executeCommand("moveToMathfieldEnd"); });
-    await page.keyboard.type(typed);
+    await page.keyboard.type(name);
+    await page.keyboard.press("Tab");
+    await page.keyboard.type(inside);
     for (let i = 0; i < left; i++) await page.keyboard.press("ArrowLeft");
   };
   await page.keyboard.press("Control+Enter");
   for (const key of ["Backspace", "Delete", "Control+Backspace", "Control+Delete"]) {
-    await prepare("solve(");
+    await prepare("ln");
     await page.keyboard.press(key);
-    check(`empty solve() + ${key} deletes it`, (await field()) === "2+", await field());
+    check(`empty ln() + ${key} deletes it`, (await field()) === "2+", await field());
   }
-  await prepare("sin(x", 1);
+  await prepare("sin", "x", 1);
   await page.keyboard.press("Backspace");
   check("Backspace at start of sin(x) keeps it, selected", (await field()).includes("\\sin\\left(x\\right)"), await field());
   await page.keyboard.press("Backspace");
   check("second Backspace deletes sin(x)", (await field()) === "2+", await field());
-  await prepare("sin(x", 1);
+  await prepare("sin", "x", 1);
   await page.keyboard.press("Control+Backspace");
   check("Ctrl+Backspace at start of sin(x) deletes it", (await field()) === "2+", await field());
-  await prepare("sin(x");
+  await prepare("sin", "x");
   await page.keyboard.press("Control+Delete");
   check("Ctrl+Delete at end of sin(x) deletes it", (await field()) === "2+", await field());
 
@@ -176,4 +179,53 @@ export default async ({ page, check, waitIdle, entries, active }) => {
   await page.keyboard.press("ArrowDown");
   check("so ↓ still selects", (await page.$$("#templates .selected")).length === 1);
   await page.keyboard.press("Control+b");
+  await page.waitForTimeout(150);
+
+  // Suggestions while typing a name: grey text after two letters, Tab takes
+  // it. Nothing converts by itself, so names that start with a function's
+  // name can be typed.
+  // The grey text is drawn on the next frame.
+  const ghost = async () => {
+    await page.waitForTimeout(50);
+    return page.evaluate(() => {
+      const g = document.querySelector(".suggestion-ghost");
+      return g && !g.hidden ? g.textContent : null;
+    });
+  };
+  await page.keyboard.press("Control+Enter");
+  await page.keyboard.type("s");
+  check("one letter shows no suggestion", (await ghost()) === null, await ghost());
+  await page.keyboard.type("o");
+  check("so suggests solve(…, x) in grey", (await ghost()) === "lve(…, x)", await ghost());
+  check("and the letters stay letters", (await current()) === "so", await current());
+  await page.keyboard.press("Tab");
+  check("Tab takes it: solve(□, x)", (await current()) === "\\operatorname{solve}\\left(\\placeholder{},x\\right)", await current());
+  await page.keyboard.press("Control+z");
+  await page.waitForTimeout(80);
+  check("Ctrl+Z goes back to the letters", (await current()) === "so", await current());
+  await page.keyboard.type("lution");
+  check("solution: no name starts so, no suggestion", (await ghost()) === null, await ghost());
+  await page.keyboard.type("1:=12");
+  await page.keyboard.press("Enter");
+  await waitIdle();
+  await page.waitForTimeout(100);
+  await page.keyboard.press("Control+Enter");
+  await page.keyboard.type("sol");
+  check("the notebook's own names come first", (await ghost()) === "ution1", await ghost());
+  await page.keyboard.press("Tab");
+  check("Tab completes the name", (await current()) === "solution1", await current());
+  await page.keyboard.press("Control+Enter");
+  await page.keyboard.type("determinant");
+  check("determinant stays one name (no det)", (await current()) === "determinant", await current());
+  await page.keyboard.press("Control+Enter");
+  await page.keyboard.type("th");
+  check("th suggests theta, showing θ", (await ghost()) === "eta θ", await ghost());
+  await page.keyboard.press("Escape");
+  check("Esc hides the suggestion", (await ghost()) === null, await ghost());
+  await page.keyboard.type("e");
+  check("the next letter brings it back", (await ghost()) === "ta θ", await ghost());
+  await page.keyboard.press("Tab");
+  check("Tab gives θ", (await current()) === "\\theta", await current());
+  await page.keyboard.press("Tab");
+  check("Tab with no suggestion does what it did", (await current()) === "\\theta", await current());
 };

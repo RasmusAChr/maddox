@@ -86,6 +86,14 @@ docs updated, a short report of what changed.
   `docs/decisions/0008-graphs.md`.
 - **% is always hundredths**: `20%` is 0.2, so `150+20%` is 150.2 (as on
   the Nspire and in Excel, not a shop calculator). Decided 2026-10-23.
+- **Names never convert by themselves; Tab takes a suggestion.** After
+  two letters of a name, the best match shows in grey after the caret
+  (`so` → `lve(…, x)`): your own names first, nearest above, then
+  functions, then Greek letters. Tab takes it, Esc hides it. `sin`, `pi`,
+  `solve` typed without Tab stay letters (they still compute), so
+  `determinant` and `solution1` can be typed. Only notation converts as
+  you type (`:=`, `<=`, `->`, `dx`, `30deg`). Decided 2026-10-26, see
+  `docs/decisions/0011-suggestions.md`.
 - **Letters typed together are one name** (`xy`, `XTy`), except: in a
   definition `f(p) := …` an undefined name ending in p is a product
   (`ab₀` with p = b₀ is a·b₀), and in graphs an undefined name with x in it
@@ -208,6 +216,7 @@ npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md
 | `app/src/notebook/notebook.ts` | cells, keys, per-line evaluation, recalculation, result layout |
 | `app/src/engine/dependencies.ts` | names a line assigns and uses (for recalculation) |
 | `app/src/notebook/lines.ts` | multi-line cells, `#` text lines |
+| `app/src/notebook/suggestions.ts`, `suggest-field.ts` | grey name suggestions: what matches, and the grey text + Tab in a field |
 | `app/src/notebook/history.ts` | the notebook-wide undo/redo history (steps live in `notebook.ts`) |
 | `app/src/notebook/matrix.ts`, `mathlive-internals.ts` | matrix editing; all MathLive private access |
 | `app/src/ui/commands.ts` | every template and its category (sidebar + search) |

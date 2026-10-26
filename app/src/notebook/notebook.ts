@@ -3,11 +3,13 @@ import type { Engine } from "../engine/engine";
 import type { AnswerMode, EvalResult, PlotResult } from "../engine/giac-session";
 import { lineNames } from "../engine/dependencies";
 import { ANS_VARIABLE, latexToGiac, UnsupportedLatex } from "../engine/latex-to-giac";
-import { OPERATOR_NAMES } from "../ui/commands";
+import { CATALOG } from "../ui/commands";
 import { Graph, type View } from "./graph";
 import { unlocalise } from "./plot-items";
 import { isTextLine, splitLines } from "./lines";
 import { History, typingOf, type Typing } from "./history";
+import { attachSuggestions } from "./suggest-field";
+import { definedSuggestion, functionSuggestions, SYMBOLS, type Suggestion } from "./suggestions";
 import { editMatrix, matrixAtCaret, matrixLatex, type MatrixAction, type MatrixInfo } from "./matrix";
 import { atLineStart, breakLine, caretLine, deleteAtBrackets, fillEmptyMatrixCells, focusImmediately, lineBoxes, moveByWord, type LineBox } from "./mathlive-internals";
 
@@ -64,21 +66,18 @@ export type Cell = {
 };
 
 // Shortcuts MathLive applies while typing. Its defaults include surprises for
-// a calculator (e.g. "in" becomes ∈), so start from a short allowlist.
+// a calculator (e.g. "in" becomes ∈), so start from a short allowlist: only
+// notation. Names (sin, pi, solve…) never convert by themselves, so a name
+// that starts with one can be typed (determinant, pick); a grey suggestion
+// shows instead, and Tab takes it (suggestions.ts).
 const KEPT_SHORTCUTS = [
-  "alpha", "delta", "Delta", "pi", "Pi", "theta", "Theta", "infty", "oo",
-  "sqrt", "int", "sum", "prod", "lim", "dx", "dy", "dt",
-  "sin", "cos", "tan", "arcsin", "arccos", "arctan", "sinh", "cosh", "tanh", "cot", "sec", "csc",
-  "ln", "<=", ">=", "!=", ":=", "->",
+  "<=", ">=", "!=", ":=", "->",
+  "dx", "dy", "dt", // ∫ … dx
   "deg", // after a number: 30deg becomes 30°
 ];
-const EXTRA_SHORTCUTS: Record<string, string> = {
-  log: "\\log", // MathLive's default asks for a base; log is base 10 here.
-  beta: "\\beta", gamma: "\\gamma", lambda: "\\lambda", mu: "\\mu", sigma: "\\sigma",
-  omega: "\\omega", phi: "\\phi", epsilon: "\\epsilon", rho: "\\rho", tau: "\\tau",
-  // The last case of a piecewise function reads as a word, not a variable.
-  otherwise: "\\text{otherwise}",
-};
+
+/** The catalog's functions, for suggestions. */
+const FUNCTIONS = functionSuggestions(CATALOG);
 
 const MATRIX_KEYS: Record<string, MatrixAction> = {
   ArrowUp: "addRowAbove",
@@ -289,6 +288,8 @@ export class Notebook {
     chip.addEventListener("click", () => this.toggleAnswers(entry));
     this.showAnswersChip(entry);
     this.attach(entry, index);
+    // Before the cell's own keys, so Tab takes a suggestion first.
+    attachSuggestions(mf, () => [this.namesAbove(entry), FUNCTIONS, SYMBOLS]);
     const style = document.createElement("style");
     style.textContent = FIELD_CSS;
     mf.shadowRoot?.append(style);
@@ -340,13 +341,63 @@ export class Notebook {
     return entry;
   }
 
+  /** Grey suggestions in a graph-panel row: every name the notebook defines, then functions. */
+  suggestIn(mf: MathfieldElement) {
+    attachSuggestions(mf, () => [this.namesAbove(null), FUNCTIONS, SYMBOLS]);
+  }
+
+  /** Names the evaluated cells above `entry` define (all cells for null), nearest first. */
+  private namesAbove(entry: Entry | null): Suggestion[] {
+    const end = entry ? this.entries.indexOf(entry) : this.entries.length;
+    const seen = new Set<string>();
+    const out: Suggestion[] = [];
+    for (const e of this.entries.slice(0, Math.max(0, end)).reverse()) {
+      for (const s of this.definitions(e)) {
+        if (seen.has(s.name)) continue;
+        seen.add(s.name);
+        out.push(s);
+      }
+    }
+    return out;
+  }
+
+  private defined = new WeakMap<Entry, { latex: string; names: Suggestion[] }>();
+
+  /** What one evaluated cell defines, last line first (cached until it runs again). */
+  private definitions(entry: Entry): Suggestion[] {
+    const latex = entry.evaluatedLatex;
+    if (latex === null) return [];
+    const cached = this.defined.get(entry);
+    if (cached?.latex === latex) return cached.names;
+    const names: Suggestion[] = [];
+    for (const line of splitLines(latex).reverse()) {
+      if (!line || isTextLine(line)) continue;
+      let giac: string;
+      try {
+        giac = latexToGiac(line);
+      } catch {
+        continue;
+      }
+      const fn = giac.match(/^\s*([A-Za-z]\w*)\(([^()]*)\)\s*:=/);
+      if (fn) {
+        const s = definedSuggestion(fn[1], fn[2].split(",").map((p) => p.trim()).filter(Boolean));
+        if (s) names.push(s);
+        continue;
+      }
+      for (const name of lineNames(giac).assigns) {
+        const s = definedSuggestion(name);
+        if (s) names.push(s);
+      }
+    }
+    this.defined.set(entry, { latex, names });
+    return names;
+  }
+
   /** Shortcuts and keybindings for a math field (the cells, and the graph panel's rows). */
   configure(mf: MathfieldElement) {
     if (!this.shortcuts) {
       const defaults = mf.inlineShortcuts as Record<string, any>;
-      const kept = Object.fromEntries(KEPT_SHORTCUTS.filter((k) => k in defaults).map((k) => [k, defaults[k]]));
-      const names = Object.fromEntries(OPERATOR_NAMES.map((n) => [n, `\\operatorname{${n}}`]));
-      this.shortcuts = { ...kept, ...EXTRA_SHORTCUTS, ...names };
+      this.shortcuts = Object.fromEntries(KEPT_SHORTCUTS.filter((k) => k in defaults).map((k) => [k, defaults[k]]));
     }
     mf.inlineShortcuts = this.shortcuts;
     mf.smartFence = true;

@@ -48,7 +48,8 @@
 | Ctrl+M | anywhere | Matrix size dialog (Tab between fields, Enter inserts) |
 | Alt+↓/↑, Alt+→/← | in a matrix | Add a row below/above, a column right/left |
 | Alt+Shift+↓/→ | in a matrix | Delete the current row / column |
-| Tab | cell | Next empty box |
+| Tab | cell | Take the grey suggestion after two letters of a name (see 0011); with none showing, next empty box |
+| Esc | cell, suggestion showing | Hide the suggestion until the next letter |
 | Backspace / Delete at a bracket edge | cell | Empty brackets: delete the call. Otherwise: select the call, press again to delete |
 | Ctrl+Backspace / Ctrl+Delete at a bracket edge | cell | Delete the whole call |
 | Ctrl+P (or Ctrl+K) | anywhere | Search templates and app actions |
