@@ -5,21 +5,35 @@ version number (semantic versioning: a fix bumps the patch, 1.0.0 → 1.0.1;
 new or changed behaviour bumps the minor, 1.0.1 → 1.1.0; a notebook file
 older versions can't open bumps the major). A release's notes are every
 section since the previous release: they become the GitHub Release text
-and are shown in the app's update dialog. So write them for students, in
-plain words. See `docs/releasing.md`.
+and are shown in the app's update dialog. See `docs/releasing.md`.
+
+Users read these notes, so write for students, in plain words: what they
+can do now, not what went wrong before or how it was fixed. Sort each
+bullet under one of these headings, in this order:
+
+- `### New`: something you couldn't do before.
+- `### Improved`: something that works better or more conveniently.
+- `### Fixed`: something that went wrong and now doesn't.
+- `### Behind the scenes`: changes users don't notice (build, tests).
+  Kept here for developers; left out of the release notes.
 
 ## 1.5.2
 
-- Printing on Linux no longer makes the top bar flicker between light and
-  dark, and closing the print dialog without printing puts the notebook
-  back at once (before, it stayed light until you clicked).
+### Fixed
+
+- Printing on Linux: the top bar no longer flickers, and cancelling the
+  print dialog brings the notebook straight back.
 
 ## 1.5.1
 
-- Pressing Tab for a suggestion right after typing, then Ctrl+Z, took
-  back the letters too. Now Ctrl+Z goes back to just the letters.
+### Fixed
+
+- Ctrl+Z right after taking a suggestion with Tab takes back only the
+  suggestion, not the letters you typed.
 
 ## 1.5.0
+
+### New
 
 - Print your notebook, or save it as a PDF, with Ctrl+Shift+P. The page
   shows only your calculations, laid out like on screen, with the
@@ -29,64 +43,88 @@ plain words. See `docs/releasing.md`.
 
 ## 1.4.0
 
-- Names no longer change while you type, so `determinant` or `solution1`
-  stay one name (before, det or sin turned into a function halfway).
-- After two letters, a suggestion shows in grey: `so` suggests
-  `solve(…, x)`, a name you defined, or a Greek letter (`th` → θ). Tab
-  takes it; Esc hides it. `sin`, `pi`, `sqrt` and the others now come
-  from Tab, or the sidebar.
-- Backspace on an empty template box (from the sidebar or Tab) deletes the
-  whole function, not just its brackets.
+### New
+
+- Suggestions while you type: after two letters, the best match shows in
+  grey (`so` → `solve(…, x)`, a name you defined, or a Greek letter like
+  `th` → θ). Tab takes it, Esc hides it. Functions such as `sin`, `pi` and
+  `sqrt` now come from Tab or the sidebar.
+
+### Improved
+
+- Names stay as you type them, so `determinant` or `solution1` are one
+  name instead of turning into a function halfway.
+- Backspace on an empty box of a function (from the sidebar or Tab)
+  deletes the whole function, not just its brackets.
 
 ## 1.3.0
 
+### New
+
 - About Maddox (Ctrl+P, "about") shows the version, the licences, and
-  where the source code of Maddox and its maths engine can be found.
-- Maddox downloads its maths engine from its own GitHub release, so
-  building it no longer depends on a university server being up.
+  where to find the source code of Maddox and its maths engine.
+
+### Behind the scenes
+
+- Building Maddox downloads the maths engine from Maddox's own GitHub
+  release instead of a university server.
 
 ## 1.2.2
 
-- Holding Ctrl+Z on Linux could type "zzzz" into a cell that undo had
-  just brought back. Holding it now keeps undoing until you let go.
+### Fixed
+
+- Holding Ctrl+Z on Linux keeps undoing until you let go, instead of
+  sometimes typing z's into the notebook.
 
 ## 1.2.1
 
-- Ctrl+Backspace in an empty cell deletes the cell, like Backspace does.
-  Before, it did nothing.
+### Improved
+
+- Ctrl+Backspace in an empty cell deletes the cell, like Backspace.
 
 ## 1.2.0
 
-- Ctrl+Z undoes the last change anywhere in the notebook, and Ctrl+Y (or
-  Ctrl+Shift+Z) redoes it. Delete a word and then the whole cell: the
-  first Ctrl+Z brings the cell back, the second the word. Typing comes
-  back a word at a time. A cell you bring back keeps its answers, and
-  what it defined works again.
+### New
+
+- Undo and redo across the whole notebook: Ctrl+Z takes back the last
+  change wherever it was, and Ctrl+Y (or Ctrl+Shift+Z) redoes it. Delete
+  a word and then the whole cell: the first Ctrl+Z brings the cell back,
+  the second the word. Typing comes back a word at a time, and a cell you
+  bring back keeps its answers.
 
 ## 1.1.2
 
-- Behind the scenes: the automatic build and test setup uses current
-  versions of GitHub's tools. Nothing changes in the app.
+### Behind the scenes
+
+- The automatic build and test setup uses current versions of GitHub's
+  tools.
 
 ## 1.1.1
 
-- Pressing Esc and then Ctrl+P quickly could open the search without the
-  keyboard in it, so what you typed went nowhere. Fixed.
+### Fixed
+
+- The search (Ctrl+P) always gets your typing, even when you open it
+  right after pressing Esc.
 
 ## 1.1.0
+
+### Improved
 
 - Settings are sorted into tabs: Notebook, Answers, Appearance, and
   Startup & updates. ↑/↓ pick a tab, Enter opens it, Esc goes back.
 
 ## 1.0.2
 
-- Typing \ followed by a name (\alp) suggests commands such as \alpha.
-  Enter now takes the suggestion; before, it ran the cell with the
-  command half typed.
+### Improved
+
+- Enter takes a suggested command such as `\alpha` (after typing `\alp`)
+  instead of running the cell.
 
 ## 1.0.1
 
-- Esc closes Settings on Linux. Before, it did nothing there.
+### Improved
+
+- Esc closes Settings on Linux too.
 
 ## 1.0.0
 

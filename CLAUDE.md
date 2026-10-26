@@ -170,9 +170,11 @@ npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md
   next version number, committed on its branch (decided 2026-10-25).
   Use semantic versioning: a fix bumps the patch (1.0.0 → 1.0.1), new or
   changed behaviour the minor (→ 1.1.0), a file format older versions
-  can't open the major. Write what users notice, in plain words. A
-  release's notes are all sections since the previous release, and they
-  are shown in the update dialog.
+  can't open the major. Write what users notice, in plain words, under
+  `### New`, `### Improved` or `### Fixed` (`### Behind the scenes` for
+  what users don't notice); say what works now, not how it broke. A
+  release's notes are all sections since the previous release, merged by
+  heading, and they are shown in the update dialog.
 
 - **After any UI or keyboard change**, run `npm run e2e`. The scenarios in
   `app/e2e/scenarios/` are the executable spec of the behaviour the owner
