@@ -7,11 +7,15 @@ export default async ({ page, check, active, setAndRun, searchRun }) => {
     window.__copied = [];
     navigator.clipboard.writeText = async (text) => { window.__copied.push(text); };
     window.__printed = null;
+    // Like Chromium (and WebView2), the dialog sends beforeprint; with
+    // __silent, nothing, like WebKitGTK when the dialog is cancelled.
     window.print = () => {
+      if (!window.__silent) window.dispatchEvent(new Event("beforeprint"));
       const root = document.documentElement;
       window.__printed = {
         printing: root.classList.contains("printing"),
         theme: root.dataset.theme ?? null,
+        text: getComputedStyle(root).getPropertyValue("--text").trim(),
         title: document.querySelector("#print-title").textContent,
         date: document.querySelector("#print-date").textContent,
         blank: document.querySelectorAll(".entry.blank").length,
@@ -45,7 +49,8 @@ export default async ({ page, check, active, setAndRun, searchRun }) => {
   await page.keyboard.press("Control+Shift+p");
   await page.waitForFunction(() => window.__printed);
   const printed = await page.evaluate(() => window.__printed);
-  check("Ctrl+Shift+P prints in the light theme at print width", printed.printing && printed.theme === "light", JSON.stringify(printed));
+  // The screen keeps its theme (WebKitGTK repainted a switch badly); paper is light.
+  check("Ctrl+Shift+P lays out at print width, the screen keeping its theme", printed.printing && printed.theme === "dark" && printed.text !== "#1d1d1f", JSON.stringify(printed));
   check("with the notebook's name and the date on top", printed.title === "Untitled" && /\d{4}$/.test(printed.date), JSON.stringify(printed));
   check("leaving out the empty cells", printed.blank === 2, JSON.stringify(printed));
   await page.emulateMedia({ media: "print" });
@@ -54,13 +59,22 @@ export default async ({ page, check, active, setAndRun, searchRun }) => {
     status: getComputedStyle(document.querySelector(".statusbar")).display,
     header: getComputedStyle(document.querySelector(".print-header")).display,
     cells: [...document.querySelectorAll(".entry")].filter((e) => getComputedStyle(e).display !== "none").length,
+    text: getComputedStyle(document.documentElement).getPropertyValue("--text").trim(),
   }));
   check("on paper: no toolbar or status bar, a header, the cells", shown.topbar === "none" && shown.status === "none" && shown.header === "flex" && shown.cells === 2, JSON.stringify(shown));
+  check("in light colours", shown.text === "#1d1d1f", JSON.stringify(shown));
   await page.emulateMedia({ media: "screen" });
+  const state = () => page.evaluate(() => ({ printing: document.documentElement.classList.contains("printing"), theme: document.documentElement.dataset.theme }));
+  check("while the dialog is open, the print layout stays", (await state()).printing === true, JSON.stringify(await state()));
   await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
   await page.waitForTimeout(150);
-  const after = await page.evaluate(() => ({ printing: document.documentElement.classList.contains("printing"), theme: document.documentElement.dataset.theme }));
-  check("after printing, the screen is as it was", !after.printing && after.theme === "dark", JSON.stringify(after));
+  check("after printing, the screen is as it was", !(await state()).printing && (await state()).theme === "dark", JSON.stringify(await state()));
+  // WebKitGTK: print() waits for the dialog, and Cancel sends no events.
+  await page.evaluate(() => { window.__silent = true; window.__printed = null; });
+  await page.keyboard.press("Control+Shift+p");
+  await page.waitForFunction(() => window.__printed);
+  await page.waitForTimeout(150);
+  check("a dialog closed without print events puts the screen back at once", !(await state()).printing, JSON.stringify(await state()));
   check("and the keyboard is back in a cell", (await active()).startsWith("MATH-FIELD"), await active());
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
 };

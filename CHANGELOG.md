@@ -8,6 +8,12 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. So write them for students, in
 plain words. See `docs/releasing.md`.
 
+## 1.5.2
+
+- Printing on Linux no longer makes the top bar flicker between light and
+  dark, and closing the print dialog without printing puts the notebook
+  back at once (before, it stayed light until you clicked).
+
 ## 1.5.1
 
 - Pressing Tab for a suggestion right after typing, then Ctrl+Z, took

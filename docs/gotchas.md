@@ -119,9 +119,16 @@ Re-check this list after upgrading.
   in pixels from screen measurements, and `--math-size` follows the
   window width, so the print media alone would misplace them. `print()`
   in `main.ts` first sets `html.printing` (a fixed 680px sheet and maths
-  size, the same in print), the light theme and blank-cell marks, lays
-  out again, then calls `window.print()`, and undoes it on `afterprint`
-  (or the next key or click, in case a webview never sends it).
+  size, the same in print) and blank-cell marks, lays out again, then
+  calls `window.print()`, and undoes it on `afterprint`.
+- **WebKitGTK printing (Linux).** `window.print()` waits for the GTK print
+  dialog. Printing sends `beforeprint` and `afterprint`; **Cancel sends
+  neither**, so `print()` undoes the print layout itself when it returns
+  without a `beforeprint`. Don't switch the theme for printing: WebKitGTK
+  repainted the switch badly around its dialog (the top bar flickered
+  between light and dark until the window lost focus). Paper is light
+  through `@media print` alone. Verified with the real dialog on a GTK
+  Broadway display (a WebKit2 Python script, `GDK_BACKEND=broadway`).
 - **Matrix results need `pmatrix`.** Giac's `\left(\begin{array}…\right)`
   renders with misaligned brackets and pastes back as uneditable.
   `cleanLatex()` rewrites it to `pmatrix`.

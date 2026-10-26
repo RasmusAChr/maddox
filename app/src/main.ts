@@ -580,37 +580,38 @@ function searchItems(): SearchItem[] {
 
 /**
  * Ctrl+Shift+P: the system's print dialog, which also saves a PDF. The page
- * switches to a fixed print width and the light theme first, so results and
- * their leaders are placed where they will print, then switches back.
+ * switches to a fixed print width first, so results and their leaders are
+ * placed where they will print (paper is always light: style.css), then
+ * switches back.
  */
 function print() {
   const root = document.documentElement;
-  const theme = root.dataset.theme;
   $("#print-title").textContent = $("#doc-name").textContent ?? "";
   $("#print-date").textContent = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   root.classList.add("printing");
-  root.dataset.theme = "light";
   (document.activeElement as HTMLElement | null)?.blur(); // no caret or selection on paper
   notebook.preparePrint(true);
   let done = false;
+  let started = false;
   const finish = () => {
     if (done) return;
     done = true;
     root.classList.remove("printing");
-    if (theme) root.dataset.theme = theme;
-    else delete root.dataset.theme;
     notebook.preparePrint(false);
     refocus();
   };
+  window.addEventListener("beforeprint", () => (started = true), { once: true });
   window.addEventListener("afterprint", finish, { once: true });
-  // If a webview never reports the dialog closing, the next key or click does.
-  const later = () => setTimeout(() => {
-    window.addEventListener("keydown", finish, { once: true, capture: true });
-    window.addEventListener("pointerdown", finish, { once: true, capture: true });
-  });
   requestAnimationFrame(() => {
     window.print();
-    later();
+    // WebKitGTK: print() waits for the dialog, and Cancel sends neither
+    // beforeprint nor afterprint, so nothing more will come.
+    if (!started) return finish();
+    // A webview that never reports the end: the next key or click.
+    setTimeout(() => {
+      window.addEventListener("keydown", finish, { once: true, capture: true });
+      window.addEventListener("pointerdown", finish, { once: true, capture: true });
+    });
   });
 }
 
