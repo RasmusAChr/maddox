@@ -96,7 +96,8 @@ export function splitLatexArgs(latex: string): string[] {
 export function plotItemsFromLine(line: string): string[] {
   const latex = line.trim();
   if (!latex || isTextLine(latex)) return [];
-  const plot = latex.match(/^\\operatorname\{(?:\\mathrm\{)?plot\}+\\left\((.*)\\right\)$/s);
+  // \operatorname{plot} from Tab or a template; plain letters when typed.
+  const plot = latex.match(/^(?:\\operatorname\{(?:\\mathrm\{)?plot\}+|plot)\\left\((.*)\\right\)$/s);
   if (plot) return splitLatexArgs(plot[1]);
   const definition = latex.match(/^(.+?)(?:\\coloneq|:=)/s);
   if (definition) {

@@ -125,8 +125,16 @@ export function breakLine(mf: MathfieldElement) {
 export function deleteAtBrackets(mf: MathfieldElement, key: "Backspace" | "Delete", ctrl: boolean): boolean {
   try {
     const model = internal(mf).model;
-    if (model.selectionIsCollapsed === false) return false;
-    const atom = model.at(model.position);
+    // A lone selected box (as a template or a suggestion leaves it) counts
+    // as the caret in empty brackets.
+    let position = model.position;
+    if (model.selectionIsCollapsed === false) {
+      const [from, to] = model.selection.ranges[0];
+      const atoms = model.getAtoms([from, to]);
+      if (atoms.length !== 1 || atoms[0].type !== "placeholder") return false;
+      position = Math.min(from, to);
+    }
+    const atom = model.at(position);
     const fence = atom?.parent;
     if (fence?.type !== "leftright") return false;
     const atStart = atom.type === "first";
@@ -270,4 +278,12 @@ export function focusImmediately(mf: MathfieldElement) {
   } catch {
     // MathLive's own delayed focus still applies.
   }
+}
+
+/** Where the caret is drawn, on screen; null when none is (no focus, or a selection). */
+export function caretRect(mf: MathfieldElement): DOMRect | null {
+  const caret = mf.shadowRoot?.querySelector(".ML__caret");
+  if (!caret) return null;
+  const rect = caret.getBoundingClientRect();
+  return rect.height ? rect : null;
 }

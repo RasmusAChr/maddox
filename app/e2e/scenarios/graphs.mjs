@@ -9,13 +9,15 @@ export default async ({ page, check, waitIdle, entries, hints, current, active, 
   await page.keyboard.press("ArrowRight");
   await page.keyboard.type(":=x^2-2");
   await page.keyboard.press("Shift+Enter");
-  await page.keyboard.type("plot(fp,x");
+  await page.keyboard.type("plot");
+  await page.keyboard.press("Tab"); // the suggestion: plot(□)
+  await page.keyboard.type("fp,x");
   await page.waitForTimeout(100);
   const plotCell = () => page.$$eval(".entry", (els) => {
     const el = els.find((e) => /plot\}+\\left\(/.test(e.querySelector("math-field")?.value ?? ""));
     return el ? { curves: [...el.querySelectorAll(".graph-curve")].filter((p) => (p.getAttribute("d") ?? "").length > 20).length, note: el.querySelector(".graph-note")?.textContent ?? null } : null;
   });
-  check("typing plot( gives the plot command", /operatorname\{(\\mathrm\{)?plot\}/.test(await current()), await current());
+  check("plot, Tab gives the plot command", /operatorname\{(\\mathrm\{)?plot\}/.test(await current()), await current());
   await page.keyboard.press("ArrowUp"); // back to the first line, so Enter evaluates the whole cell
   await page.keyboard.press("Enter");
   await waitIdle();

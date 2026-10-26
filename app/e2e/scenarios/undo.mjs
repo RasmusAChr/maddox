@@ -110,12 +110,12 @@ export default async ({ page, check, waitIdle, current, entries, setAndRun, resu
   await page.keyboard.type("0");
   check("the restored cell still takes typing", (await current()) === "uz\\coloneq50", await current());
   await page.keyboard.type("pi");
-  check("and its typing shortcuts (pi is π)", (await current()) === "uz\\coloneq50\\pi", await current());
+  await page.keyboard.press("Tab");
+  check("and its suggestions (pi, Tab is π)", (await current()) === "uz\\coloneq50\\pi", await current());
 
   // Ctrl+P has Undo and Redo too.
   await searchRun("undo");
-  // 0 and pi were typed as one run of letters and digits: one step.
-  check("Ctrl+P Undo takes back the last change", (await current()) === "uz\\coloneq5", await current());
+  check("Ctrl+P Undo takes back the last change (Tab's π)", (await current()) === "uz\\coloneq50pi", await current());
   await searchRun("redo");
   check("Ctrl+P Redo puts it back", (await current()) === "uz\\coloneq50\\pi", await current());
 };

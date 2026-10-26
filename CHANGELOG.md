@@ -8,6 +8,17 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. So write them for students, in
 plain words. See `docs/releasing.md`.
 
+## 1.4.0
+
+- Names no longer change while you type, so `determinant` or `solution1`
+  stay one name (before, det or sin turned into a function halfway).
+- After two letters, a suggestion shows in grey: `so` suggests
+  `solve(…, x)`, a name you defined, or a Greek letter (`th` → θ). Tab
+  takes it; Esc hides it. `sin`, `pi`, `sqrt` and the others now come
+  from Tab, or the sidebar.
+- Backspace on an empty template box (from the sidebar or Tab) deletes the
+  whole function, not just its brackets.
+
 ## 1.3.0
 
 - About Maddox (Ctrl+P, "about") shows the version, the licences, and

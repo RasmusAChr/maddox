@@ -27,7 +27,10 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)
 
 const engine = new Engine(new URL("giac/giacwasm.js", document.baseURI).href);
 const notebook = new Notebook($("#sheet"), engine);
-const panel = new GraphPanel($("#graph-panel"), engine, (mf) => notebook.configure(mf));
+const panel = new GraphPanel($("#graph-panel"), engine, (mf) => {
+  notebook.configure(mf);
+  notebook.suggestIn(mf);
+});
 void applyZoom();
 
 // Room to scroll the last cell up off the bottom edge, but only once the

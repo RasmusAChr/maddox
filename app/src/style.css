@@ -1662,3 +1662,17 @@ body.with-graph-panel .notebook {
   user-select: all;
   word-break: break-all;
 }
+
+/* A grey suggestion after the caret (suggest-field.ts): Tab takes it. */
+.suggestion-ghost {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  white-space: nowrap;
+  color: var(--muted);
+  opacity: 0.75;
+  font-family: "KaTeX_Main", "Times New Roman", serif;
+}
+.suggestion-ghost[hidden] {
+  display: none;
+}
