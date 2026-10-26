@@ -27,6 +27,7 @@
     <div class="workspace">
       <aside id="templates" class="templates" aria-label="Templates"></aside>
       <main id="notebook" class="notebook" aria-label="Calculations">
+        <div class="print-header" aria-hidden="true"><span id="print-title"></span><span id="print-date"></span></div>
         <div id="sheet" class="sheet"></div>
       </main>
       <aside id="graph-panel" class="graph-panel" aria-label="Graphs" hidden></aside>
@@ -104,8 +105,11 @@
 
     <dialog id="settings-dialog" class="settings-dialog" aria-label="Settings">
       <h2>Settings</h2>
-      <div class="settings-list"></div>
-      <div class="dialog-foot"><kbd>↑</kbd><kbd>↓</kbd> choose · <kbd>←</kbd><kbd>→</kbd> change · <kbd>Esc</kbd> close · changes apply at once</div>
+      <div class="settings-body">
+        <div class="settings-tabs" role="tablist" aria-orientation="vertical"></div>
+        <div class="settings-list" role="tabpanel"></div>
+      </div>
+      <div class="dialog-foot"></div>
     </dialog>
 
     <dialog id="help-dialog" class="help-dialog" aria-label="Keyboard shortcuts">
@@ -120,9 +124,13 @@
             <dt><kbd>Ctrl</kbd> <kbd>Enter</kbd></dt><dd>New entry below</dd>
             <dt><kbd>Alt</kbd> <kbd>Enter</kbd></dt><dd>This entry as decimals ≈ (again: back)</dd>
             <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Previous / next entry</dd>
-            <dt><kbd>Backspace</kbd></dt><dd>Delete an empty entry</dd>
+            <dt><kbd>Backspace</kbd> or <kbd>Ctrl</kbd> <kbd>Backspace</kbd></dt><dd>Delete an empty entry</dd>
             <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Backspace</kbd></dt><dd>Delete this entry</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Z</kbd></dt><dd>Undo the last change, in any entry</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Y</kbd></dt><dd>Redo (also <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd>)</dd>
             <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Enter</kbd></dt><dd>Run all from the top</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>C</kbd></dt><dd>Copy this line's result as text (LaTeX: <kbd>Ctrl</kbd> <kbd>P</kbd>)</dd>
+            <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>P</kbd></dt><dd>Print, or save as PDF</dd>
             <dt><kbd>Esc</kbd></dt><dd>Cancel a long computation</dd>
           </dl>
         </section>
@@ -138,9 +146,10 @@
           </dl>
           <h3>Typing maths</h3>
           <dl>
+            <dt><code>so</code> <kbd>Tab</kbd></dt><dd>Take the grey suggestion: <code>solve(…, x)</code>, a name of yours, θ… <kbd>Esc</kbd> hides it</dd>
             <dt><kbd>/</kbd></dt><dd>Fraction</dd>
             <dt><kbd>^</kbd> <kbd>_</kbd></dt><dd>Power / subscript</dd>
-            <dt><code>sqrt</code> <code>int</code> <code>sum</code> <code>lim</code></dt><dd>Templates</dd>
+            <dt><code>sqrt</code> <code>int</code> <code>sum</code> <code>lim</code> <kbd>Tab</kbd></dt><dd>Templates</dd>
             <dt><code>:=</code></dt><dd>Assign, e.g. <code>a:=5</code>, <code>f(x):=x^2</code></dd>
             <dt><code>ans</code></dt><dd>The previous result</dd>
             <dt><code>(1, 3)</code></dt><dd>A point or vector, any length: Q − P, 2P, P·Q work</dd>

@@ -9,6 +9,7 @@ describe("plotItemsFromLine (Ctrl+Shift+G)", () => {
     ["y_1\\coloneq 3x", ["y_1"]],
     ["\\operatorname{\\mathrm{plot}}\\left(f,x^2,\\frac{1}{x}\\right)", ["f", "x^2", "\\frac{1}{x}"]],
     ["\\operatorname{plot}\\left(\\left(1,3\\right),g\\right)", ["\\left(1,3\\right)", "g"]],
+    ["plot\\left(f,x\\right)", ["f", "x"]],
     ["x^2-2", ["x^2-2"]],
     ["\\text{\\# Area}", []],
     ["", []],

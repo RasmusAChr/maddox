@@ -53,6 +53,12 @@ Re-check this list after upgrading.
   `solve(…)` removes only `(`, leaving `\left.`. Delete on empty `()`
   removes only `)`. Ctrl+Backspace at a group's start does nothing. Fix:
   `deleteAtBrackets()`; a function name is any atom with `isFunction`.
+- **LaTeX mode owns Enter, Tab and ↑/↓.** Typing `\` switches the field to
+  `mode === "latex"` and shows suggestions (`\alp` → `\alpha`). Enter or
+  Tab accepts one, and ↑/↓ choose, all without moving the caret. Our
+  capture-phase key handler must leave these keys alone in that mode.
+  Otherwise Enter evaluates the half-typed command, and ↑/↓ look like
+  "caret didn't move" and leave the cell.
 - **Ctrl+←/→ get stuck.** MathLive binds them to move to the start or end
   of the current group, so at a group's edge (e.g. right before the `(` of
   `transpose(A)`) they do nothing. Its Alt+arrows (word moves) step through
@@ -81,6 +87,48 @@ Re-check this list after upgrading.
     power on the last unit comes out after the group (`\mathrm{m/s}^2`),
     and the converter gives it to that last unit;
   - inline shortcuts still fire (deg → °), so unit mode turns them off.
+- **A math-field taken out of the page and put back is rebuilt.** On
+  reconnect MathLive makes a new internal field from the element's
+  attribute options only: `keybindings` and `inlineShortcuts` set from
+  code are gone, and so is its own undo history. Undo puts a deleted cell
+  back by re-attaching its element, so `attach()` runs `configure()` again.
+- **MathLive's own undo is per field.** Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z are
+  claimed in the cells' key handler for the notebook-wide history
+  (`history.ts`), so MathLive never sees them there. The graph panel's rows
+  still use MathLive's.
+- **A held Ctrl+Z can repeat as a plain z (Linux, fcitx5 on Wayland).**
+  Holding Ctrl+Z until undo brought back a deleted cell typed "zzzz" into
+  it: once the keyboard moved to the restored (rebuilt) field, the repeats
+  arrived without Ctrl. Not reproducible in Chromium, nor in WebKitGTK with
+  GTK's plain input method (driven on a Broadway display). So the notebook
+  remembers a held Ctrl+Z / Ctrl+Y until that key's keyup: every press of
+  it (or a `Process` key) undoes, and text arriving meanwhile is dropped.
+- **Invisible atoms after the `:=` shortcut.** MathLive leaves atoms that
+  serialise as nothing, so `getValue(start, end)` over them returns the
+  same text as a shorter range. Walking back over a typed word must stop
+  when a step adds no character, or it swallows the `:=`
+  (`suggest-field.ts`).
+- **`insert(…, { focus: true })` refocuses later.** MathLive's delayed
+  focus can swallow keys typed right after. Don't pass it to a field that
+  already has focus.
+- **Templates leave their first box selected.** Backspace then has a
+  selection, not a caret, so `deleteAtBrackets()` treats a lone selected
+  box like the caret in empty brackets; otherwise MathLive deleted the
+  brackets and left the name (`\ln`).
+- **Print layout is measured on screen.** Results and leaders are placed
+  in pixels from screen measurements, and `--math-size` follows the
+  window width, so the print media alone would misplace them. `print()`
+  in `main.ts` first sets `html.printing` (a fixed 680px sheet and maths
+  size, the same in print) and blank-cell marks, lays out again, then
+  calls `window.print()`, and undoes it on `afterprint`.
+- **WebKitGTK printing (Linux).** `window.print()` waits for the GTK print
+  dialog. Printing sends `beforeprint` and `afterprint`; **Cancel sends
+  neither**, so `print()` undoes the print layout itself when it returns
+  without a `beforeprint`. Don't switch the theme for printing: WebKitGTK
+  repainted the switch badly around its dialog (the top bar flickered
+  between light and dark until the window lost focus). Paper is light
+  through `@media print` alone. Verified with the real dialog on a GTK
+  Broadway display (a WebKit2 Python script, `GDK_BACKEND=broadway`).
 - **Matrix results need `pmatrix`.** Giac's `\left(\begin{array}…\right)`
   renders with misaligned brackets and pastes back as uneditable.
   `cleanLatex()` rewrites it to `pmatrix`.
@@ -200,6 +248,22 @@ Re-check this list after upgrading.
   `dropRestoredFocus()` in `dialogs.ts` blurs the restored cell, so the
   caller's focus is a real one. Never rely on dialog focus restoration for
   a math-field.
+- **WebKitGTK: Esc didn't close the settings dialog** (2026-10-25), from
+  Ctrl+, or from Ctrl+P, even though focus stayed in it and ↑/↓ worked.
+  Chromium closes it fine. WebKit hands a key to its editor
+  (`Editor::handleKeyboardEvent`, on GTK the input-method key bindings)
+  before its default Esc handling closes a modal dialog. If the editor
+  marks the key as handled, the dialog never closes. `openDialog()` in
+  `dialogs.ts` therefore closes every dialog on Esc itself. Don't rely on
+  the browser's own Esc for a `<dialog>`.
+- **A `<dialog>`'s `close` event can arrive after it reopened** (2026-10-25).
+  Esc, then a quick Ctrl+P: Chrome handles the input before the queued
+  `close` event, so the event reaches the search dialog while it is open
+  again. It ran the old opening's cancel (focus back to the cell), and focus
+  left the new dialog. This happened only on the slower CI machines.
+  `openDialog()` settles a close it makes itself at once, and ignores a
+  `close` while the dialog is open. The templates scenario forces the race
+  with synthetic keys.
 - **WebKitGTK (Linux) navigation:**
   - MathLive's `move-out` event is unreliable at the top and bottom rows,
     so ↑/↓ also move between cells when the caret provably did not move.

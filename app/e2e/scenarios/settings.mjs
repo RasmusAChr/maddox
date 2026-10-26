@@ -1,0 +1,101 @@
+// The settings dialog (Ctrl+,): tabs, changing values, theme, reopening the
+// last notebook.
+
+export default async ({ page, check, waitIdle, setAndRun, approxOf, chip, settled, focusedSetting, focusedTab, settingsOpen, closeSettings, openSettingsAt }) => {
+  // Settings (Ctrl+,): tabs on the left (↑/↓, Enter or → goes in); inside,
+  // ↑/↓ choose, ←/→ change at once, Esc back to the tabs; Esc there closes.
+  await setAndRun(String.raw`9\pi`);
+  await page.keyboard.press("Control+,");
+  await page.waitForSelector("#settings-dialog[open]");
+  check("Ctrl+, opens settings on the tab list, first tab", (await focusedTab()) === "Notebook" && !!(await page.$('#settings-dialog .setting[data-id="angle"]')), await focusedTab());
+  await page.keyboard.press("ArrowDown");
+  check("↓ picks the next tab and shows its settings", (await focusedTab()) === "Answers" && !!(await page.$('#settings-dialog .setting[data-id="digits"]')) && !(await page.$('#settings-dialog .setting[data-id="angle"]')), await focusedTab());
+  await page.keyboard.press("Enter");
+  check("Enter goes into the tab", (await focusedSetting()) === "answer-mode", await focusedSetting());
+  check("the foot shows the keys for inside a tab", /back to the tabs/.test(await page.textContent("#settings-dialog .dialog-foot")), await page.textContent("#settings-dialog .dialog-foot"));
+  await page.keyboard.press("Escape");
+  check("Esc inside a tab goes back to the tabs", (await settingsOpen()) && (await focusedTab()) === "Answers", await focusedTab());
+  await page.keyboard.press("ArrowRight");
+  check("→ goes into the tab too", (await focusedSetting()) === "answer-mode", await focusedSetting());
+  await closeSettings();
+  await page.keyboard.press("Control+,");
+  await page.waitForSelector("#settings-dialog[open]");
+  check("settings reopen on the last tab", (await focusedTab()) === "Answers", await focusedTab());
+  await openSettingsAt("digits");
+  await page.keyboard.press("ArrowRight");
+  await settled();
+  check("→ on digits gives 8 digits at once", (await approxOf("9\\pi"))?.includes("28.274334"), await approxOf("9\\pi"));
+  check("the dialog stays open while changing", await page.isVisible("#settings-dialog[open]"));
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  check("↑ moves to the answers setting", (await focusedSetting()) === "answer-mode", await focusedSetting());
+  await page.keyboard.press("ArrowRight");
+  await settled();
+  check("Exact only hides the decimal", (await approxOf("9\\pi")) === null, await approxOf("9\\pi"));
+  await page.keyboard.press("ArrowLeft");
+  await settled();
+  check("Exact + decimal shows it again with 6 digits", (await approxOf("9\\pi"))?.includes("28.2743") && !(await approxOf("9\\pi")).includes("28.27433"), await approxOf("9\\pi"));
+  await openSettingsAt("theme");
+  await page.keyboard.press("ArrowRight");
+  check("Theme → Light sets the theme", (await page.evaluate(() => document.documentElement.dataset.theme)) === "light");
+  await page.keyboard.press("ArrowRight");
+  const darkBg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--sheet").trim());
+  check("Theme → Dark switches the colours", darkBg === "#1c1d21", darkBg);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  check("Theme → System follows the system again", (await page.evaluate(() => document.documentElement.dataset.theme)) === undefined);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  check("Esc, Esc closes settings back into the cell", !(await page.isVisible("#settings-dialog[open]")) && (await page.evaluate(() => document.activeElement?.tagName === "MATH-FIELD")));
+  await page.keyboard.type("5");
+  check("typing works after settings closed", (await page.evaluate(() => document.activeElement?.value)) === "5", await page.evaluate(() => document.activeElement?.value));
+  await page.keyboard.press("Backspace");
+  // Opened from Ctrl+P, Esc closes it too (it didn't in WebKitGTK; see openDialog).
+  await page.keyboard.press("Control+p");
+  await page.keyboard.type("settings");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector("#settings-dialog[open]");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  check("Ctrl+P Settings, then Esc, closes it back into the cell", !(await page.isVisible("dialog[open]")) && (await page.evaluate(() => document.activeElement?.tagName === "MATH-FIELD")));
+  await page.click('[data-action="settings"]');
+  await page.waitForSelector("#settings-dialog[open]");
+  check("the gear button opens settings", await page.isVisible("#settings-dialog[open]"));
+  await page.click('#settings-dialog .settings-tab[data-section="Notebook"]');
+  check("clicking a tab shows it", (await focusedTab()) === "Notebook" && !!(await page.$('#settings-dialog .setting[data-id="angle"]')));
+  await page.click('#settings-dialog [data-id="angle"] .seg button:last-child');
+  await settled();
+  check("clicking Radians changes the notebook's mode", (await chip()) === "RAD", await chip());
+  await page.click('#settings-dialog [data-id="angle"] .seg button:first-child');
+  await settled();
+  await closeSettings();
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("maddox.prefs") ?? "{}"));
+  check("settings are remembered", stored.digits === 6 && stored.answerMode === "auto" && stored.theme === "system", JSON.stringify(stored));
+  // Reopen last notebook: Off starts empty, but unsaved work is still restored.
+  await page.waitForTimeout(150);
+  await openSettingsAt("reopen");
+  await page.keyboard.press("ArrowRight");
+  await closeSettings();
+  await page.waitForTimeout(150);
+  const cleanSave = page.waitForEvent("download", { timeout: 5000 }).catch(() => null);
+  await page.keyboard.press("Control+s");
+  await cleanSave;
+  await page.waitForTimeout(200);
+  await page.reload();
+  await page.waitForSelector("math-field");
+  await waitIdle();
+  const afterReload = await page.$$eval(".entry math-field", (els) => els.map((e) => e.value));
+  check("Reopen last: Off starts an empty notebook", afterReload.length === 1 && afterReload[0] === "", JSON.stringify(afterReload));
+  await page.waitForTimeout(300);
+  await page.keyboard.type("7*6");
+  await page.keyboard.press("Enter");
+  await waitIdle();
+  await page.waitForTimeout(700); // autosave waits 400 ms
+  await page.reload();
+  await page.waitForSelector("math-field");
+  const unsavedKept = await page.$$eval(".entry math-field", (els) => els.map((e) => e.value));
+  check("…but unsaved work is still restored", unsavedKept.some((v) => v.includes("7") && v.includes("6")), JSON.stringify(unsavedKept));
+  await page.evaluate(() => localStorage.removeItem("maddox.prefs"));
+};

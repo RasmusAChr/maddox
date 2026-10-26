@@ -35,7 +35,16 @@ docs updated, a short report of what changed.
   options first, as above.
 - **Small, explicit instructions** ("rename this", "commit this") need no
   proposal: just do them.
-- **Never commit or push unless asked.** `legacy_python` stays on the remote.
+- **Branches** (decided 2026-10-25):
+  - `main` is the latest release. It changes only through a pull request
+    from `development`, when the owner makes a release.
+  - `development` collects finished work. Merge or commit into it when
+    the owner says so.
+  - Feature branches `fix/<short-name>` or `feature/<short-name>` are cut
+    from `development`, one per bug or feature. You may commit and push
+    freely on them.
+  - Never commit to `main` or open a release pull request unless asked.
+    `legacy_python` stays on the remote.
 
 ## Product rules (decided by the owner — don't change without asking)
 
@@ -77,6 +86,14 @@ docs updated, a short report of what changed.
   `docs/decisions/0008-graphs.md`.
 - **% is always hundredths**: `20%` is 0.2, so `150+20%` is 150.2 (as on
   the Nspire and in Excel, not a shop calculator). Decided 2026-10-23.
+- **Names never convert by themselves; Tab takes a suggestion.** After
+  two letters of a name, the best match shows in grey after the caret
+  (`so` → `lve(…, x)`): your own names first, nearest above, then
+  functions, then Greek letters. Tab takes it, Esc hides it. `sin`, `pi`,
+  `solve` typed without Tab stay letters (they still compute), so
+  `determinant` and `solution1` can be typed. Only notation converts as
+  you type (`:=`, `<=`, `->`, `dx`, `30deg`). Decided 2026-10-26, see
+  `docs/decisions/0011-suggestions.md`.
 - **Letters typed together are one name** (`xy`, `XTy`), except: in a
   definition `f(p) := …` an undefined name ending in p is a product
   (`ab₀` with p = b₀ is a·b₀), and in graphs an undefined name with x in it
@@ -85,9 +102,12 @@ docs updated, a short report of what changed.
   owner decided this on 2026-10-23: students learn the international
   convention. Commas separate arguments and list items. Don't add a
   decimal-comma mode.
-- **One settings dialog (Ctrl+, or ⚙).** Sections: this notebook (angles),
-  answers (exact/decimal/both, solve style, digits), appearance (theme,
-  zoom), startup and files. ↑/↓ choose, ←/→ change, changes apply at once,
+- **One settings dialog (Ctrl+, or ⚙)** with tabs on the left (decided
+  2026-10-25): Notebook (angles), Answers (exact/decimal/both, solve style,
+  digits), Appearance (theme, centring, zoom), Startup & updates. It opens
+  on the tab list, at the last tab used. ↑/↓ choose a tab and Enter or →
+  goes in. Inside a tab, ↑/↓ choose, ←/→ change (← never goes back), and
+  Esc returns to the tabs; Esc there closes. Changes apply at once, with
   no Save. Everything except the angle is a preference of this computer
   (`app/src/settings.ts`, key `maddox.prefs`). A new setting is one entry
   in `settingsList()` in `main.ts`. Keep the quick ways (chip, shortcuts,
@@ -107,6 +127,20 @@ docs updated, a short report of what changed.
   cells below that use r (and what they define); a deleted definition is
   cleared. Changed results flash briefly. Top to bottom only. Decided
   2026-10-24, see `docs/decisions/0007-recalculation.md`.
+- **Undo is one history for the whole notebook.** Ctrl+Z takes back the
+  last change wherever it was (delete a word, then the cell: the first
+  Ctrl+Z brings the cell back, the second the word); Ctrl+Y or
+  Ctrl+Shift+Z redoes. Typing comes back a word at a time. A restored cell
+  comes back with its results, and what it defined applies again. Cells
+  are never reordered. Graph-panel rows keep their own undo for now.
+  Decided 2026-10-26, see `docs/decisions/0010-undo.md`.
+- **Export is print/PDF and copying a result.** Ctrl+Shift+P opens the
+  system print dialog (which saves PDFs): only the notebook, laid out like
+  the screen (results right, leaders), light colours, the notebook's name
+  and the date on top, empty cells left out. Ctrl+Shift+C copies the
+  caret's line's result as plain text (`1/2 ≈ 0.5`); Ctrl+P has "Copy
+  result as LaTeX". No Markdown/LaTeX document export for now. Decided
+  2026-10-26, see `docs/decisions/0012-export.md`.
 - **Updates are offered, never forced.** The desktop app checks GitHub at
   startup and once a day (Settings can turn it off); a newer version shows
   `↑ 0.2.0` in the status bar and "Install Maddox 0.2.0" in Ctrl+P. Enter
@@ -125,20 +159,36 @@ npm install          # also fetches Giac into public/giac/ (sha256-pinned)
 npm test             # vitest: converter + real-Giac integration tests
 npx tsc --noEmit
 npm run dev          # browser at http://localhost:1420
-npm run e2e          # keyboard-driven smoke test; needs a dev server on :1420
+npm run e2e          # keyboard-driven e2e scenarios; needs a dev server on :1420
+npm run e2e -- graphs settings   # only those scenarios
 npm run tauri dev    # desktop window
 npm run tauri build  # installers in src-tauri/target/release/bundle/
 npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md)
 ```
 
-- **Keep `CHANGELOG.md` current**: add what users notice to the top
-  section (`## Unreleased` until a release names it). Its text is shown in
-  the update dialog.
+- **Every fix or feature gets its own `CHANGELOG.md` section** with the
+  next version number, committed on its branch (decided 2026-10-25).
+  Use semantic versioning: a fix bumps the patch (1.0.0 → 1.0.1), new or
+  changed behaviour the minor (→ 1.1.0), a file format older versions
+  can't open the major. Write what users notice, in plain words, under
+  `### New`, `### Improved` or `### Fixed` (`### Behind the scenes` for
+  what users don't notice); say what works now, not how it broke. A
+  release's notes are all sections since the previous release, merged by
+  heading, and they are shown in the update dialog.
 
-- **After any UI or keyboard change**, run `npm run e2e`.
-  `app/e2e/smoke.mjs` is the executable spec of the behaviour the owner
-  asked for. Add a check for every new behaviour. The same script can drive
-  the built desktop app (see its header).
+- **After any UI or keyboard change**, run `npm run e2e`. The scenarios in
+  `app/e2e/scenarios/` are the executable spec of the behaviour the owner
+  asked for. Add a check for every new behaviour, in the scenario it
+  belongs to. Each scenario starts on a fresh page (empty notebook and
+  settings), so it must set up what it needs. Shared helpers are in
+  `e2e/lib.mjs`, and a new scenario goes in the list in `e2e/run.mjs`.
+  While working, run only the scenario you touch, then all of them before
+  committing. The same runner can drive the built desktop app (see the
+  header of `run.mjs`).
+- **Keep the scenarios fast.** A slow cell (e.g. the 15 s `ifactor` the
+  basics scenario cancels) must not stay in a notebook that is re-run
+  later. Each "re-run everything" would compute it again; that once made
+  the whole run take 5 minutes.
 - **Linux (WebKitGTK) can only be verified in CI**
   (`.github/workflows/app.yml`, Windows + Ubuntu). Check the run after
   pushing UI changes.
@@ -175,6 +225,9 @@ npm run release -- 1.2.3   # owner only: version, commit, tag (docs/releasing.md
 | `app/src/notebook/notebook.ts` | cells, keys, per-line evaluation, recalculation, result layout |
 | `app/src/engine/dependencies.ts` | names a line assigns and uses (for recalculation) |
 | `app/src/notebook/lines.ts` | multi-line cells, `#` text lines |
+| `app/src/notebook/suggestions.ts`, `suggest-field.ts` | grey name suggestions: what matches, and the grey text + Tab in a field |
+| `app/src/notebook/plain-text.ts` | a result as plain text for the clipboard (Ctrl+Shift+C); printing is `print()` in `main.ts` |
+| `app/src/notebook/history.ts` | the notebook-wide undo/redo history (steps live in `notebook.ts`) |
 | `app/src/notebook/matrix.ts`, `mathlive-internals.ts` | matrix editing; all MathLive private access |
 | `app/src/ui/commands.ts` | every template and its category (sidebar + search) |
 | `app/src/ui/templates.ts`, `dialogs.ts`, `search.ts` | sidebar, Ctrl+P / matrix / help dialogs, matching |

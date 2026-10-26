@@ -1,12 +1,16 @@
-import { MathfieldElement, convertLatexToMarkup } from "mathlive";
+import { MathfieldElement, convertLatexToAsciiMath, convertLatexToMarkup } from "mathlive";
 import type { Engine } from "../engine/engine";
 import type { AnswerMode, EvalResult, PlotResult } from "../engine/giac-session";
 import { lineNames } from "../engine/dependencies";
 import { ANS_VARIABLE, latexToGiac, UnsupportedLatex } from "../engine/latex-to-giac";
-import { OPERATOR_NAMES } from "../ui/commands";
+import { CATALOG } from "../ui/commands";
 import { Graph, type View } from "./graph";
 import { unlocalise } from "./plot-items";
 import { isTextLine, splitLines } from "./lines";
+import { History, typingOf, type Typing } from "./history";
+import { tidyAsciiMath } from "./plain-text";
+import { attachSuggestions } from "./suggest-field";
+import { definedSuggestion, functionSuggestions, SYMBOLS, type Suggestion } from "./suggestions";
 import { editMatrix, matrixAtCaret, matrixLatex, type MatrixAction, type MatrixInfo } from "./matrix";
 import { atLineStart, breakLine, caretLine, deleteAtBrackets, fillEmptyMatrixCells, focusImmediately, lineBoxes, moveByWord, type LineBox } from "./mathlive-internals";
 
@@ -39,7 +43,17 @@ type Entry = {
   views: Record<number, View>;
   /** Slider values, by line index; saved with the cell. */
   sliders: Record<number, Record<string, number>>;
+  /** The text as the undo history last saw it, and the caret in it. */
+  recorded: Snapshot;
 };
+
+type Snapshot = { latex: string; position: number };
+
+/** One step of the notebook's undo history. */
+type Step =
+  | { kind: "edit"; entry: Entry; before: Snapshot; after: Snapshot; join: { owner: Entry; typing: Typing; at: number } }
+  | { kind: "insert" | "delete"; entry: Entry; index: number }
+  | { kind: "answers"; entry: Entry; before: Answers | null; after: Answers | null };
 
 /** A cell's own answer form, overriding the global setting. */
 export type Answers = "exact" | "approx";
@@ -53,21 +67,18 @@ export type Cell = {
 };
 
 // Shortcuts MathLive applies while typing. Its defaults include surprises for
-// a calculator (e.g. "in" becomes ∈), so start from a short allowlist.
+// a calculator (e.g. "in" becomes ∈), so start from a short allowlist: only
+// notation. Names (sin, pi, solve…) never convert by themselves, so a name
+// that starts with one can be typed (determinant, pick); a grey suggestion
+// shows instead, and Tab takes it (suggestions.ts).
 const KEPT_SHORTCUTS = [
-  "alpha", "delta", "Delta", "pi", "Pi", "theta", "Theta", "infty", "oo",
-  "sqrt", "int", "sum", "prod", "lim", "dx", "dy", "dt",
-  "sin", "cos", "tan", "arcsin", "arccos", "arctan", "sinh", "cosh", "tanh", "cot", "sec", "csc",
-  "ln", "<=", ">=", "!=", ":=", "->",
+  "<=", ">=", "!=", ":=", "->",
+  "dx", "dy", "dt", // ∫ … dx
   "deg", // after a number: 30deg becomes 30°
 ];
-const EXTRA_SHORTCUTS: Record<string, string> = {
-  log: "\\log", // MathLive's default asks for a base; log is base 10 here.
-  beta: "\\beta", gamma: "\\gamma", lambda: "\\lambda", mu: "\\mu", sigma: "\\sigma",
-  omega: "\\omega", phi: "\\phi", epsilon: "\\epsilon", rho: "\\rho", tau: "\\tau",
-  // The last case of a piecewise function reads as a word, not a variable.
-  otherwise: "\\text{otherwise}",
-};
+
+/** The catalog's functions, for suggestions. */
+const FUNCTIONS = functionSuggestions(CATALOG);
 
 const MATRIX_KEYS: Record<string, MatrixAction> = {
   ArrowUp: "addRowAbove",
@@ -96,6 +107,17 @@ export class Notebook {
   answerMode: AnswerMode = "auto";
   /** Settings: scroll so the current cell is never below the middle of the window. */
   centreCell = true;
+  /** Ctrl+Z / Ctrl+Y: every change to the cells, in order, whichever cell it was in. */
+  private history = new History<Step>();
+  /** What the key being handled does to the text, for joining undo steps. */
+  private typing: Typing = null;
+  /** Undo or redo is changing the cells: don't record that as a new step. */
+  private restoring = false;
+  /**
+   * A Ctrl+Z (or Ctrl+Y) that is still held: its key keeps undoing until it
+   * is released, even if the repeats arrive without Ctrl (docs/gotchas.md).
+   */
+  private held: { key: string; action: "undo" | "redo" } | null = null;
   private resizeObserver = new ResizeObserver((records) => {
     for (const r of records) {
       const entry = this.entries.find((e) => e.el === r.target);
@@ -118,6 +140,10 @@ export class Notebook {
     // Positions measured before the maths fonts arrive are wrong; redo them.
     document.fonts?.addEventListener("loadingdone", () => this.relayout());
     void document.fonts?.ready.then(() => this.relayout());
+    window.addEventListener("keyup", (e) => {
+      if (this.held && e.key.toLowerCase() === this.held.key) this.held = null;
+    }, { capture: true });
+    window.addEventListener("blur", () => (this.held = null));
     engine.onRestart = () => {
       this.recalculation++;
       for (const e of this.entries) if (e.evaluatedLatex !== null) e.el.classList.add("stale");
@@ -150,6 +176,7 @@ export class Notebook {
     this.container.replaceChildren();
     this.entries = [];
     this.active = null;
+    this.history.clear();
     const list = cells.length ? cells : [{ latex: "" }];
     list.forEach((cell, i) => this.createEntry(cell.latex, i, cell.answers ?? null, cell.views, cell.sliders));
   }
@@ -160,7 +187,13 @@ export class Notebook {
    * the global setting. Saved with the cell; re-runs it.
    */
   toggleAnswers(entry = this.active ?? this.entries[this.entries.length - 1]) {
-    entry.answers = entry.answers ? null : this.answerMode === "approx" ? "exact" : "approx";
+    const answers = entry.answers ? null : this.answerMode === "approx" ? "exact" : "approx";
+    this.history.push({ kind: "answers", entry, before: entry.answers, after: answers }, () => {});
+    this.setAnswers(entry, answers);
+  }
+
+  private setAnswers(entry: Entry, answers: Answers | null) {
+    entry.answers = answers;
     this.showAnswersChip(entry);
     this.onMessage(
       entry.answers === "approx" ? "This cell shows decimals. Alt+Enter switches back."
@@ -201,6 +234,25 @@ export class Notebook {
   /** Returns focus to the entry being edited, caret unchanged. */
   refocus() {
     focusImmediately((this.active ?? this.entries[this.entries.length - 1]).mf);
+  }
+
+  /**
+   * Ctrl+Shift+C: the result of the caret's line as shown (exact, then
+   * ≈ decimal), as plain text or LaTeX. Null when the line has none.
+   */
+  resultAtCaret(format: "text" | "latex"): string | null {
+    const entry = this.active;
+    const result = entry?.results[caretLine(entry.mf)];
+    if (!result || result === "pending" || !result.ok || "plot" in result) return null;
+    const forms = result.approxLatex ? [result.latex, result.approxLatex] : [result.latex];
+    if (format === "latex") return forms.join(" \\approx ");
+    return forms.map((latex) => tidyAsciiMath(convertLatexToAsciiMath(latex))).join(" ≈ ");
+  }
+
+  /** Printing: empty cells are left out (marked "blank" while `on`); results are placed for the print width. */
+  preparePrint(on: boolean) {
+    for (const e of this.entries) e.el.classList.toggle("blank", on && !e.mf.value.trim());
+    this.relayout();
   }
 
   /** Inserts LaTeX at the caret of the entry being edited. */
@@ -249,20 +301,26 @@ export class Notebook {
     graphsEl.className = "entry-graphs";
     el.append(mf, resultEl, graphsEl, chip);
 
-    const entry: Entry = { el, mf, resultEl, evaluatedLatex: null, results: [], answers, chip, graphsEl, graphs: new Map(), views: { ...views }, sliders: { ...sliders } };
+    const entry: Entry = {
+      el, mf, resultEl, evaluatedLatex: null, results: [], answers, chip, graphsEl, graphs: new Map(),
+      views: { ...views }, sliders: { ...sliders }, recorded: { latex: "", position: 0 },
+    };
     chip.addEventListener("click", () => this.toggleAnswers(entry));
     this.showAnswersChip(entry);
-    const next = this.entries[index];
-    this.container.insertBefore(el, next ? next.el : null);
-    this.entries.splice(index, 0, entry);
-    // MathLive rejects option access until the field is in the document.
-    this.configure(mf);
+    this.attach(entry, index);
+    // Before the cell's own keys, so Tab takes a suggestion first.
+    attachSuggestions(mf, () => [this.namesAbove(entry), FUNCTIONS, SYMBOLS], () => {
+      // Taking a suggestion is an undo step of its own, even right after typing.
+      this.record(entry);
+      this.typing = null;
+      this.history.seal();
+    });
     const style = document.createElement("style");
     style.textContent = FIELD_CSS;
     mf.shadowRoot?.append(style);
     mf.value = latex;
     fillEmptyMatrixCells(mf);
-    this.resizeObserver.observe(el);
+    entry.recorded = { latex: mf.value, position: 0 };
 
     mf.addEventListener("keydown", (e) => this.onKeyDown(entry, e), { capture: true });
     mf.addEventListener("move-out", (e) => this.onMoveOut(entry, e as CustomEvent));
@@ -277,10 +335,29 @@ export class Notebook {
       this.active = entry;
       this.emitContext(entry);
     });
-    mf.addEventListener("selection-change", () => this.emitContext(entry));
+    mf.addEventListener("selection-change", () => {
+      // Where an undo of the next change puts the caret back.
+      if (mf.value === entry.recorded.latex) entry.recorded.position = mf.position;
+      this.emitContext(entry);
+    });
+    // A click moves the caret: what is typed next is a new undo step.
+    mf.addEventListener("pointerdown", () => {
+      this.history.seal();
+      this.held = null;
+    });
+    // Text that arrives while Ctrl+Z is held (a repeat without Ctrl, or an
+    // input method's commit) is not typed; MathLive listens further in.
+    for (const type of ["beforeinput", "input"]) {
+      mf.addEventListener(type, (e) => {
+        if (!this.held) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }, { capture: true });
+    }
     mf.addEventListener("input", () => {
       // Deleting a matrix cell's content (or its box) leaves it empty; refill it.
       fillEmptyMatrixCells(mf);
+      this.record(entry);
       el.classList.toggle("stale", entry.evaluatedLatex !== null && mf.value !== entry.evaluatedLatex);
       // Lines move as you type; keep results and leader dots beside them.
       requestAnimationFrame(() => this.layoutResults(entry));
@@ -289,13 +366,63 @@ export class Notebook {
     return entry;
   }
 
+  /** Grey suggestions in a graph-panel row: every name the notebook defines, then functions. */
+  suggestIn(mf: MathfieldElement) {
+    attachSuggestions(mf, () => [this.namesAbove(null), FUNCTIONS, SYMBOLS]);
+  }
+
+  /** Names the evaluated cells above `entry` define (all cells for null), nearest first. */
+  private namesAbove(entry: Entry | null): Suggestion[] {
+    const end = entry ? this.entries.indexOf(entry) : this.entries.length;
+    const seen = new Set<string>();
+    const out: Suggestion[] = [];
+    for (const e of this.entries.slice(0, Math.max(0, end)).reverse()) {
+      for (const s of this.definitions(e)) {
+        if (seen.has(s.name)) continue;
+        seen.add(s.name);
+        out.push(s);
+      }
+    }
+    return out;
+  }
+
+  private defined = new WeakMap<Entry, { latex: string; names: Suggestion[] }>();
+
+  /** What one evaluated cell defines, last line first (cached until it runs again). */
+  private definitions(entry: Entry): Suggestion[] {
+    const latex = entry.evaluatedLatex;
+    if (latex === null) return [];
+    const cached = this.defined.get(entry);
+    if (cached?.latex === latex) return cached.names;
+    const names: Suggestion[] = [];
+    for (const line of splitLines(latex).reverse()) {
+      if (!line || isTextLine(line)) continue;
+      let giac: string;
+      try {
+        giac = latexToGiac(line);
+      } catch {
+        continue;
+      }
+      const fn = giac.match(/^\s*([A-Za-z]\w*)\(([^()]*)\)\s*:=/);
+      if (fn) {
+        const s = definedSuggestion(fn[1], fn[2].split(",").map((p) => p.trim()).filter(Boolean));
+        if (s) names.push(s);
+        continue;
+      }
+      for (const name of lineNames(giac).assigns) {
+        const s = definedSuggestion(name);
+        if (s) names.push(s);
+      }
+    }
+    this.defined.set(entry, { latex, names });
+    return names;
+  }
+
   /** Shortcuts and keybindings for a math field (the cells, and the graph panel's rows). */
   configure(mf: MathfieldElement) {
     if (!this.shortcuts) {
       const defaults = mf.inlineShortcuts as Record<string, any>;
-      const kept = Object.fromEntries(KEPT_SHORTCUTS.filter((k) => k in defaults).map((k) => [k, defaults[k]]));
-      const names = Object.fromEntries(OPERATOR_NAMES.map((n) => [n, `\\operatorname{${n}}`]));
-      this.shortcuts = { ...kept, ...EXTRA_SHORTCUTS, ...names };
+      this.shortcuts = Object.fromEntries(KEPT_SHORTCUTS.filter((k) => k in defaults).map((k) => [k, defaults[k]]));
     }
     mf.inlineShortcuts = this.shortcuts;
     mf.smartFence = true;
@@ -312,14 +439,30 @@ export class Notebook {
     });
   }
 
+  /** Puts an entry's element in the notebook at `index` (a new one, or one brought back by undo). */
+  private attach(entry: Entry, index: number) {
+    const next = this.entries[index];
+    this.container.insertBefore(entry.el, next ? next.el : null);
+    this.entries.splice(index, 0, entry);
+    // MathLive rejects option access until the field is in the document, and
+    // rebuilds the field from its attributes alone when it is put back.
+    this.configure(entry.mf);
+    this.resizeObserver.observe(entry.el);
+  }
+
+  private detach(entry: Entry) {
+    this.resizeObserver.unobserve(entry.el);
+    entry.el.remove();
+    this.entries.splice(this.entries.indexOf(entry), 1);
+    if (this.active === entry) this.active = null;
+  }
+
   private removeEntry(entry: Entry) {
     const index = this.entries.indexOf(entry);
     if (index < 0 || this.entries.length === 1) return;
     const defined = entry.evaluatedLatex === null ? [] : [...cellNames(entry.evaluatedLatex).assigns];
-    this.resizeObserver.unobserve(entry.el);
-    entry.el.remove();
-    this.entries.splice(index, 1);
-    if (this.active === entry) this.active = null;
+    if (!this.restoring) this.history.push({ kind: "delete", entry, index }, () => {});
+    this.detach(entry);
     this.focus(this.entries[Math.max(0, index - 1)], index > 0 ? "end" : "start");
     this.onChange();
     // Its definitions go with it: the cells that used them recalculate.
@@ -327,7 +470,9 @@ export class Notebook {
   }
 
   private insertEntryAfter(entry: Entry): Entry {
-    const created = this.createEntry("", this.entries.indexOf(entry) + 1);
+    const index = this.entries.indexOf(entry) + 1;
+    const created = this.createEntry("", index);
+    this.history.push({ kind: "insert", entry: created, index }, () => {});
     this.focus(created, "start");
     this.onChange();
     return created;
@@ -407,7 +552,28 @@ export class Notebook {
     };
     const mod = e.ctrlKey || e.metaKey;
 
-    if (e.key.toLowerCase() === "u" && mod && !e.altKey && !e.shiftKey) {
+    // A change that fired no "input" (a matrix box refilled) is a step of its own.
+    this.record(entry);
+    const key = e.key.toLowerCase();
+    if (this.held && !e.altKey && (key === this.held.key || key === "process" || key === "unidentified")) {
+      claim();
+      this[this.held.action]();
+      return;
+    }
+    if (mod && !e.altKey && (key === "z" || key === "y")) {
+      claim();
+      this.held = { key, action: key === "y" || e.shiftKey ? "redo" : "undo" };
+      this[this.held.action]();
+      return;
+    }
+    this.typing = typingOf(e);
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Tab"].includes(e.key)) this.history.seal();
+    requestAnimationFrame(() => {
+      this.record(entry);
+      this.typing = null;
+    });
+
+    if (key === "u" && mod && !e.altKey && !e.shiftKey) {
       claim();
       this.setUnitMode(entry, !this.unitMode);
       return;
@@ -416,6 +582,11 @@ export class Notebook {
       claim();
       return;
     }
+
+    // Typing \ opens MathLive's LaTeX mode and its list of suggestions
+    // (\alp → \alpha): there Enter and Tab accept one and ↑/↓ choose. Leave
+    // those keys to MathLive, or Enter would evaluate the half-typed command.
+    if (entry.mf.mode === "latex" && !mod && !e.altKey && ["Enter", "Tab", "ArrowUp", "ArrowDown"].includes(e.key)) return;
 
     if (e.key === "Enter" && e.altKey && !mod && !e.shiftKey) {
       claim();
@@ -466,7 +637,12 @@ export class Notebook {
 
     // Deleting a matrix cell's box fires no "input" event, so check after
     // every deletion too.
-    if (e.key === "Backspace" || e.key === "Delete") requestAnimationFrame(() => fillEmptyMatrixCells(entry.mf));
+    if (e.key === "Backspace" || e.key === "Delete") {
+      requestAnimationFrame(() => {
+        fillEmptyMatrixCells(entry.mf);
+        this.record(entry, true);
+      });
+    }
 
     if ((e.key === "Backspace" || e.key === "Delete") && !e.shiftKey && !e.altKey && deleteAtBrackets(entry.mf, e.key, mod)) {
       claim();
@@ -478,7 +654,7 @@ export class Notebook {
       this.removeEntry(entry);
       return;
     }
-    if (e.key === "Backspace" && !mod && entry.mf.value === "" && this.entries.length > 1) {
+    if (e.key === "Backspace" && !e.altKey && entry.mf.value === "" && this.entries.length > 1) {
       claim();
       this.removeEntry(entry);
       return;
@@ -562,6 +738,96 @@ export class Notebook {
     }
     this.setUnitMode(entry, false);
     return e.key === " " || e.key === "Escape";
+  }
+
+  // ---- undo -----------------------------------------------------------------
+
+  /**
+   * Records a change to the entry's text as an undo step, joined to the step
+   * before while typing a word or deleting (history.ts). `fixup`: a box put
+   * back in an emptied matrix cell belongs to the step that emptied it.
+   */
+  private record(entry: Entry, fixup = false) {
+    if (this.restoring) return;
+    const latex = entry.mf.value;
+    if (latex === entry.recorded.latex) return;
+    const after = { latex, position: entry.mf.position };
+    const last = this.history.last;
+    if (fixup && last?.kind === "edit" && last.entry === entry) {
+      last.after = after;
+    } else {
+      const step: Step = { kind: "edit", entry, before: entry.recorded, after, join: { owner: entry, typing: this.typing, at: Date.now() } };
+      this.history.push(step, (into, joined) => {
+        if (into.kind === "edit" && joined.kind === "edit") into.after = joined.after;
+      });
+    }
+    entry.recorded = { ...after };
+  }
+
+  /** Ctrl+Z: takes back the last change, in whichever cell it was. */
+  undo() {
+    if (this.active) this.record(this.active);
+    const step = this.history.undo();
+    if (step) this.apply(step, "undo");
+    else this.onMessage("Nothing to undo.");
+  }
+
+  /** Ctrl+Y or Ctrl+Shift+Z: puts back what undo took. */
+  redo() {
+    if (this.active) this.record(this.active);
+    const step = this.history.redo();
+    if (step) this.apply(step, "redo");
+    else this.onMessage("Nothing to redo.");
+  }
+
+  private apply(step: Step, direction: "undo" | "redo") {
+    const back = direction === "undo";
+    this.restoring = true;
+    try {
+      if (step.kind === "edit") this.setText(step.entry, back ? step.before : step.after);
+      else if (step.kind === "answers") this.setAnswers(step.entry, back ? step.before : step.after);
+      else if ((step.kind === "insert") === back) this.removeEntry(step.entry);
+      else if (step.kind === "insert") {
+        this.attach(step.entry, Math.min(step.index, this.entries.length));
+        this.focus(step.entry, "end");
+        this.onChange();
+      } else void this.restore(step.entry, step.index);
+    } finally {
+      this.restoring = false;
+    }
+  }
+
+  private setText(entry: Entry, to: Snapshot) {
+    entry.mf.value = to.latex;
+    fillEmptyMatrixCells(entry.mf);
+    entry.recorded = { latex: entry.mf.value, position: to.position };
+    entry.el.classList.toggle("stale", entry.evaluatedLatex !== null && entry.mf.value !== entry.evaluatedLatex);
+    requestAnimationFrame(() => this.layoutResults(entry));
+    this.onChange();
+    this.active = entry;
+    ensureFocused(entry.mf, () => {
+      focusImmediately(entry.mf);
+      entry.mf.position = to.position;
+    });
+    this.keepInView(entry);
+    this.emitContext(entry);
+  }
+
+  /**
+   * Undoing a delete: the cell comes back as it was, results included. What
+   * it defined applies again, so it runs again, and so do the cells below
+   * that use it (the reverse of removeEntry).
+   */
+  private async restore(entry: Entry, index: number) {
+    this.attach(entry, Math.min(index, this.entries.length));
+    this.focus(entry, "end");
+    this.onChange();
+    if (entry.evaluatedLatex === null) return;
+    const names = cellNames(entry.evaluatedLatex);
+    if (!names.assigns.size && !names.stateful) return;
+    await this.rerun(entry);
+    if (!this.entries.includes(entry)) return;
+    await this.recalculateFrom(this.entries.indexOf(entry) + 1, new Set(names.assigns), [], names.stateful);
   }
 
   // ---- evaluation ---------------------------------------------------------

@@ -37,16 +37,21 @@
 | Ctrl+U | cell | Type a unit (upright): / stays inline, * is ·, Space / Esc / Ctrl+U ends it |
 | Alt+Enter | cell | Show this cell's answers as decimals (exact ones when the setting is "Decimals only"), or follow the setting again. Saved with the cell, marked ≈ (or =) |
 | Ctrl+Shift+Enter | anywhere | Run all (resets the engine first) |
+| Ctrl+Shift+C | cell | Copy the result of the caret's line as plain text (as LaTeX: Ctrl+P "Copy result as LaTeX"). See 0012 |
+| Ctrl+Shift+P | anywhere | Print, or save as PDF from the print dialog |
 | ↑ / ↓ at the first or last line | cell | Previous / next cell |
 | Ctrl+← / Ctrl+→ | cell | Jump by word: a run of letters or digits, an operator, a function name, or a whole structure such as `(…)`, a fraction or a matrix. At a group's edge, leave the group |
 | Shift+Ctrl+← / → | cell | Select by the same jumps |
-| Backspace in an empty cell | cell | Delete the cell |
+| Backspace or Ctrl+Backspace in an empty cell | cell | Delete the cell |
 | Ctrl+Shift+Backspace | cell | Delete the cell |
+| Ctrl+Z | cell | Undo the last change in the notebook, whichever cell it was in: typing (a word or a run of deletions at a time), a new or deleted cell, Alt+Enter. The caret goes to it. See 0010 |
+| Ctrl+Y / Ctrl+Shift+Z | cell | Redo |
 | Esc | while computing | Cancel (restarts the engine, clearing variables) |
 | Ctrl+M | anywhere | Matrix size dialog (Tab between fields, Enter inserts) |
 | Alt+↓/↑, Alt+→/← | in a matrix | Add a row below/above, a column right/left |
 | Alt+Shift+↓/→ | in a matrix | Delete the current row / column |
-| Tab | cell | Next empty box |
+| Tab | cell | Take the grey suggestion after two letters of a name (see 0011); with none showing, next empty box |
+| Esc | cell, suggestion showing | Hide the suggestion until the next letter |
 | Backspace / Delete at a bracket edge | cell | Empty brackets: delete the call. Otherwise: select the call, press again to delete |
 | Ctrl+Backspace / Ctrl+Delete at a bracket edge | cell | Delete the whole call |
 | Ctrl+P (or Ctrl+K) | anywhere | Search templates and app actions |
@@ -57,7 +62,8 @@
 | Enter / D / Esc | "Save changes?" dialog | Save / don't save / cancel. Shown before New, Open, opening a recent or launch file, and closing the window, whenever there are unsaved changes |
 | Ctrl+Shift+A (or the DEG/RAD chip) | anywhere | Switch degrees / radians for this notebook, then re-run everything |
 | Ctrl+, (or the ⚙ button) | anywhere | Settings |
-| ↑ / ↓, ← / →, Enter, Esc | settings dialog | Choose a setting; change it (applies at once); press a button (Clear recent files); close, back to the cell |
+| ↑ / ↓, Enter or →, Esc | settings: tab list | Choose a tab (its settings show at once); go into it; close, back to the cell |
+| ↑ / ↓, ← / →, Enter, Esc | settings: inside a tab | Choose a setting; change it (applies at once); press a button (Clear recent files); back to the tab list |
 | Ctrl++ (or Ctrl+=) / Ctrl+− / Ctrl+0 | anywhere | Zoom in / out / reset (remembered; matched by character, so `+` works on Danish and US layouts alike) |
 | F1 (or Ctrl+/) | anywhere | Shortcut list |
 

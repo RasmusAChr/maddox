@@ -24,9 +24,18 @@ available alongside the binaries.
 
 ## Each release
 
-1. Write the notes: rename `## Unreleased` at the top of `CHANGELOG.md`
-   to `## 1.2.3` (or add that section), in plain words for students. The app shows it in the update dialog.
-2. Commit everything, then in `app/`: `npm run release -- 1.2.3`. It writes
+Work happens on feature branches, which are merged into `development`.
+`main` is always the latest release (see "Branches" in `CLAUDE.md`).
+
+1. Check the notes on `development`. Every fix or feature already has its
+   own `CHANGELOG.md` section with its own version (see the top of that
+   file), so the release version is the top section's. The release notes
+   are every section since the previous release's tag, merged under one
+   "New", "Improved" and "Fixed" heading each ("Behind the scenes" is left
+   out). Preview them with `node scripts/release.mjs --notes 1.2.3`.
+2. Open a pull request from `development` to `main`, let CI pass, and
+   merge it. Then `git switch main && git pull`, and in `app/`:
+   `npm run release -- 1.2.3`. It writes
    the version into `package.json` and `Cargo.toml` (`tauri.conf.json`
    reads it from `package.json`), commits "Release 1.2.3" and tags
    `v1.2.3`. It refuses without notes, with uncommitted changes, or if the
@@ -37,6 +46,9 @@ available alongside the binaries.
 4. Look at the draft on GitHub, and install one of its files if you like.
    Press **Publish**. From then on, running copies see the update within a
    day (at their next start, or at their daily check).
+5. Bring the "Release 1.2.3" commit back:
+   `git switch development && git merge main && git push`. This keeps
+   the version in `development` in step with `main`.
 
 ## The engine mirror
 

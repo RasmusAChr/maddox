@@ -5,22 +5,45 @@ import { queryWords, score, type Searchable } from "./search";
  * the returned `finish`. finish() runs its action synchronously: the "close"
  * event fires a task later, after focus is already back in the entry, and a
  * key typed in between would land before the inserted text.
+ *
+ * Closing is settled at once whenever we close the dialog ourselves (Esc,
+ * finish). Only a close by the browser waits for the "close" event. That
+ * event can arrive late: after Esc, a quick Ctrl+P reopened the search before
+ * it came (Chrome handles input first). If it then ran the old opening's
+ * cancel, focus left the new dialog and the typed query went nowhere.
  */
 export function openDialog(dialog: HTMLDialogElement, onCancel: () => void) {
   let finished = false;
-  dialog.addEventListener(
-    "close",
-    () => {
-      if (finished) return;
-      dropRestoredFocus();
-      onCancel();
-    },
-    { once: true },
-  );
+  let settled = false;
+  const settle = () => {
+    if (settled) return;
+    settled = true;
+    dialog.removeEventListener("keydown", onEscape);
+    dialog.removeEventListener("close", onClose);
+    if (finished) return;
+    dropRestoredFocus();
+    onCancel();
+  };
+  // Esc closes the dialog here rather than by the browser's own handling:
+  // in WebKitGTK (Linux) the settings dialog ignored Esc, even though focus
+  // stayed in it.
+  const onEscape = (e: KeyboardEvent) => {
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    e.preventDefault();
+    dialog.close();
+    settle();
+  };
+  // A late "close" from an earlier opening finds the dialog open again: not ours.
+  const onClose = () => {
+    if (!dialog.open) settle();
+  };
+  dialog.addEventListener("keydown", onEscape);
+  dialog.addEventListener("close", onClose);
   dialog.showModal();
   return (action: () => void) => {
     finished = true;
     dialog.close();
+    settle();
     dropRestoredFocus();
     action();
     // An action that focuses nothing (Run all, Save as…): back to the notebook.
@@ -200,7 +223,7 @@ export function askUpdate(dialog: HTMLDialogElement, version: string, current: s
     dialog.querySelector(".update-version")!.textContent = version;
     dialog.querySelector(".update-current")!.textContent = current;
     const notesEl = dialog.querySelector<HTMLElement>(".update-notes")!;
-    notesEl.textContent = notes.trim();
+    notesEl.textContent = notes.trim().replace(/^#+ /gm, ""); // plain text: "### Fixed" shows as "Fixed"
     notesEl.hidden = !notes.trim();
     const finish = openDialog(dialog, () => resolve(false));
     for (const button of dialog.querySelectorAll<HTMLButtonElement>("button[data-choice]")) {

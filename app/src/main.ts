@@ -27,7 +27,10 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)
 
 const engine = new Engine(new URL("giac/giacwasm.js", document.baseURI).href);
 const notebook = new Notebook($("#sheet"), engine);
-const panel = new GraphPanel($("#graph-panel"), engine, (mf) => notebook.configure(mf));
+const panel = new GraphPanel($("#graph-panel"), engine, (mf) => {
+  notebook.configure(mf);
+  notebook.suggestIn(mf);
+});
 void applyZoom();
 
 // Room to scroll the last cell up off the bottom edge, but only once the
@@ -254,27 +257,27 @@ function toggleSolveStyle() {
 function settingsList(): Setting[] {
   return [
     {
-      kind: "choice", id: "angle", section: "This notebook", label: "Angles",
-      hint: "For sin, cos, tan and their inverses. Saved in the notebook. Ctrl+Shift+A",
+      kind: "choice", id: "angle", section: "Notebook", label: "Angles",
+      hint: "For sin, cos, tan and their inverses. Saved in this notebook; Ctrl+Shift+A",
       options: [{ value: "deg", label: "Degrees" }, { value: "rad", label: "Radians" }],
       get: () => angle,
       set: (v) => v !== angle && toggleAngle(),
     },
     {
-      kind: "choice", id: "answer-mode", section: "Answers (this computer)", label: "Answers",
+      kind: "choice", id: "answer-mode", section: "Answers", label: "Answers",
       hint: "Exact answers, decimals, or both",
       options: [{ value: "auto", label: "Exact + decimal" }, { value: "exact", label: "Exact only" }, { value: "approx", label: "Decimals only" }],
       get: () => prefs.answerMode,
       set: (v) => setAnswerPref("answerMode", v as AnswerMode),
     },
     {
-      kind: "choice", id: "solve-style", section: "Answers (this computer)", label: "Solve answers",
+      kind: "choice", id: "solve-style", section: "Answers", label: "Solve answers",
       options: [{ value: "textbook", label: "x = 2 or x = 3" }, { value: "sets", label: "x ∈ {2, 3}" }],
       get: () => prefs.solveStyle,
       set: (v) => setAnswerPref("solveStyle", v as SolveStyle),
     },
     {
-      kind: "choice", id: "digits", section: "Answers (this computer)", label: "Decimal digits",
+      kind: "choice", id: "digits", section: "Answers", label: "Decimal digits",
       hint: "Significant digits; approx(…, n) still gives n",
       options: DIGIT_CHOICES.map((d) => ({ value: String(d), label: String(d) })),
       get: () => String(prefs.digits),
@@ -309,28 +312,28 @@ function settingsList(): Setting[] {
       },
     },
     {
-      kind: "choice", id: "reopen", section: "Startup and files", label: "Reopen last notebook",
+      kind: "choice", id: "reopen", section: "Startup & updates", label: "Reopen last notebook",
       hint: "Off starts empty; unsaved work is always restored",
       options: [{ value: "on", label: "On" }, { value: "off", label: "Off" }],
       get: () => (prefs.reopenLast ? "on" : "off"),
       set: (v) => setPref("reopenLast", v === "on"),
     },
     {
-      kind: "action", id: "recent", section: "Startup and files", label: "Recent files",
+      kind: "action", id: "recent", section: "Startup & updates", label: "Recent files",
       hint: isTauri ? "The list behind Ctrl+Shift+O" : "Kept in the desktop app",
       button: () => (recentFiles().length ? `Clear ${recentFiles().length}` : "Empty"),
       enabled: () => recentFiles().length > 0,
       run: clearRecentFiles,
     },
     {
-      kind: "choice", id: "check-updates", section: "Startup and files", label: "Check for updates",
+      kind: "choice", id: "check-updates", section: "Startup & updates", label: "Check for updates",
       hint: "At startup and once a day; nothing installs without asking",
       options: [{ value: "on", label: "On" }, { value: "off", label: "Off" }],
       get: () => (prefs.checkUpdates ? "on" : "off"),
       set: (v) => setPref("checkUpdates", v === "on"),
     },
     {
-      kind: "action", id: "version", section: "Startup and files", label: `Maddox ${appVersion}`,
+      kind: "action", id: "version", section: "Startup & updates", label: `Maddox ${appVersion}`,
       hint: canUpdate ? "Ctrl+P: Check for updates" : "Updates come with the desktop app",
       button: () => (update ? `Install ${update.version}` : "Check now"),
       enabled: () => canUpdate,
@@ -557,7 +560,12 @@ function searchItems(): SearchItem[] {
       "solve answers format style sets textbook equations",
     ),
     action("Type a unit", "Letters typed next are a unit (5 m/s), upright; Space ends it", () => notebook.startUnit(), "Ctrl+U", "units metre meter second km/h kg newton convert physics"),
+    action("Undo", "Take back the last change, in whichever cell it was", () => notebook.undo(), "Ctrl+Z", "undo revert back restore deleted cell"),
+    action("Redo", "Put back what Undo took", () => notebook.redo(), "Ctrl+Y", "redo again"),
     action("Switch this cell: exact / decimal", "Show this cell's answers in the other form, or follow the setting again", () => notebook.toggleAnswers(), "Alt+Enter", "approximate approx decimal exact numeric evalf cell answers"),
+    action("Print / Save as PDF", "The notebook on paper, or as a PDF from the print dialog", print, "Ctrl+Shift+P", "print pdf export paper hand in"),
+    action("Copy result", "The result of the caret's line, as plain text", () => copyResult(), "Ctrl+Shift+C", "copy clipboard result answer text export"),
+    action("Copy result as LaTeX", "The result of the caret's line, for LaTeX or Overleaf", () => copyResult("latex"), undefined, "copy clipboard result latex tex overleaf export"),
     action("Settings", "Angles, answers, digits, theme, zoom, startup", settings, "Ctrl+,", "preferences options configure theme digits"),
     ...(update ? [action(`Install Maddox ${update.version}`, "Download the new version and restart", () => void offerUpdate(), undefined, "update upgrade install new version")] : []),
     action("Check for updates", `You have Maddox ${appVersion}`, () => void lookForUpdate(true), undefined, "update upgrade new version release download about"),
@@ -566,6 +574,71 @@ function searchItems(): SearchItem[] {
     action("About Maddox", `Version ${appVersion}, licences, source code`, about, undefined, "about version licence license gpl giac credits source copyright"),
   ];
   return [...recentItems(), ...templates, ...actions];
+}
+
+// ---- export: print / PDF, copy a result ------------------------------------------
+
+/**
+ * Ctrl+Shift+P: the system's print dialog, which also saves a PDF. The page
+ * switches to a fixed print width first, so results and their leaders are
+ * placed where they will print (paper is always light: style.css), then
+ * switches back.
+ */
+function print() {
+  const root = document.documentElement;
+  $("#print-title").textContent = $("#doc-name").textContent ?? "";
+  $("#print-date").textContent = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  root.classList.add("printing");
+  (document.activeElement as HTMLElement | null)?.blur(); // no caret or selection on paper
+  notebook.preparePrint(true);
+  let done = false;
+  let started = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    root.classList.remove("printing");
+    notebook.preparePrint(false);
+    refocus();
+  };
+  window.addEventListener("beforeprint", () => (started = true), { once: true });
+  window.addEventListener("afterprint", finish, { once: true });
+  requestAnimationFrame(() => {
+    window.print();
+    // WebKitGTK: print() waits for the dialog, and Cancel sends neither
+    // beforeprint nor afterprint, so nothing more will come.
+    if (!started) return finish();
+    // A webview that never reports the end: the next key or click.
+    setTimeout(() => {
+      window.addEventListener("keydown", finish, { once: true, capture: true });
+      window.addEventListener("pointerdown", finish, { once: true, capture: true });
+    });
+  });
+}
+
+/** Ctrl+Shift+C: the result of the caret's line to the clipboard (Ctrl+P: as LaTeX). */
+function copyResult(format: "text" | "latex" = "text") {
+  const text = notebook.resultAtCaret(format);
+  if (text === null) return showMessage("This line has no result to copy.");
+  void writeClipboard(text).then((ok) => showMessage(ok ? `Copied: ${text}` : "Couldn't copy to the clipboard."));
+}
+
+async function writeClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Older webviews: copy from a hidden text field, then give the keyboard back.
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    refocus();
+    return ok;
+  }
 }
 
 function matrix() {
@@ -641,6 +714,8 @@ window.addEventListener(
     if (e.shiftKey && e.key === "Enter") return run(ACTIONS["run-all"]);
     if (e.shiftKey && key === "a") return run(toggleAngle);
     if (e.key === ",") return run(settings);
+    if (e.shiftKey && key === "p") return run(print);
+    if (e.shiftKey && key === "c") return run(() => copyResult());
     if (key === "p" || key === "k") return run(search);
     // By character, not physical key: on a Danish keyboard "+" has its own
     // key (whose code is "Minus"), on a US one it is "=".

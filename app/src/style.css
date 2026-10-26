@@ -1075,27 +1075,58 @@ dialog h2 {
 /* ---- settings (Ctrl+,) ---- */
 
 .settings-dialog {
-  width: min(640px, calc(100vw - 32px));
+  width: min(760px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   margin-top: 8vh;
+}
+
+/* Tabs on the left (one per section), that tab's settings on the right. */
+.settings-body {
+  display: grid;
+  grid-template-columns: minmax(150px, 22%) 1fr;
+  gap: 8px;
+  padding: 12px 10px 10px;
+}
+
+.settings-tabs {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding-right: 8px;
+  border-right: 1px solid var(--border);
+}
+
+.settings-tab {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.settings-tab[aria-selected="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.settings-tab:focus {
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 .settings-dialog > h2 {
   padding: 16px 18px 0;
 }
 
+/* A fixed height, so switching tabs doesn't make the dialog jump. */
 .settings-list {
-  max-height: calc(100vh - 200px);
+  height: min(330px, calc(100vh - 200px));
   overflow-y: auto;
-  padding: 0 10px 10px;
-}
-
-.settings-section {
-  margin: 14px 8px 4px;
-  color: var(--muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .setting {
@@ -1630,4 +1661,132 @@ body.with-graph-panel .notebook {
   color: var(--accent);
   user-select: all;
   word-break: break-all;
+}
+
+/* A grey suggestion after the caret (suggest-field.ts): Tab takes it. */
+.suggestion-ghost {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  white-space: nowrap;
+  color: var(--muted);
+  opacity: 0.75;
+  font-family: "KaTeX_Main", "Times New Roman", serif;
+}
+.suggestion-ghost[hidden] {
+  display: none;
+}
+
+/* ---- printing (Ctrl+Shift+P) ------------------------------------------------
+   main.ts adds .printing while the print dialog is
+   open: a fixed width and maths size, so the results and leaders placed on
+   screen land in the same spots on paper. 680px is 180 mm: A4 less margins. */
+.print-header {
+  display: none;
+}
+
+html.printing {
+  --math-size: 1.3rem;
+}
+
+html.printing .sheet,
+html.printing .print-header {
+  width: 680px;
+}
+
+/* Hidden before the layout, so no leader points at it. */
+html.printing .graph-note {
+  display: none;
+}
+
+@page {
+  margin: 15mm;
+}
+
+@media print {
+  /* Paper is always light: the light tokens again, above the dark theme's
+     selectors. The screen never switches theme (WebKitGTK repainted the
+     switch badly around its print dialog). */
+  :root:root:root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface-2: #f0f0ed;
+    --text: #1d1d1f;
+    --muted: #6b6b70;
+    --border: #e3e3df;
+    --accent: #3b5bdb;
+    --accent-soft: #e8edfd;
+    --result: #1f6f50;
+    --error: #c0392b;
+    --error-soft: #fdecea;
+    --kbd-bg: #ffffff;
+    --page: #eeeeea;
+    --sheet: #ffffff;
+    --active: #f6f7fc;
+    --rule: #ecece8;
+    --leader: #cfcfc8;
+    --plot-1: #2f6fdb;
+    --plot-2: #d9480f;
+    --plot-3: #2b8a3e;
+    --plot-4: #9c36b5;
+    --plot-5: #c2255c;
+    --plot-6: #0b7285;
+    color-scheme: light;
+  }
+  html,
+  body {
+    height: auto;
+  }
+  body {
+    display: block;
+    overflow: visible;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .topbar,
+  .statusbar,
+  .templates,
+  .graph-panel,
+  dialog,
+  .suggestion-ghost,
+  .entry.blank,
+  .graph-readout {
+    display: none !important;
+  }
+  .workspace {
+    display: block;
+  }
+  .notebook {
+    overflow: visible;
+    background: none;
+  }
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 0 6mm;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .sheet,
+  .notebook.tall .sheet {
+    margin: 0;
+    overflow: visible;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .entry {
+    break-inside: avoid;
+  }
+  .entry:focus-within {
+    border-left-color: transparent;
+    background: none;
+  }
+  .answers-chip {
+    border: none;
+    background: none;
+  }
 }
