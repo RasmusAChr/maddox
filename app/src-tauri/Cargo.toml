@@ -1,6 +1,6 @@
 [package]
 name = "maddox"
-version = "1.0.0"
+version = "1.5.2"
 description = "A keyboard-first CAS notebook"
 license = "GPL-3.0-or-later"
 edition = "2021"
