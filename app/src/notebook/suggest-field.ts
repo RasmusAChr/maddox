@@ -42,7 +42,7 @@ function ghostEl(): HTMLElement {
  * replacing the letters; Esc hides it until the next letter. Register this
  * before the field's other keydown handlers, so Tab and Esc go here first.
  */
-export function attachSuggestions(mf: MathfieldElement, lists: () => Suggestion[][]) {
+export function attachSuggestions(mf: MathfieldElement, lists: () => Suggestion[][], onAccept: () => void = () => {}) {
   let current: { start: number; suggestion: Suggestion } | null = null;
   let dismissedAt = -1;
 
@@ -95,6 +95,7 @@ export function attachSuggestions(mf: MathfieldElement, lists: () => Suggestion[
       e.stopImmediatePropagation();
       const { start } = word;
       hide();
+      onAccept();
       mf.selection = { ranges: [[start, mf.position]], direction: "forward" };
       // No focus option: the field has it, and MathLive's delayed refocus
       // could swallow the keys typed right after Tab.

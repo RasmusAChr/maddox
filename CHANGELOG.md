@@ -8,6 +8,11 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. So write them for students, in
 plain words. See `docs/releasing.md`.
 
+## 1.5.1
+
+- Pressing Tab for a suggestion right after typing, then Ctrl+Z, took
+  back the letters too. Now Ctrl+Z goes back to just the letters.
+
 ## 1.5.0
 
 - Print your notebook, or save it as a PDF, with Ctrl+Shift+P. The page

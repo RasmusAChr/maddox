@@ -203,6 +203,13 @@ export default async ({ page, check, waitIdle, entries, active, current, setAndR
   await page.keyboard.press("Control+z");
   await page.waitForTimeout(80);
   check("Ctrl+Z goes back to the letters", (await current()) === "so", await current());
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("so");
+  await page.keyboard.press("Tab"); // at once, in the same frame as the last letter
+  await page.keyboard.press("Control+z");
+  await page.waitForTimeout(80);
+  check("Tab right after typing is still its own undo step", (await current()) === "so", await current());
   await page.keyboard.type("lution");
   check("solution: no name starts so, no suggestion", (await ghost()) === null, await ghost());
   await page.keyboard.type("1:=12");

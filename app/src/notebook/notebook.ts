@@ -309,7 +309,12 @@ export class Notebook {
     this.showAnswersChip(entry);
     this.attach(entry, index);
     // Before the cell's own keys, so Tab takes a suggestion first.
-    attachSuggestions(mf, () => [this.namesAbove(entry), FUNCTIONS, SYMBOLS]);
+    attachSuggestions(mf, () => [this.namesAbove(entry), FUNCTIONS, SYMBOLS], () => {
+      // Taking a suggestion is an undo step of its own, even right after typing.
+      this.record(entry);
+      this.typing = null;
+      this.history.seal();
+    });
     const style = document.createElement("style");
     style.textContent = FIELD_CSS;
     mf.shadowRoot?.append(style);
