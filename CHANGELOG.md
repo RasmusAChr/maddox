@@ -8,7 +8,9 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. See `docs/releasing.md`.
 
 Users read these notes, so write for students, in plain words: what they
-can do now, not what went wrong before or how it was fixed. Sort each
+can do now, not what went wrong before or how it was fixed. Keep each
+bullet to one short sentence or two; the docs and the F1 help have the
+details. Sort each
 bullet under one of these headings, in this order:
 
 - `### New`: something you couldn't do before.
@@ -17,52 +19,54 @@ bullet under one of these headings, in this order:
 - `### Behind the scenes`: changes users don't notice (build, tests).
   Kept here for developers; left out of the release notes.
 
+A fix to something that hasn't been released yet (it came in a section
+since the last release's tag) goes under `### Behind the scenes`: no user
+ever met that bug. If it changes what the feature does, reword the
+feature's own bullet instead.
+
 ## 1.5.2
 
-### Fixed
+### Behind the scenes
 
-- Printing on Linux: the top bar no longer flickers, and cancelling the
-  print dialog brings the notebook straight back.
+- Printing (new in 1.5.0) on Linux: the top bar no longer flickers, and
+  cancelling the print dialog brings the notebook straight back.
 
 ## 1.5.1
 
-### Fixed
+### Behind the scenes
 
-- Ctrl+Z right after taking a suggestion with Tab takes back only the
-  suggestion, not the letters you typed.
+- Ctrl+Z right after taking a suggestion (new in 1.4.0) with Tab takes
+  back only the suggestion, not the letters you typed.
 
 ## 1.5.0
 
 ### New
 
-- Print your notebook, or save it as a PDF, with Ctrl+Shift+P. The page
-  shows only your calculations, laid out like on screen, with the
-  notebook's name and the date on top.
-- Ctrl+Shift+C copies the result of the line you are on, as plain text
-  (`1/2 ≈ 0.5`). Ctrl+P → "Copy result as LaTeX" copies it as LaTeX.
+- Print your notebook or save it as a PDF with Ctrl+Shift+P.
+- Copy the answer on your line with Ctrl+Shift+C.
 
 ## 1.4.0
 
 ### New
 
-- Suggestions while you type: after two letters, the best match shows in
-  grey (`so` → `solve(…, x)`, a name you defined, or a Greek letter like
-  `th` → θ). Tab takes it, Esc hides it. Functions such as `sin`, `pi` and
-  `sqrt` now come from Tab or the sidebar.
+- Suggestions as you type: after two letters, Maddox suggests a name or
+  function in grey. Press Tab to use it.
 
 ### Improved
 
-- Names stay as you type them, so `determinant` or `solution1` are one
-  name instead of turning into a function halfway.
-- Backspace on an empty box of a function (from the sidebar or Tab)
-  deletes the whole function, not just its brackets.
+- Backspace in an empty box of a function deletes the whole function.
+
+### Fixed
+
+- Long names like `determinant` no longer turn into functions while you
+  type them.
 
 ## 1.3.0
 
 ### New
 
-- About Maddox (Ctrl+P, "about") shows the version, the licences, and
-  where to find the source code of Maddox and its maths engine.
+- About Maddox (search "about" in Ctrl+P) shows the version and the
+  licences.
 
 ### Behind the scenes
 
@@ -71,26 +75,24 @@ bullet under one of these headings, in this order:
 
 ## 1.2.2
 
-### Fixed
+### Behind the scenes
 
-- Holding Ctrl+Z on Linux keeps undoing until you let go, instead of
-  sometimes typing z's into the notebook.
+- Holding Ctrl+Z (the notebook-wide undo, new in 1.2.0) on Linux keeps
+  undoing until you let go, instead of sometimes typing z's into the
+  notebook.
 
 ## 1.2.1
 
-### Improved
+### Fixed
 
-- Ctrl+Backspace in an empty cell deletes the cell, like Backspace.
+- Ctrl+Backspace deletes an empty cell, like Backspace does.
 
 ## 1.2.0
 
 ### New
 
-- Undo and redo across the whole notebook: Ctrl+Z takes back the last
-  change wherever it was, and Ctrl+Y (or Ctrl+Shift+Z) redoes it. Delete
-  a word and then the whole cell: the first Ctrl+Z brings the cell back,
-  the second the word. Typing comes back a word at a time, and a cell you
-  bring back keeps its answers.
+- Undo and redo anything in the notebook with Ctrl+Z and Ctrl+Y, even a
+  deleted cell.
 
 ## 1.1.2
 
@@ -103,28 +105,27 @@ bullet under one of these headings, in this order:
 
 ### Fixed
 
-- The search (Ctrl+P) always gets your typing, even when you open it
-  right after pressing Esc.
+- Typing in the search (Ctrl+P) works when you open it right after
+  pressing Esc.
 
 ## 1.1.0
 
 ### Improved
 
-- Settings are sorted into tabs: Notebook, Answers, Appearance, and
-  Startup & updates. ↑/↓ pick a tab, Enter opens it, Esc goes back.
+- Settings are split into tabs, so they are easier to find.
 
 ## 1.0.2
 
-### Improved
+### Fixed
 
-- Enter takes a suggested command such as `\alpha` (after typing `\alp`)
+- Enter picks a suggested symbol (typing `\alp` suggests `\alpha`)
   instead of running the cell.
 
 ## 1.0.1
 
-### Improved
+### Fixed
 
-- Esc closes Settings on Linux too.
+- Esc closes Settings on Linux.
 
 ## 1.0.0
 
