@@ -1617,3 +1617,48 @@ body.with-graph-panel .notebook {
 .panel-sliders:empty {
   display: none;
 }
+
+/* About Maddox (Ctrl+P): version, licences, where the source is. */
+.about-dialog {
+  width: min(680px, 100vw - 32px);
+  max-height: min(86vh, 900px);
+  padding: 22px 24px 18px;
+  outline: none;
+}
+
+.about-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.about-dialog h3 {
+  margin: 16px 0 4px;
+  font-size: 1.15rem;
+}
+
+.about-dialog p,
+.about-parts {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.about-dialog p + p {
+  margin-top: 8px;
+}
+
+.about-parts dt {
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.about-parts dd {
+  margin: 0 0 0 16px;
+  color: var(--muted);
+}
+
+.about-url {
+  color: var(--accent);
+  user-select: all;
+  word-break: break-all;
+}

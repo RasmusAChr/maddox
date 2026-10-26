@@ -8,6 +8,13 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. So write them for students, in
 plain words. See `docs/releasing.md`.
 
+## 1.3.0
+
+- About Maddox (Ctrl+P, "about") shows the version, the licences, and
+  where the source code of Maddox and its maths engine can be found.
+- Maddox downloads its maths engine from its own GitHub release, so
+  building it no longer depends on a university server being up.
+
 ## 1.2.2
 
 - Holding Ctrl+Z on Linux could type "zzzz" into a cell that undo had
@@ -50,3 +57,7 @@ plain words. See `docs/releasing.md`.
 ## 1.0.1
 
 - Esc closes Settings on Linux. Before, it did nothing there.
+
+## 1.0.0
+
+The first release of Maddox, a keyboard-first maths notebook.
