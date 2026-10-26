@@ -8,6 +8,11 @@ section since the previous release: they become the GitHub Release text
 and are shown in the app's update dialog. So write them for students, in
 plain words. See `docs/releasing.md`.
 
+## 1.2.2
+
+- Holding Ctrl+Z on Linux could type "zzzz" into a cell that undo had
+  just brought back. Holding it now keeps undoing until you let go.
+
 ## 1.2.1
 
 - Ctrl+Backspace in an empty cell deletes the cell, like Backspace does.

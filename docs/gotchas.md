@@ -96,6 +96,13 @@ Re-check this list after upgrading.
   claimed in the cells' key handler for the notebook-wide history
   (`history.ts`), so MathLive never sees them there. The graph panel's rows
   still use MathLive's.
+- **A held Ctrl+Z can repeat as a plain z (Linux, fcitx5 on Wayland).**
+  Holding Ctrl+Z until undo brought back a deleted cell typed "zzzz" into
+  it: once the keyboard moved to the restored (rebuilt) field, the repeats
+  arrived without Ctrl. Not reproducible in Chromium, nor in WebKitGTK with
+  GTK's plain input method (driven on a Broadway display). So the notebook
+  remembers a held Ctrl+Z / Ctrl+Y until that key's keyup: every press of
+  it (or a `Process` key) undoes, and text arriving meanwhile is dropped.
 - **Matrix results need `pmatrix`.** Giac's `\left(\begin{array}…\right)`
   renders with misaligned brackets and pastes back as uneditable.
   `cleanLatex()` rewrites it to `pmatrix`.

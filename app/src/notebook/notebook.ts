@@ -113,6 +113,11 @@ export class Notebook {
   private typing: Typing = null;
   /** Undo or redo is changing the cells: don't record that as a new step. */
   private restoring = false;
+  /**
+   * A Ctrl+Z (or Ctrl+Y) that is still held: its key keeps undoing until it
+   * is released, even if the repeats arrive without Ctrl (docs/gotchas.md).
+   */
+  private held: { key: string; action: "undo" | "redo" } | null = null;
   private resizeObserver = new ResizeObserver((records) => {
     for (const r of records) {
       const entry = this.entries.find((e) => e.el === r.target);
@@ -135,6 +140,10 @@ export class Notebook {
     // Positions measured before the maths fonts arrive are wrong; redo them.
     document.fonts?.addEventListener("loadingdone", () => this.relayout());
     void document.fonts?.ready.then(() => this.relayout());
+    window.addEventListener("keyup", (e) => {
+      if (this.held && e.key.toLowerCase() === this.held.key) this.held = null;
+    }, { capture: true });
+    window.addEventListener("blur", () => (this.held = null));
     engine.onRestart = () => {
       this.recalculation++;
       for (const e of this.entries) if (e.evaluatedLatex !== null) e.el.classList.add("stale");
@@ -306,7 +315,19 @@ export class Notebook {
       this.emitContext(entry);
     });
     // A click moves the caret: what is typed next is a new undo step.
-    mf.addEventListener("pointerdown", () => this.history.seal());
+    mf.addEventListener("pointerdown", () => {
+      this.history.seal();
+      this.held = null;
+    });
+    // Text that arrives while Ctrl+Z is held (a repeat without Ctrl, or an
+    // input method's commit) is not typed; MathLive listens further in.
+    for (const type of ["beforeinput", "input"]) {
+      mf.addEventListener(type, (e) => {
+        if (!this.held) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }, { capture: true });
+    }
     mf.addEventListener("input", () => {
       // Deleting a matrix cell's content (or its box) leaves it empty; refill it.
       fillEmptyMatrixCells(mf);
@@ -458,10 +479,15 @@ export class Notebook {
     // A change that fired no "input" (a matrix box refilled) is a step of its own.
     this.record(entry);
     const key = e.key.toLowerCase();
+    if (this.held && !e.altKey && (key === this.held.key || key === "process" || key === "unidentified")) {
+      claim();
+      this[this.held.action]();
+      return;
+    }
     if (mod && !e.altKey && (key === "z" || key === "y")) {
       claim();
-      if (key === "y" || e.shiftKey) this.redo();
-      else this.undo();
+      this.held = { key, action: key === "y" || e.shiftKey ? "redo" : "undo" };
+      this[this.held.action]();
       return;
     }
     this.typing = typingOf(e);

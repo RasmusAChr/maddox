@@ -27,6 +27,20 @@ export default async ({ page, check, waitIdle, current, entries, setAndRun, resu
   await redo();
   check("typing after undo drops what could be redone", (await current()) === "12+7", await current());
 
+  // Holding Ctrl+Z keeps undoing until Z is released, even when the repeats
+  // arrive without Ctrl (fcitx5 on Wayland sent plain z's after undo moved
+  // the keyboard to a restored cell, and they were typed).
+  await page.keyboard.type("+8+9");
+  await page.keyboard.down("Control");
+  await page.keyboard.down("z");
+  await page.keyboard.up("Control");
+  for (let i = 0; i < 3; i++) await page.keyboard.down("z"); // repeats, now without Ctrl
+  await page.keyboard.up("z");
+  check("repeats of a held Ctrl+Z undo, not type z", (await current()) === "12+7", await current());
+  await page.keyboard.type("z");
+  check("after Z is released, z types again", (await current()) === "12+7z", await current());
+  await undo();
+
   // The owner's example: delete a word, then the cell. The first Ctrl+Z
   // brings the cell back, the second the word.
   await page.keyboard.press("Control+Enter");
