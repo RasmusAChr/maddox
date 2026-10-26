@@ -557,6 +557,8 @@ function searchItems(): SearchItem[] {
       "solve answers format style sets textbook equations",
     ),
     action("Type a unit", "Letters typed next are a unit (5 m/s), upright; Space ends it", () => notebook.startUnit(), "Ctrl+U", "units metre meter second km/h kg newton convert physics"),
+    action("Undo", "Take back the last change, in whichever cell it was", () => notebook.undo(), "Ctrl+Z", "undo revert back restore deleted cell"),
+    action("Redo", "Put back what Undo took", () => notebook.redo(), "Ctrl+Y", "redo again"),
     action("Switch this cell: exact / decimal", "Show this cell's answers in the other form, or follow the setting again", () => notebook.toggleAnswers(), "Alt+Enter", "approximate approx decimal exact numeric evalf cell answers"),
     action("Settings", "Angles, answers, digits, theme, zoom, startup", settings, "Ctrl+,", "preferences options configure theme digits"),
     ...(update ? [action(`Install Maddox ${update.version}`, "Download the new version and restart", () => void offerUpdate(), undefined, "update upgrade install new version")] : []),

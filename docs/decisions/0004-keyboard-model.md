@@ -40,8 +40,10 @@
 | ↑ / ↓ at the first or last line | cell | Previous / next cell |
 | Ctrl+← / Ctrl+→ | cell | Jump by word: a run of letters or digits, an operator, a function name, or a whole structure such as `(…)`, a fraction or a matrix. At a group's edge, leave the group |
 | Shift+Ctrl+← / → | cell | Select by the same jumps |
-| Backspace in an empty cell | cell | Delete the cell |
+| Backspace or Ctrl+Backspace in an empty cell | cell | Delete the cell |
 | Ctrl+Shift+Backspace | cell | Delete the cell |
+| Ctrl+Z | cell | Undo the last change in the notebook, whichever cell it was in: typing (a word or a run of deletions at a time), a new or deleted cell, Alt+Enter. The caret goes to it. See 0010 |
+| Ctrl+Y / Ctrl+Shift+Z | cell | Redo |
 | Esc | while computing | Cancel (restarts the engine, clearing variables) |
 | Ctrl+M | anywhere | Matrix size dialog (Tab between fields, Enter inserts) |
 | Alt+↓/↑, Alt+→/← | in a matrix | Add a row below/above, a column right/left |

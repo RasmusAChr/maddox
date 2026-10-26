@@ -87,6 +87,22 @@ Re-check this list after upgrading.
     power on the last unit comes out after the group (`\mathrm{m/s}^2`),
     and the converter gives it to that last unit;
   - inline shortcuts still fire (deg → °), so unit mode turns them off.
+- **A math-field taken out of the page and put back is rebuilt.** On
+  reconnect MathLive makes a new internal field from the element's
+  attribute options only: `keybindings` and `inlineShortcuts` set from
+  code are gone, and so is its own undo history. Undo puts a deleted cell
+  back by re-attaching its element, so `attach()` runs `configure()` again.
+- **MathLive's own undo is per field.** Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z are
+  claimed in the cells' key handler for the notebook-wide history
+  (`history.ts`), so MathLive never sees them there. The graph panel's rows
+  still use MathLive's.
+- **A held Ctrl+Z can repeat as a plain z (Linux, fcitx5 on Wayland).**
+  Holding Ctrl+Z until undo brought back a deleted cell typed "zzzz" into
+  it: once the keyboard moved to the restored (rebuilt) field, the repeats
+  arrived without Ctrl. Not reproducible in Chromium, nor in WebKitGTK with
+  GTK's plain input method (driven on a Broadway display). So the notebook
+  remembers a held Ctrl+Z / Ctrl+Y until that key's keyup: every press of
+  it (or a `Process` key) undoes, and text arriving meanwhile is dropped.
 - **Matrix results need `pmatrix`.** Giac's `\left(\begin{array}…\right)`
   renders with misaligned brackets and pastes back as uneditable.
   `cleanLatex()` rewrites it to `pmatrix`.
